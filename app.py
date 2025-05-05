@@ -1,0 +1,47 @@
+import streamlit as st
+from PIL import Image
+
+# Config
+st.set_page_config(page_title="ITB Carbon Dashboard", layout="wide", initial_sidebar_state="expanded")
+
+# Load logo
+logo = Image.open("assets/logo_itb.png")
+
+# Sidebar - Custom
+with st.sidebar:
+    st.image(logo, width=100)
+    st.markdown("### ITB Carbon Dashboard")
+    st.markdown("Monitoring campus carbon emissions using dynamic visualizations.")
+    st.markdown("---")
+    selected_page = st.radio("Menu", [
+        "Overview", "Transportation", "Electronic", "Food Waste", "Other Activities", "Heatmap", "About"
+    ])
+
+# Page Routing
+if selected_page == "Overview":
+    import overview
+    overview.show()
+
+elif selected_page == "Transportation":
+    import transportation
+    transportation.show()
+
+elif selected_page == "Electronic":
+    import electronic
+    electronic.show()
+
+elif selected_page == "Food Waste":
+    import food_waste
+    food_waste.show()
+
+elif selected_page == "Other Activities":
+    import other_activities
+    other_activities.show()
+
+elif selected_page == "Heatmap":
+    import heatmap
+    heatmap.show()
+
+elif selected_page == "About":
+    import about
+    about.show()
