@@ -1,7 +1,6 @@
 import streamlit as st
 from PIL import Image
 
-# Config
 st.set_page_config(page_title="ITB Carbon Dashboard", layout="wide", initial_sidebar_state="expanded")
 
 # Load logo
@@ -9,7 +8,7 @@ logo = Image.open("assets/logo_itb.png")
 
 # Sidebar - Custom
 with st.sidebar:
-    st.image(logo, width=100)
+    st.image(logo, width=75)
     st.markdown("### ITB Carbon Dashboard")
     st.markdown("Monitoring campus carbon emissions using dynamic visualizations.")
     st.markdown("---")
