@@ -38,8 +38,6 @@ def show():
     with col1:
         st.metric("Total Emisi Mingguan", f"{filtered_df['emisi_mingguan'].sum():,.2f} kg CO₂")
     with col2:
-        st.metric("Jumlah Responden", f"{filtered_df['id_responden'].nunique()}")
-    with col3:
         rata2 = filtered_df['emisi_mingguan'].mean()
         st.metric("Rata-rata Emisi / Responden", f"{rata2:.2f} kg CO₂")
 
