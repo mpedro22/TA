@@ -30,8 +30,8 @@ elif selected_page == "Electronic":
     electronic.show()
 
 elif selected_page == "Food Waste":
-    import food_waste
-    food_waste.show()
+    import food_drink_waste
+    food_drink_waste.show()
 
 elif selected_page == "Other Activities":
     import other_activities

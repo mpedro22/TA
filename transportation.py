@@ -56,7 +56,7 @@ def show():
 
     # Line chart: Emisi harian total semua responden
     st.subheader("Total Emisi Harian")
-    daily_cols = ['emisi_senin','emisi_selasa','emisi_rabu','emisi_kamis','emisi_jumat','emisi_sabtu','emisi_minggu']
+    daily_cols = ['emisi_transportasi_senin','emisi_transportasi_selasa','emisi_transportasi_rabu','emisi_transportasi_kamis','emisi_transportasi_jumat','emisi_transportasi_sabtu','emisi_transportasi_minggu']
     daily_total = filtered_df[daily_cols].sum().reset_index()
     daily_total.columns = ['Hari', 'Total Emisi (kg CO₂)']
     daily_total['Hari'] = daily_total['Hari'].str.replace('emisi_', '').str.capitalize()
