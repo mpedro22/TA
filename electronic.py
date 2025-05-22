@@ -24,7 +24,7 @@ def show():
         hari_list = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
         selected_day = st.multiselect("Hari Datang", hari_list, default=hari_list)
 
-    filtered_df = df[df['hari_datang'].apply(lambda x: any(day in x for day in selected_day))]
+    filtered_df = df[df['hari_datang'].apply(lambda x: isinstance(x, str) and any(day in x for day in selected_day))]
 
     # KPI Summary
     col1, col2, col3 = st.columns(3)
