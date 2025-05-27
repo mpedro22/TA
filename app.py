@@ -13,7 +13,7 @@ with st.sidebar:
     st.markdown("Monitoring campus carbon emissions using dynamic visualizations.")
     st.markdown("---")
     selected_page = st.radio("Menu", [
-        "Overview", "Transportation", "Electronic", "Food Waste", "Other Activities", "Heatmap", "About"
+        "Overview", "Transportation", "Electronic", "Food Waste", "About"
     ])
 
 # Page Routing
@@ -32,14 +32,6 @@ elif selected_page == "Electronic":
 elif selected_page == "Food Waste":
     import food_drink_waste
     food_drink_waste.show()
-
-elif selected_page == "Other Activities":
-    import other_activities
-    other_activities.show()
-
-elif selected_page == "Heatmap":
-    import heatmap
-    heatmap.show()
 
 elif selected_page == "About":
     import about
