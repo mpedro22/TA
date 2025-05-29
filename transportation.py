@@ -4,7 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=3600)
 def load_data():
     """Load transportation data from Google Sheets"""
     url = "https://docs.google.com/spreadsheets/d/11Y7cx9SqtLeG5S09F34nDQSnwaZDfUkZKVnNwRLi8V4/export?format=csv&gid=155140281"
@@ -73,8 +73,10 @@ def show():
     with col3:
         st.markdown(create_metric_card("Moda Dominan", f"{moda_populer}", f"{moda_pct:.1f}% pengguna", None, "primary"), unsafe_allow_html=True)
 
+    st.markdown("<div style='margin: 1rem 0;'></div>", unsafe_allow_html=True)
+
     # Row 1: Main Charts
-    col1, col2 = st.columns([1.3, 1])
+    col1, col2 = st.columns([1, 1.3])
 
     with col1:
         # Chart 1: Donut Chart
@@ -92,12 +94,12 @@ def show():
             textinfo='label+percent',
             textfont_size=9,
             textfont_family="Poppins",
-            hovertemplate='<b>%{label}</b><br>Pengguna: %{value} orang<br>Persentase: %{percent}<extra></extra>',
+            hovertemplate='<b>%{value} orang<br>Persentase: %{percent}<extra></extra>',
             pull=[0.05 if i == 0 else 0 for i in range(len(transport_counts))]
         )
         
         fig_donut.update_layout(
-            height=240,
+            height=220,
             margin=dict(t=40, b=5, l=5, r=40),
             showlegend=True,
             legend=dict(
@@ -109,26 +111,20 @@ def show():
                 font=dict(family="Poppins", size=8)
             ),
             font=dict(family="Poppins", size=9),
-            annotations=[dict(
-                text=f'<b>{total_users}</b><br>Total<br>Pengguna', 
-                x=0.5, y=0.5, 
-                font=dict(size=11, family="Poppins"), 
-                showarrow=False
-            )],
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
             title=dict(
                 text="Komposisi Moda Transportasi",
                 x=0.5,
-                y=0.98,
+                y=0.93,
                 xanchor='center',
                 yanchor='top',
-                font=dict(family="Poppins", size=13, color="#1e293b")
+                font=dict(family="Poppins", size=13, color="#059669")
             )
         )
         
         st.plotly_chart(fig_donut, use_container_width=True, config={'displayModeBar': False})
-
+    
     with col2:
         # Chart 2: Box Plot
         fig_box = px.box(
@@ -144,8 +140,8 @@ def show():
         )
         
         fig_box.update_layout(
-            height=240,
-            margin=dict(t=40, b=5, l=5, r=5),
+            height=220,
+            margin=dict(t=50, b=5, l=5, r=5),
             showlegend=False,
             xaxis_title="Moda Transportasi",
             yaxis_title="Emisi Mingguan (kg CO₂)",
@@ -155,10 +151,10 @@ def show():
             title=dict(
                 text="Distribusi Emisi per Moda",
                 x=0.5,
-                y=0.98,
+                y=0.93,
                 xanchor='center',
                 yanchor='top',
-                font=dict(family="Poppins", size=13, color="#1e293b")
+                font=dict(family="Poppins", size=13, color="#059669")
             ),
             xaxis=dict(
                 tickangle=45,
@@ -175,7 +171,7 @@ def show():
     col1, col2, col3 = st.columns([1, 1, 1])
 
     with col1:
-        # Chart 3: Line Chart
+        # Chart 3: Tren Emisi Harian
         hari_cols = [c for c in df.columns if 'emisi_transportasi_' in c]
         
         if hari_cols:
@@ -202,7 +198,7 @@ def show():
             )
             
             fig_trend.update_layout(
-                height=180,
+                height=220,
                 margin=dict(t=35, b=5, l=5, r=5),
                 xaxis_title="",
                 yaxis_title="Emisi (kg CO₂)",
@@ -213,10 +209,10 @@ def show():
                 title=dict(
                     text="Tren Emisi Harian",
                     x=0.5,
-                    y=0.98,
+                    y=0.93,
                     xanchor='center',
                     yanchor='top',
-                    font=dict(family="Poppins", size=12, color="#1e293b")
+                    font=dict(family="Poppins", size=12, color="#059669")
                 ),
                 xaxis=dict(
                     tickfont=dict(family="Poppins", size=7),
@@ -234,7 +230,7 @@ def show():
             st.info("Data emisi harian tidak tersedia")
 
     with col2:
-        # Chart 4: Parking Locations
+        # Chart 4: lokasi Parkir Populer
         if 'lokasi_parkir' in df.columns:
             parking_data = df['lokasi_parkir'].value_counts().head(5)
             
@@ -254,7 +250,7 @@ def show():
             )
             
             fig_parking.update_layout(
-                height=180,
+                height=220,
                 margin=dict(t=35, b=5, l=5, r=5),
                 xaxis_title="Jumlah Pengguna",
                 yaxis_title="",
@@ -265,10 +261,10 @@ def show():
                 title=dict(
                     text="Lokasi Parkir Populer",
                     x=0.5,
-                    y=0.98,
+                    y=0.93,
                     xanchor='center',
                     yanchor='top',
-                    font=dict(family="Poppins", size=12, color="#1e293b")
+                    font=dict(family="Poppins", size=12, color="#059669")
                 ),
                 xaxis=dict(
                     tickfont=dict(family="Poppins", size=7),
@@ -285,7 +281,7 @@ def show():
             st.info("Data lokasi parkir tidak tersedia")
 
     with col3:
-        # Chart 5: Scatter Plot
+        # Chart 5: Emisi vs Popularitas
         stats = df.groupby('transportasi')['emisi_mingguan'].agg(['mean', 'count']).reset_index()
         stats.columns = ['transportasi', 'avg_emisi', 'frekuensi']
         
@@ -307,7 +303,7 @@ def show():
         )
         
         fig_scatter.update_layout(
-            height=180,
+            height=220,
             margin=dict(t=35, b=5, l=5, r=5),
             xaxis_title="Jumlah Pengguna",
             yaxis_title="Rata-rata Emisi (kg CO₂)",
@@ -318,10 +314,10 @@ def show():
             title=dict(
                 text="Emisi vs Popularitas",
                 x=0.5,
-                y=0.98,
+                y=0.93,
                 xanchor='center',
                 yanchor='top',
-                font=dict(family="Poppins", size=12, color="#1e293b")
+                font=dict(family="Poppins", size=12, color="#059669")
             ),
             xaxis=dict(
                 tickfont=dict(family="Poppins", size=7),

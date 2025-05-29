@@ -24,10 +24,13 @@
     font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-.main .block-container {
+div.block-container {
     padding-top: 0rem !important;
-    max-width: 1400px;
+    padding-bottom: 0.2rem !important;
+    margin-top: 0rem !important;
+    max-height: 100vh;
 }
+
 
 /* Hide Streamlit Elements */
 #MainMenu, footer, header, .stDeployButton {
@@ -36,26 +39,15 @@
 }
 
 /* Sidebar Styling */
-.css-1d391kg {
-    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
-    border-right: 1px solid rgba(5, 150, 105, 0.1) !important;
-    backdrop-filter: blur(10px) !important;
-}
-
-.css-1lcbmhc {
-    width: 300px !important;
-}
-
-/* Sidebar Header */
 .sidebar-header {
     text-align: center;
-    padding: 2rem 1rem;
-    border-bottom: 1px solid rgba(5, 150, 105, 0.1);
-    margin-bottom: 1rem;
+    padding: 0rem 0rem;
+    border-bottom: 2px solid rgba(5, 150, 105, 0.1);
+    margin-bottom: 0rem;
 }
 
 .logo-container {
-    margin-bottom: 1rem;
+    margin-bottom: 0rem;
 }
 
 .logo-circle {
@@ -91,19 +83,19 @@
 .logo-text {
     color: white;
     font-size: 1.8rem;
-    font-weight: 800;
+    font-weight: 700;
     letter-spacing: -0.02em;
     font-family: 'Poppins', sans-serif;
 }
 
 .sidebar-title {
-    font-size: 1.5rem;
+    font-size: 1rem;
     font-weight: 700;
     background: linear-gradient(135deg, var(--primary-green) 0%, var(--secondary-green) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0rem;
     font-family: 'Poppins', sans-serif;
 }
 
@@ -121,13 +113,13 @@
 
 .stButton > button {
     width: 100% !important;
-    height: 56px !important;
+    height: 40px !important;
     background: transparent !important;
     border: 1px solid transparent !important;
-    border-radius: 12px !important;
+    border-radius: 15px !important;
     padding: 0 1rem !important;
     margin: 0.25rem 0 !important;
-    font-size: 0.95rem !important;
+    font-size: 0.5rem !important;
     font-weight: 500 !important;
     color: #64748b !important;
     text-align: left !important;
@@ -254,10 +246,10 @@
 .kpi-card.quaternary { --gradient: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
 
 .kpi-value {
-    font-size: 1.7rem;
-    font-weight: 800;
-    color: #1e293b;
-    margin-bottom: 0.2rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #059669;
+    margin-bottom: 0.5rem;
     line-height: 1;
     font-family: 'Poppins', sans-serif;
 }
@@ -272,7 +264,7 @@
     font-family: 'Poppins', sans-serif;
 }
 
-/* OPTIMIZED: Plotly Chart Containers - More Compact */
+/* OPTIMIZED: Plotly Chart Containers*/
 .stPlotlyChart {
     background: rgba(255, 255, 255, 0.95) !important;
     backdrop-filter: blur(20px) !important;
@@ -304,7 +296,7 @@
     display: none !important;
 }
 
-/* Streamlit columns spacing - More compact */
+/* Streamlit columns spacing*/
 .stColumn {
     padding: 0 0.4rem !important;
 }
@@ -431,11 +423,10 @@
     font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif !important;
 }
 
-/* WOW Header Styling - UPDATED with better text and compact design */
 .wow-header {
     position: relative;
     text-align: center;
-    padding: 1rem 0;
+    padding:  0rem 1rem;
     margin-bottom: 1rem;
     background: linear-gradient(135deg, #059669 0%, #10b981 30%, #34d399 70%, #6ee7b7 100%);
     border-radius: 20px;
@@ -525,24 +516,14 @@
 }
 
 .header-title {
-    font-size: 2.2rem;
-    font-weight: 800;
+    font-size: 2rem;
+    font-weight: 600;
     color: #ffffff !important;
     margin: 0.2rem 0;
     font-family: 'Poppins', sans-serif !important;
     text-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
     letter-spacing: -0.02em;
     filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
-}
-
-.header-subtitle {
-    font-size: 1rem;
-    color: rgba(255, 255, 255, 0.95);
-    margin: 0;
-    font-weight: 500;
-    font-family: 'Poppins', sans-serif;
-    text-shadow: 0 2px 8px rgba(0,0,0,0.2);
-    opacity: 0.9;
 }
 
 /* WOW Header Animations */
@@ -577,4 +558,8 @@
     50% { 
         transform: translateX(20px) translateY(-20px); 
     }
+}
+
+::-webkit-scrollbar {
+    display: none !important;
 }

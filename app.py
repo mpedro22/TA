@@ -11,6 +11,7 @@ st.set_page_config(
     page_icon="🌱"
 )
 
+
 # Load CSS
 with open("style.css") as f:
     st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
@@ -27,7 +28,7 @@ def create_sidebar():
                 </div>
             </div>
             <h2 class="sidebar-title">Dashboard Emisi Karbon</h2>
-            <p class="sidebar-subtitle">Kampus ITB</p>
+            <p class="sidebar-subtitle">Kampus Ganesha</p>
         </div>
         """, unsafe_allow_html=True)
         
@@ -63,16 +64,6 @@ def create_sidebar():
         # Sidebar footer
         st.markdown("""
         <div class="sidebar-footer">
-            <div class="footer-stats">
-                <div class="stat-item">
-                    <span class="stat-number">36</span>
-                    <span class="stat-label">Responden</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-number">Live</span>
-                    <span class="stat-label">Data Status</span>
-                </div>
-            </div>
             <p class="footer-text">© 2025 ITB Dashboard</p>
         </div>
         """, unsafe_allow_html=True)
