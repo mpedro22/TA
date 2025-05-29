@@ -1,0 +1,580 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --primary-green: #059669;
+    --secondary-green: #10b981;
+    --light-green: #d1fae5;
+    --dark-green: #065f46;
+    --accent-blue: #3b82f6;
+    --bg-gradient: linear-gradient(135deg, #f0f9ff 0%, #ecfdf5 100%);
+    --card-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+    --border-radius: 16px;
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* App Background */
+.stApp {
+    background: var(--bg-gradient);
+    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.main .block-container {
+    padding-top: 0rem !important;
+    max-width: 1400px;
+}
+
+/* Hide Streamlit Elements */
+#MainMenu, footer, header, .stDeployButton {
+    visibility: hidden !important;
+    display: none !important;
+}
+
+/* Sidebar Styling */
+.css-1d391kg {
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+    border-right: 1px solid rgba(5, 150, 105, 0.1) !important;
+    backdrop-filter: blur(10px) !important;
+}
+
+.css-1lcbmhc {
+    width: 300px !important;
+}
+
+/* Sidebar Header */
+.sidebar-header {
+    text-align: center;
+    padding: 2rem 1rem;
+    border-bottom: 1px solid rgba(5, 150, 105, 0.1);
+    margin-bottom: 1rem;
+}
+
+.logo-container {
+    margin-bottom: 1rem;
+}
+
+.logo-circle {
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, var(--primary-green) 0%, var(--secondary-green) 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+    box-shadow: 0 8px 32px rgba(5, 150, 105, 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+.logo-circle::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    animation: shimmer 3s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+    100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+}
+
+.logo-text {
+    color: white;
+    font-size: 1.8rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    font-family: 'Poppins', sans-serif;
+}
+
+.sidebar-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--primary-green) 0%, var(--secondary-green) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 0.5rem;
+    font-family: 'Poppins', sans-serif;
+}
+
+.sidebar-subtitle {
+    color: #64748b;
+    font-size: 0.875rem;
+    font-weight: 500;
+    font-family: 'Poppins', sans-serif;
+}
+
+/* Navigation Menu */
+.nav-menu {
+    padding: 0 1rem;
+}
+
+.stButton > button {
+    width: 100% !important;
+    height: 56px !important;
+    background: transparent !important;
+    border: 1px solid transparent !important;
+    border-radius: 12px !important;
+    padding: 0 1rem !important;
+    margin: 0.25rem 0 !important;
+    font-size: 0.95rem !important;
+    font-weight: 500 !important;
+    color: #64748b !important;
+    text-align: left !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    transition: var(--transition) !important;
+    position: relative !important;
+    overflow: hidden !important;
+    font-family: 'Poppins', sans-serif !important;
+}
+
+.stButton > button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(5, 150, 105, 0.1), transparent);
+    transition: left 0.5s ease-in-out;
+}
+
+.stButton > button:hover {
+    background: rgba(5, 150, 105, 0.05) !important;
+    border-color: rgba(5, 150, 105, 0.2) !important;
+    color: var(--primary-green) !important;
+    transform: translateX(4px) !important;
+    box-shadow: 0 4px 12px rgba(5, 150, 105, 0.15) !important;
+}
+
+.stButton > button:hover::before {
+    left: 100%;
+}
+
+.stButton > button:focus {
+    background: linear-gradient(135deg, var(--primary-green) 0%, var(--secondary-green) 100%) !important;
+    border-color: var(--primary-green) !important;
+    color: white !important;
+    box-shadow: 0 6px 20px rgba(5, 150, 105, 0.4) !important;
+}
+
+/* Sidebar Footer */
+.sidebar-footer {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 1.5rem;
+    background: linear-gradient(180deg, transparent 0%, rgba(248, 250, 252, 0.8) 100%);
+    border-top: 1px solid rgba(5, 150, 105, 0.1);
+}
+
+.footer-stats {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+
+.stat-item {
+    text-align: center;
+}
+
+.stat-number {
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--primary-green);
+    font-family: 'Poppins', sans-serif;
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    color: #64748b;
+    font-weight: 500;
+    font-family: 'Poppins', sans-serif;
+}
+
+.footer-text {
+    text-align: center;
+    font-size: 0.75rem;
+    color: #94a3b8;
+    font-weight: 400;
+    font-family: 'Poppins', sans-serif;
+}
+
+/* KPI Cards - Smaller and more compact */
+.kpi-card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: var(--border-radius);
+    padding: 1.2rem;
+    text-align: center;
+    box-shadow: var(--card-shadow);
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+    height: 85px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    margin-bottom: 0.75rem;
+}
+
+.kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--gradient, linear-gradient(135deg, var(--primary-green) 0%, var(--secondary-green) 100%));
+}
+
+.kpi-card:hover {
+    transform: translateY(-4px) scale(1.01);
+    box-shadow: 0 12px 25px rgba(5, 150, 105, 0.15);
+}
+
+.kpi-card.primary { --gradient: linear-gradient(135deg, #059669 0%, #10b981 100%); }
+.kpi-card.secondary { --gradient: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); }
+.kpi-card.tertiary { --gradient: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+.kpi-card.quaternary { --gradient: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
+
+.kpi-value {
+    font-size: 1.7rem;
+    font-weight: 800;
+    color: #1e293b;
+    margin-bottom: 0.2rem;
+    line-height: 1;
+    font-family: 'Poppins', sans-serif;
+}
+
+.kpi-label {
+    font-size: 0.75rem;
+    color: #64748b;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    line-height: 1.2;
+    font-family: 'Poppins', sans-serif;
+}
+
+/* OPTIMIZED: Plotly Chart Containers - More Compact */
+.stPlotlyChart {
+    background: rgba(255, 255, 255, 0.95) !important;
+    backdrop-filter: blur(20px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06) !important;
+    padding: 0 !important;
+    margin-bottom: 0.75rem !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.stPlotlyChart:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 12px 25px rgba(0, 0, 0, 0.08) !important;
+}
+
+.stPlotlyChart > div {
+    border-radius: 16px !important;
+    overflow: hidden !important;
+}
+
+/* Fix untuk chart titles yang integrated */
+.js-plotly-plot .plotly {
+    border-radius: 16px !important;
+}
+
+/* Remove default plotly margins */
+.modebar {
+    display: none !important;
+}
+
+/* Streamlit columns spacing - More compact */
+.stColumn {
+    padding: 0 0.4rem !important;
+}
+
+.stColumn:first-child {
+    padding-left: 0 !important;
+}
+
+.stColumn:last-child {
+    padding-right: 0 !important;
+}
+
+/* Expander styling */
+.streamlit-expanderHeader {
+    background: rgba(255, 255, 255, 0.95) !important;
+    backdrop-filter: blur(20px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    border-radius: 16px !important;
+    font-family: 'Poppins', sans-serif !important;
+    font-weight: 600 !important;
+    color: #1e293b !important;
+}
+
+.streamlit-expanderContent {
+    background: rgba(255, 255, 255, 0.95) !important;
+    backdrop-filter: blur(20px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    border-radius: 16px !important;
+    margin-top: 0.5rem !important;
+}
+
+/* Dataframe styling */
+.stDataFrame {
+    font-family: 'Poppins', sans-serif !important;
+}
+
+.stDataFrame table {
+    border-radius: 12px !important;
+    overflow: hidden !important;
+}
+
+/* Info message styling */
+.stInfo {
+    background: rgba(59, 130, 246, 0.1) !important;
+    border-left: 4px solid #3b82f6 !important;
+    border-radius: 8px !important;
+    font-family: 'Poppins', sans-serif !important;
+}
+
+/* Error message styling */
+.stError {
+    background: rgba(239, 68, 68, 0.1) !important;
+    border-left: 4px solid #ef4444 !important;
+    border-radius: 8px !important;
+    font-family: 'Poppins', sans-serif !important;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .css-1lcbmhc {
+        width: 280px !important;
+    }
+    
+    .main .block-container {
+        padding-top: 0.25rem !important;
+    }
+    
+    .kpi-card {
+        height: 90px;
+        padding: 1rem;
+        margin-bottom: 0.75rem;
+    }
+    
+    .kpi-value {
+        font-size: 1.6rem;
+    }
+    
+    .stColumn {
+        padding: 0 0.2rem !important;
+    }
+    
+    .stPlotlyChart {
+        margin-bottom: 0.5rem !important;
+    }
+}
+
+/* Animations */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.kpi-card, .stPlotlyChart {
+    animation: fadeInUp 0.5s ease-out;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, var(--primary-green) 0%, var(--secondary-green) 100%);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, var(--secondary-green) 0%, var(--primary-green) 100%);
+}
+
+/* Global Font Override */
+.stApp, .stApp * {
+    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif !important;
+}
+
+/* WOW Header Styling - UPDATED with better text and compact design */
+.wow-header {
+    position: relative;
+    text-align: center;
+    padding: 1rem 0;
+    margin-bottom: 1rem;
+    background: linear-gradient(135deg, #059669 0%, #10b981 30%, #34d399 70%, #6ee7b7 100%);
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 15px 30px rgba(5, 150, 105, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.header-bg-pattern {
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.08) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: 0.4;
+    animation: dotPattern 20s ease-in-out infinite;
+}
+
+.header-float-1 {
+    position: absolute;
+    top: 15%;
+    left: 8%;
+    width: 50px;
+    height: 50px;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 50%;
+    animation: float 6s ease-in-out infinite;
+}
+
+.header-float-2 {
+    position: absolute;
+    top: 65%;
+    right: 12%;
+    width: 35px;
+    height: 35px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 50%;
+    animation: floatReverse 8s ease-in-out infinite;
+}
+
+.header-float-3 {
+    position: absolute;
+    top: 25%;
+    right: 25%;
+    width: 18px;
+    height: 18px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 50%;
+    animation: float 10s ease-in-out infinite;
+}
+
+.header-content {
+    position: relative;
+    z-index: 10;
+}
+
+.header-badge {
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: 0.4rem;
+    padding: 0.4rem 1.2rem;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 50px;
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    transition: all 0.3s ease;
+}
+
+.header-badge:hover {
+    transform: scale(1.02);
+    box-shadow: 0 6px 20px rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.18);
+}
+
+.header-icon {
+    font-size: 1.5rem;
+    margin-right: 0.6rem;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+    transition: all 0.3s ease;
+}
+
+.header-icon:hover {
+    transform: scale(1.1) rotate(5deg);
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));
+}
+
+.header-title {
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: #ffffff !important;
+    margin: 0.2rem 0;
+    font-family: 'Poppins', sans-serif !important;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+    letter-spacing: -0.02em;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+}
+
+.header-subtitle {
+    font-size: 1rem;
+    color: rgba(255, 255, 255, 0.95);
+    margin: 0;
+    font-weight: 500;
+    font-family: 'Poppins', sans-serif;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    opacity: 0.9;
+}
+
+/* WOW Header Animations */
+@keyframes float {
+    0%, 100% { 
+        transform: translateY(0px) rotate(0deg); 
+    }
+    33% { 
+        transform: translateY(-15px) rotate(120deg); 
+    }
+    66% { 
+        transform: translateY(-8px) rotate(240deg); 
+    }
+}
+
+@keyframes floatReverse {
+    0%, 100% { 
+        transform: translateY(0px) rotate(0deg); 
+    }
+    33% { 
+        transform: translateY(8px) rotate(-120deg); 
+    }
+    66% { 
+        transform: translateY(-12px) rotate(-240deg); 
+    }
+}
+
+@keyframes dotPattern {
+    0%, 100% { 
+        transform: translateX(0) translateY(0); 
+    }
+    50% { 
+        transform: translateX(20px) translateY(-20px); 
+    }
+}
