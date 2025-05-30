@@ -563,3 +563,37 @@ div.block-container {
 ::-webkit-scrollbar {
     display: none !important;
 }
+
+/* KPI Circle Cards */
+.kpi-circle {
+    background: rgba(255, 255, 255, 0.95) !important;
+    backdrop-filter: blur(20px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    border-radius: 50% !important;
+    padding: 1.8rem !important;
+    text-align: center !important;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06) !important;
+    margin: 0.7rem auto !important;
+    width: 170px !important;
+    height: 170px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+    position: relative !important;
+    overflow: hidden !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    cursor: pointer !important;
+}
+
+.kpi-circle:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 12px 25px rgba(5, 150, 105, 0.15) !important;
+}
+
+
+
+
+.kpi-card, .stPlotlyChart, .kpi-circle {
+    animation: fadeInUp 0.5s ease-out;
+}
