@@ -31,7 +31,6 @@ div.block-container {
     max-height: 100vh;
 }
 
-
 /* Hide Streamlit Elements */
 #MainMenu, footer, header, .stDeployButton {
     visibility: hidden !important;
@@ -218,7 +217,8 @@ div.block-container {
     transition: var(--transition);
     position: relative;
     overflow: hidden;
-    height: 85px;
+    min-height: 85px;
+    height: auto;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -264,7 +264,65 @@ div.block-container {
     font-family: 'Poppins', sans-serif;
 }
 
-/* OPTIMIZED: Plotly Chart Containers*/
+/* KPI Square Cards */
+.kpi-square {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: var(--border-radius);
+    text-align: center;
+    box-shadow: var(--card-shadow);
+    transition: var(--transition);
+    overflow: hidden;
+    width: 100%;
+    max-width: 172px;
+    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    margin: 1 5 0rem 0;
+}
+
+.kpi-square::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--gradient, linear-gradient(135deg, var(--primary-green) 0%, var(--secondary-green) 100%));
+}
+
+.kpi-square:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 6px 15px rgba(5, 150, 105, 0.15);
+}
+
+.kpi-square.primary { --gradient: linear-gradient(135deg, #059669 0%, #10b981 100%); }
+.kpi-square.secondary { --gradient: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); }
+.kpi-square.tertiary { --gradient: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+.kpi-square.quaternary { --gradient: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
+
+.kpi-square .kpi-value {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #059669;
+    margin-bottom: 0.1rem;
+    line-height: 1;
+    font-family: 'Poppins', sans-serif;
+}
+
+.kpi-square .kpi-label {
+    font-size: 0.5rem;
+    color: #64748b;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    line-height: 1;
+    font-family: 'Poppins', sans-serif;
+}
+
+/* ULTRA COMPACT: Plotly Chart Containers */
 .stPlotlyChart {
     background: rgba(255, 255, 255, 0.95) !important;
     backdrop-filter: blur(20px) !important;
@@ -272,7 +330,7 @@ div.block-container {
     border-radius: 16px !important;
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06) !important;
     padding: 0 !important;
-    margin-bottom: 0.75rem !important;
+    margin-bottom: 0.05rem !important; /* SUPER MINIMAL */
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
@@ -296,9 +354,9 @@ div.block-container {
     display: none !important;
 }
 
-/* Streamlit columns spacing*/
+/* TIGHT Streamlit columns spacing */
 .stColumn {
-    padding: 0 0.4rem !important;
+    padding: 0 0.2rem !important; /* SUPER MINIMAL PADDING */
 }
 
 .stColumn:first-child {
@@ -370,16 +428,30 @@ div.block-container {
         margin-bottom: 0.75rem;
     }
     
+    .kpi-square {
+        padding: 0.3rem;
+        margin-bottom: 0.1rem; 
+        max-width: 80px;
+    }
+    
+    .kpi-square .kpi-value {
+        font-size: 0.7rem;
+    }
+    
+    .kpi-square .kpi-label {
+        font-size: 0.45rem;
+    }
+    
     .kpi-value {
         font-size: 1.6rem;
     }
     
     .stColumn {
-        padding: 0 0.2rem !important;
+        padding: 0 0.1rem !important; 
     }
     
     .stPlotlyChart {
-        margin-bottom: 0.5rem !important;
+        margin-bottom: 0.15rem !important; 
     }
 }
 
@@ -396,6 +468,10 @@ div.block-container {
 }
 
 .kpi-card, .stPlotlyChart {
+    animation: fadeInUp 0.5s ease-out;
+}
+
+.kpi-square {
     animation: fadeInUp 0.5s ease-out;
 }
 
@@ -426,8 +502,8 @@ div.block-container {
 .wow-header {
     position: relative;
     text-align: center;
-    padding:  0rem 1rem;
-    margin-bottom: 1rem;
+    padding: 0.5rem 1rem;
+    margin-bottom: 0.6rem; 
     background: linear-gradient(135deg, #059669 0%, #10b981 30%, #34d399 70%, #6ee7b7 100%);
     border-radius: 20px;
     overflow: hidden;
@@ -516,10 +592,10 @@ div.block-container {
 }
 
 .header-title {
-    font-size: 2rem;
+    font-size: 1.8rem; /* REDUCED SIZE */
     font-weight: 600;
     color: #ffffff !important;
-    margin: 0.2rem 0;
+    margin: 0.1rem 0; /* REDUCED MARGIN */
     font-family: 'Poppins', sans-serif !important;
     text-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
     letter-spacing: -0.02em;
@@ -591,9 +667,6 @@ div.block-container {
     box-shadow: 0 12px 25px rgba(5, 150, 105, 0.15) !important;
 }
 
-
-
-
-.kpi-card, .stPlotlyChart, .kpi-circle {
+.kpi-card, .stPlotlyChart, .kpi-circle, .kpi-square {
     animation: fadeInUp 0.5s ease-out;
 }

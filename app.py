@@ -40,7 +40,7 @@ def create_sidebar():
             ("", "Overview", "overview"),
             ("", "Transportation", "transportation"),
             ("", "Electronic", "electronic"),
-            ("", "Food & Waste", "food"),
+            ("", "Food & Drink Waste", "food"),
             ("", "Analytics", "analytics"),
             ("", "Heatmap", "heatmap"),
             ("", "About", "about")
