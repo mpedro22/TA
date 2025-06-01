@@ -177,7 +177,7 @@ def show():
                 height=170,
                 margin=dict(t=25, b=5, l=5, r=25),
                 paper_bgcolor='rgba(0,0,0,0)',
-                title=dict(text="Distribusi Lokasi", x=0.5, y=0.95, font=dict(family="Poppins", size=9, color="#059669")),
+                title=dict(text="Distribusi Lokasi", x=0.38, y=0.95, font=dict(family="Poppins", size=9, color="#059669")),
                 showlegend=True,
                 legend=dict(orientation="v", yanchor="middle", y=0.5, xanchor="left", x=1.0, font=dict(size=7)),
                 font=dict(family="Poppins", size=7)
@@ -221,7 +221,7 @@ def show():
                 font=dict(family="Poppins", size=8),
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
-                title=dict(text="Pola Waktu per Hari", x=0.5, y=0.93, font=dict(family="Poppins", size=9, color="#059669")),
+                title=dict(text="Pola Waktu per Hari", x=0.38, y=0.93, font=dict(family="Poppins", size=9, color="#059669")),
                 xaxis=dict(tickfont=dict(size=7), showgrid=True, gridcolor='rgba(0,0,0,0.1)'),
                 yaxis=dict(tickfont=dict(size=7), showgrid=True, gridcolor='rgba(0,0,0,0.1)')
             )
@@ -254,7 +254,7 @@ def show():
                 margin=dict(t=25, b=10, l=10, r=10),
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
-                title=dict(text="Distribusi Periode", x=0.5, y=0.93, font=dict(family="Poppins", size=9, color="#059669")),
+                title=dict(text="Distribusi Periode", x=0.42, y=0.93, font=dict(family="Poppins", size=9, color="#059669")),
                 xaxis=dict(tickfont=dict(size=7)),
                 yaxis=dict(tickfont=dict(size=7)),
                 showlegend=False,
@@ -288,7 +288,7 @@ def show():
                 margin=dict(t=25, b=10, l=10, r=10),
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
-                title=dict(text="Tren Harian", x=0.5, y=0.93, font=dict(family="Poppins", size=9, color="#059669")),
+                title=dict(text="Tren Harian", x=0.45, y=0.93, font=dict(family="Poppins", size=9, color="#059669")),
                 xaxis=dict(tickfont=dict(size=7)),
                 yaxis=dict(tickfont=dict(size=7)),
                 showlegend=False,
@@ -317,7 +317,7 @@ def show():
             font=dict(family="Poppins", size=8),
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
-            title=dict(text="Heatmap: Lokasi vs Waktu Konsumsi", x=0.5, y=0.95, font=dict(family="Poppins", size=9, color="#059669")),
+            title=dict(text="Heatmap: Lokasi vs Waktu Konsumsi", x=0.42, y=0.95, font=dict(family="Poppins", size=9, color="#059669")),
             xaxis=dict(title="Lokasi Konsumsi", tickfont=dict(size=7), tickangle=45),
             yaxis=dict(title="Waktu", tickfont=dict(size=7))
         )

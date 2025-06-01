@@ -41,7 +41,6 @@ def create_sidebar():
             ("", "Transportation", "transportation"),
             ("", "Electronic", "electronic"),
             ("", "Food & Drink Waste", "food"),
-            ("", "Analytics", "analytics"),
             ("", "Heatmap", "heatmap"),
             ("", "About", "about")
         ]
@@ -85,54 +84,11 @@ def main():
     elif st.session_state.current_page == 'food':
         import food_drink_waste
         food_drink_waste.show()
-    elif st.session_state.current_page == 'analytics':
-        show_analytics()
     elif st.session_state.current_page == 'heatmap':
         show_heatmap()
     elif st.session_state.current_page == 'about':
         import about
         about.show()
-
-def show_analytics():
-    st.markdown("""
-    <div class="page-header">
-        <h1 class="page-title">📊 Analytics & Insights</h1>
-        <p class="page-subtitle">Advanced analysis of carbon emission patterns</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Placeholder for analytics
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown("""
-        <div class="feature-card">
-            <div class="feature-icon">📈</div>
-            <h3>Trend Analysis</h3>
-            <p>Analyze emission trends over time</p>
-            <span class="coming-soon">Coming Soon</span>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("""
-        <div class="feature-card">
-            <div class="feature-icon">🎯</div>
-            <h3>Goal Tracking</h3>
-            <p>Monitor emission reduction goals</p>
-            <span class="coming-soon">Coming Soon</span>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown("""
-        <div class="feature-card">
-            <div class="feature-icon">💡</div>
-            <h3>Recommendations</h3>
-            <p>AI-powered reduction suggestions</p>
-            <span class="coming-soon">Coming Soon</span>
-        </div>
-        """, unsafe_allow_html=True)
-
 
 if __name__ == "__main__":
     main()
