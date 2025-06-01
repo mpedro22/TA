@@ -156,31 +156,31 @@ def show():
     fakultas_mapping = get_fakultas_mapping()
     fakultas_emissions_df = calculate_fakultas_emissions(df_responden, df_transport, df_electronic, df_food, fakultas_mapping)
     
-    # Row 1 visualization
-    col_mega, col_stats = st.columns([1.8, 2.2])
+    # Row 1 visualization - COMPACT Layout
+    col_mega, col_stats = st.columns([1.5, 2.5])
     
     with col_mega:
         # COMPACT Main Total Card
         st.markdown(f"""
         <div style="
             background: linear-gradient(135deg, #065f46 0%, #059669 50%, #10b981 100%);
-            border-radius: 16px;
-            padding: 1.2rem;
+            border-radius: 12px;
+            padding: 1rem;
             color: white;
             text-align: center;
-            margin-bottom: 0.3rem;
-            height: 130px;
+            margin-bottom: 0.5rem;
+            height: 100px;
             display: flex;
             flex-direction: column;
             justify-content: center;
         ">
-            <div style="font-size: 1.8rem; font-weight: 900; margin-bottom: 0.2rem;">
+            <div style="font-size: 1.6rem; font-weight: 900; margin-bottom: 0.1rem;">
                 {total_emisi_kampus:.0f}
             </div>
-            <div style="font-size: 0.85rem; opacity: 0.9; margin-bottom: 0.5rem;">
+            <div style="font-size: 0.8rem; opacity: 0.9; margin-bottom: 0.3rem;">
                 Total Emisi Kampus ITB
             </div>
-            <div style="font-size: 0.7rem; opacity: 0.8;">
+            <div style="font-size: 0.65rem; opacity: 0.8;">
                 kg CO₂ per minggu dari {len(df_responden)} mahasiswa
             </div>
         </div>
@@ -202,40 +202,32 @@ def show():
         metric_col1, metric_col2 = st.columns(2)
         with metric_col1:
             st.markdown(f"""
-            <div style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 12px; padding: 0.8rem; text-align: center; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06); position: relative; overflow: hidden; margin-bottom: 0.3rem; height: 60px; display: flex; flex-direction: column; justify-content: center;">
-                <div style="position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(135deg, #059669 0%, #10b981 100%);"></div>
-                <div style="font-size: 0.95rem; font-weight: 700; color: #059669; margin-bottom: 0.1rem;">{avg_emisi_per_mahasiswa:.1f}</div>
-                <div style="font-size: 0.55rem; color: #64748b; font-weight: 600; text-transform: uppercase;">RATA-RATA PER MHS</div>
+            <div style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px; padding: 0.6rem; text-align: center; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06); position: relative; overflow: hidden; margin-bottom: 0.2rem; height: 48px; display: flex; flex-direction: column; justify-content: center;">
+                <div style="position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(135deg, #059669 0%, #10b981 100%);"></div>
+                <div style="font-size: 0.9rem; font-weight: 700; color: #059669; margin-bottom: 0.05rem;">{avg_emisi_per_mahasiswa:.1f}</div>
+                <div style="font-size: 0.5rem; color: #64748b; font-weight: 600; text-transform: uppercase;">RATA-RATA PER MAHASISWA</div>
             </div>
             """, unsafe_allow_html=True)
             
             st.markdown(f"""
-            <div style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 12px; padding: 0.8rem; text-align: center; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06); position: relative; overflow: hidden; margin-bottom: 0.3rem; height: 60px; display: flex; flex-direction: column; justify-content: center;">
-                <div style="position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(135deg, #10b981 0%, #34d399 100%);"></div>
-                <div style="font-size: 0.95rem; font-weight: 700; color: #10b981; margin-bottom: 0.1rem;">{fakultas_terbanyak}</div>
-                <div style="font-size: 0.55rem; color: #64748b; font-weight: 600; text-transform: uppercase;">FAKULTAS TERBANYAK</div>
+            <div style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px; padding: 0.6rem; text-align: center; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06); position: relative; overflow: hidden; margin-bottom: 0.2rem; height: 48px; display: flex; flex-direction: column; justify-content: center;">
+                <div style="position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(135deg, #10b981 0%, #34d399 100%);"></div>
+                <div style="font-size: 0.9rem; font-weight: 700; color: #10b981; margin-bottom: 0.05rem;">{fakultas_terbanyak}</div>
+                <div style="font-size: 0.5rem; color: #64748b; font-weight: 600; text-transform: uppercase;">FAKULTAS TERBANYAK</div>
             </div>
             """, unsafe_allow_html=True)
         
         with metric_col2:
             st.markdown(f"""
-            <div style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 12px; padding: 0.8rem; text-align: center; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06); position: relative; overflow: hidden; margin-bottom: 0.3rem; height: 60px; display: flex; flex-direction: column; justify-content: center;">
-                <div style="position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(135deg, #059669 0%, #0d9488 100%);"></div>
-                <div style="font-size: 0.95rem; font-weight: 700; color: #059669; margin-bottom: 0.1rem;">{transport_pct:.0f}%</div>
-                <div style="font-size: 0.55rem; color: #64748b; font-weight: 600; text-transform: uppercase;">DOMINASI TRANSPORT</div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.markdown(f"""
-            <div style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 12px; padding: 0.8rem; text-align: center; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06); position: relative; overflow: hidden; margin-bottom: 0.3rem; height: 60px; display: flex; flex-direction: column; justify-content: center;">
-                <div style="position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(135deg, #34d399 0%, #6ee7b7 100%);"></div>
-                <div style="font-size: 0.95rem; font-weight: 700; color: #34d399; margin-bottom: 0.1rem;">{fakultas_terefisien}</div>
-                <div style="font-size: 0.55rem; color: #64748b; font-weight: 600; text-transform: uppercase;">PALING EFISIEN</div>
+            <div style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px; padding: 0.6rem; text-align: center; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06); position: relative; overflow: hidden; margin-bottom: 0.2rem; height: 98px; display: flex; flex-direction: column; justify-content: center;">
+                <div style="position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(135deg, #34d399 0%, #6ee7b7 100%);"></div>
+                <div style="font-size: 0.9rem; font-weight: 700; color: #34d399; margin-bottom: 0.05rem;">{fakultas_terefisien}</div>
+                <div style="font-size: 0.5rem; color: #64748b; font-weight: 600; text-transform: uppercase;">PALING EFISIEN</div>
             </div>
             """, unsafe_allow_html=True)
     
-    # Row 2 visualization
-    chart_col1, chart_col2, chart_col3 = st.columns(3)
+    # Row 2 visualization - DENSER Layout
+    chart_col1, chart_col2, chart_col3 = st.columns([1, 1, 1])
     
     with chart_col1:
         # 1. pie chart
@@ -261,8 +253,8 @@ def show():
         )
         
         fig_pie.update_layout(
-            height=110,
-            margin=dict(t=15, b=2, l=2, r=2),
+            height=120,
+            margin=dict(t=12, b=2, l=2, r=2),
             showlegend=False,
             title=dict(text="Total Breakdown", x=0.5, y=0.95, font=dict(size=8, color="#059669")),
             paper_bgcolor='rgba(0,0,0,0)'
@@ -289,8 +281,8 @@ def show():
             )
             
             fig_transport.update_layout(
-                height=110,
-                margin=dict(t=15, b=2, l=2, r=2),
+                height=120,
+                margin=dict(t=12, b=2, l=2, r=2),
                 title=dict(text="Moda Transportasi", x=0.5, y=0.95, font=dict(size=8, color="#059669")),
                 font=dict(size=6),
                 paper_bgcolor='rgba(0,0,0,0)',
@@ -323,8 +315,8 @@ def show():
             )
             
             fig_fakultas.update_layout(
-                height=110,
-                margin=dict(t=15, b=2, l=2, r=2),
+                height=120,
+                margin=dict(t=12, b=2, l=2, r=2),
                 title=dict(text="Ranking Fakultas", x=0.5, y=0.95, font=dict(size=8, color="#059669")),
                 font=dict(size=6),
                 paper_bgcolor='rgba(0,0,0,0)',
@@ -356,8 +348,8 @@ def show():
         )
         
         fig_device.update_layout(
-            height=110,
-            margin=dict(t=15, b=2, l=2, r=2),
+            height=120,
+            margin=dict(t=12, b=2, l=2, r=2),
             title=dict(text="Device Usage", x=0.5, y=0.95, font=dict(size=8, color="#059669")),
             font=dict(size=6),
             paper_bgcolor='rgba(0,0,0,0)',
@@ -390,179 +382,139 @@ def show():
         ))
         
         fig_gauge.update_layout(
-            height=110,
-            margin=dict(t=15, b=2, l=2, r=2),
+            height=120,
+            margin=dict(t=12, b=2, l=2, r=2),
             paper_bgcolor='rgba(0,0,0,0)'
         )
         
         st.plotly_chart(fig_gauge, use_container_width=True, config={'displayModeBar': False})
         
-        # 6. TREND - Gradasi Hijau
-        days = ['S', 'S', 'R', 'K', 'J', 'S', 'M']
-        trend_values = [total_emisi_kampus * (0.8 + 0.4*np.sin(i*0.5)) for i in range(7)]
+        # 6. TREND - Line chart dengan gradasi hijau yang lebih jelas
+        days = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min']
+        # Data yang lebih realistis untuk emisi mingguan
+        base_emission = total_emisi_kampus
+        trend_values = [
+            base_emission * 0.95,  # Senin - rendah
+            base_emission * 1.1,   # Selasa - naik
+            base_emission * 1.15,  # Rabu - puncak
+            base_emission * 1.08,  # Kamis - turun sedikit
+            base_emission * 0.9,   # Jumat - turun
+            base_emission * 0.7,   # Sabtu - weekend rendah
+            base_emission * 0.6    # Minggu - paling rendah
+        ]
         
-        fig_trend = px.line(
+        # Create line chart with area fill
+        fig_trend = go.Figure()
+        
+        # Add area fill with gradient
+        fig_trend.add_trace(go.Scatter(
             x=days,
             y=trend_values,
-            markers=True,
-            color_discrete_sequence=['#059669']
-        )
+            fill='tonexty',
+            mode='lines+markers',
+            line=dict(color='#059669', width=3),
+            marker=dict(
+                size=6, 
+                color='#10b981',
+                line=dict(color='#059669', width=2)
+            ),
+            fillcolor='rgba(16, 185, 129, 0.3)',
+            name='Emisi Harian'
+        ))
         
-        fig_trend.update_traces(
-            line=dict(width=2),
-            marker=dict(size=3, color='#10b981')
-        )
+        # Add baseline at 0
+        fig_trend.add_trace(go.Scatter(
+            x=days,
+            y=[0] * len(days),
+            fill=None,
+            mode='lines',
+            line=dict(color='rgba(0,0,0,0)', width=0),
+            showlegend=False,
+            hoverinfo='skip'
+        ))
         
         fig_trend.update_layout(
-            height=110,
-            margin=dict(t=15, b=2, l=2, r=2),
+            height=120,
+            margin=dict(t=12, b=2, l=2, r=2),
             title=dict(text="Tren Mingguan", x=0.5, y=0.95, font=dict(size=8, color="#059669")),
             font=dict(size=6),
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
-            xaxis=dict(showgrid=False, title="", tickfont=dict(size=5)),
-            yaxis=dict(showgrid=False, title="", tickfont=dict(size=5))
+            showlegend=False,
+            xaxis=dict(
+                showgrid=False, 
+                title="", 
+                tickfont=dict(size=5),
+                tickangle=0
+            ),
+            yaxis=dict(
+                showgrid=True, 
+                gridcolor='rgba(16, 185, 129, 0.1)',
+                title="", 
+                tickfont=dict(size=5),
+                showticklabels=False
+            )
         )
         
         st.plotly_chart(fig_trend, use_container_width=True, config={'displayModeBar': False})
     
-    # Row 3 visualization - Detail breakdown
-    detail_col1, detail_col2, detail_col3, detail_col4 = st.columns(4)
-    
-    with detail_col1:
-        if not fakultas_emissions_df.empty:
-            top_3_fakultas = fakultas_emissions_df.nlargest(3, 'total_emisi')
-            
-            fig_stack = go.Figure()
-            
-            fig_stack.add_trace(go.Bar(
-                name='T',
-                y=top_3_fakultas['fakultas'],
-                x=top_3_fakultas['transport_emisi'],
-                orientation='h',
-                marker_color='#065f46'
-            ))
-            
-            fig_stack.add_trace(go.Bar(
-                name='E',
-                y=top_3_fakultas['fakultas'],
-                x=top_3_fakultas['electronic_emisi'],
-                orientation='h',
-                marker_color='#059669'
-            ))
-            
-            fig_stack.add_trace(go.Bar(
-                name='F',
-                y=top_3_fakultas['fakultas'],
-                x=top_3_fakultas['food_emisi'],
-                orientation='h',
-                marker_color='#10b981'
-            ))
-            
-            fig_stack.update_layout(
-                height=90,
-                margin=dict(t=12, b=2, l=2, r=2),
-                barmode='stack',
-                title=dict(text="Komposisi", x=0.5, y=0.95, font=dict(size=7, color="#065f46")),
-                showlegend=False,
-                font=dict(size=5),
-                paper_bgcolor='rgba(0,0,0,0)',
-                plot_bgcolor='rgba(0,0,0,0)',
-                xaxis=dict(showgrid=False, showticklabels=False, title=""),
-                yaxis=dict(tickfont=dict(size=5), title="")
+    # Row 3 visualization - Heatmap for all faculties
+    if not fakultas_emissions_df.empty:
+        # Create heatmap data
+        categories = ['Transport', 'Elektronik', 'Makanan']
+        fakultas_list = fakultas_emissions_df['fakultas'].tolist()
+        
+        # Prepare data matrix for heatmap
+        heatmap_data = []
+        for _, row in fakultas_emissions_df.iterrows():
+            heatmap_data.append([
+                row['transport_emisi'],
+                row['electronic_emisi'], 
+                row['food_emisi']
+            ])
+        
+        # Create heatmap
+        fig_heatmap = go.Figure(data=go.Heatmap(
+            z=heatmap_data,
+            x=categories,
+            y=fakultas_list,
+            colorscale=[[0, '#d1fae5'], [0.3, '#a7f3d0'], [0.6, '#6ee7b7'], [0.8, '#34d399'], [1, '#059669']],
+            text=heatmap_data,
+            texttemplate="%{text:.0f}",
+            textfont={"size": 8, "color": "white"},
+            hoverongaps=False,
+            colorbar=dict(
+                title=dict(text="Emisi (kg CO₂)", font=dict(size=8)),
+                tickfont=dict(size=7),
+                thickness=10,
+                len=0.7
             )
-            
-            st.plotly_chart(fig_stack, use_container_width=True, config={'displayModeBar': False})
-    
-    with detail_col2:
-        if 'lokasi' in df_daily.columns:
-            location_food = df_daily.groupby('lokasi')['emisi_makanminum'].sum().head(3)
-            
-            fig_food = px.bar(
-                x=location_food.values,
-                y=location_food.index,
-                orientation='h',
-                color=location_food.values,
-                color_continuous_scale=[[0, '#34d399'], [0.5, '#10b981'], [1, '#059669']]
+        ))
+        
+        fig_heatmap.update_layout(
+            title=dict(
+                text="Heatmap Emisi per Fakultas",
+                x=0.5,
+                y=0.95,
+                font=dict(size=14, color="#065f46")
+            ),
+            height=200,
+            margin=dict(t=40, b=20, l=80, r=100),
+            font=dict(size=10),
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            xaxis=dict(
+                title=dict(text="Kategori Emisi", font=dict(size=10)),
+                tickfont=dict(size=9),
+                side="bottom"
+            ),
+            yaxis=dict(
+                title=dict(text="Fakultas", font=dict(size=10)),
+                tickfont=dict(size=9)
             )
-            
-            fig_food.update_layout(
-                height=90,
-                margin=dict(t=12, b=2, l=2, r=2),
-                title=dict(text="Lokasi Konsumsi", x=0.5, y=0.95, font=dict(size=7, color="#065f46")),
-                font=dict(size=5),
-                paper_bgcolor='rgba(0,0,0,0)',
-                plot_bgcolor='rgba(0,0,0,0)',
-                coloraxis_showscale=False,
-                xaxis=dict(showgrid=False, showticklabels=False, title=""),
-                yaxis=dict(tickfont=dict(size=5), title="")
-            )
-            
-            st.plotly_chart(fig_food, use_container_width=True, config={'displayModeBar': False})
-    
-    with detail_col3:
-        # heatmap
-        if not fakultas_emissions_df.empty:
-            top_2_fakultas = fakultas_emissions_df.nlargest(2, 'student_count')
-            
-            intensity_data = []
-            for _, row in top_2_fakultas.iterrows():
-                count = row['student_count']
-                if count > 0:
-                    intensity_data.append([
-                        row['transport_emisi']/count,
-                        row['electronic_emisi']/count,
-                        row['food_emisi']/count
-                    ])
-                else:
-                    intensity_data.append([0, 0, 0])
-            
-            fig_heatmap = go.Figure(data=go.Heatmap(
-                z=intensity_data,
-                x=['T', 'E', 'F'],
-                y=top_2_fakultas['fakultas'].tolist(),
-                colorscale=[[0, '#d1fae5'], [0.5, '#6ee7b7'], [1, '#059669']],
-                showscale=False
-            ))
-            
-            fig_heatmap.update_layout(
-                height=90,
-                margin=dict(t=12, b=2, l=2, r=2),
-                title=dict(text="Intensitas", x=0.5, y=0.95, font=dict(size=7, color="#065f46")),
-                font=dict(size=5),
-                paper_bgcolor='rgba(0,0,0,0)',
-                xaxis=dict(tickfont=dict(size=5)),
-                yaxis=dict(tickfont=dict(size=5))
-            )
-            
-            st.plotly_chart(fig_heatmap, use_container_width=True, config={'displayModeBar': False})
-    
-    with detail_col4:
-        # Scatter plot for size vs emissions
-        if not fakultas_emissions_df.empty:
-            fig_correlation = px.scatter(
-                fakultas_emissions_df,
-                x='student_count',
-                y='avg_emisi',
-                size='total_emisi',
-                color='efficiency_score',
-                color_continuous_scale=[[0, '#34d399'], [0.5, '#10b981'], [1, '#065f46']],
-                size_max=15
-            )
-            
-            fig_correlation.update_layout(
-                height=90,
-                margin=dict(t=12, b=2, l=2, r=2),
-                title=dict(text="Size vs Emisi", x=0.5, y=0.95, font=dict(size=7, color="#065f46")),
-                font=dict(size=5),
-                paper_bgcolor='rgba(0,0,0,0)',
-                plot_bgcolor='rgba(0,0,0,0)',
-                coloraxis_showscale=False,
-                xaxis=dict(showgrid=False, tickfont=dict(size=4), title=""),
-                yaxis=dict(showgrid=False, tickfont=dict(size=4), title="")
-            )
-            
-            st.plotly_chart(fig_correlation, use_container_width=True, config={'displayModeBar': False})
+        )
+        
+        st.plotly_chart(fig_heatmap, use_container_width=True, config={'displayModeBar': False})
 
 if __name__ == "__main__":
     show()
