@@ -8,7 +8,6 @@ st.set_page_config(
     page_title="ITB Carbon Dashboard", 
     layout="wide", 
     initial_sidebar_state="expanded",
-    page_icon="🌱"
 )
 
 
@@ -41,7 +40,6 @@ def create_sidebar():
             ("", "Transportation", "transportation"),
             ("", "Electronic", "electronic"),
             ("", "Food & Drink Waste", "food"),
-            ("", "Heatmap", "heatmap"),
             ("", "About", "about")
         ]
         
@@ -84,8 +82,6 @@ def main():
     elif st.session_state.current_page == 'food':
         import food_drink_waste
         food_drink_waste.show()
-    elif st.session_state.current_page == 'heatmap':
-        show_heatmap()
     elif st.session_state.current_page == 'about':
         import about
         about.show()

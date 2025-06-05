@@ -262,37 +262,46 @@ def show():
         
         st.plotly_chart(fig_pie, use_container_width=True, config={'displayModeBar': False})
         
-        # 2. transportation
-        if 'transportasi' in df_transport.columns:
-            transport_counts = df_transport['transportasi'].value_counts().head(4)
-            
-            fig_transport = px.bar(
-                x=transport_counts.values,
-                y=transport_counts.index,
-                orientation='h',
-                color=transport_counts.values,
-                color_continuous_scale=[[0, '#34d399'], [0.5, '#10b981'], [1, '#059669']]
-            )
-            
-            fig_transport.update_traces(
-                texttemplate='%{x}',
-                textposition='inside',
-                textfont=dict(size=6, color="white")
-            )
-            
-            fig_transport.update_layout(
-                height=120,
-                margin=dict(t=12, b=2, l=2, r=2),
-                title=dict(text="Moda Transportasi", x=0.5, y=0.95, font=dict(size=8, color="#059669")),
-                font=dict(size=6),
-                paper_bgcolor='rgba(0,0,0,0)',
-                plot_bgcolor='rgba(0,0,0,0)',
-                coloraxis_showscale=False,
-                xaxis=dict(showgrid=False, title="", showticklabels=False),
-                yaxis=dict(title="", tickfont=dict(size=6))
-            )
-            
-            st.plotly_chart(fig_transport, use_container_width=True, config={'displayModeBar': False})
+        # 2. Summary Stats Card
+        transport_avg = total_emisi_transport / len(df_responden) if len(df_responden) > 0 else 0
+        electronic_avg = total_emisi_electronic / len(df_responden) if len(df_responden) > 0 else 0
+        food_avg = (total_emisi_food + total_emisi_daily_food) / len(df_responden) if len(df_responden) > 0 else 0
+        
+        st.markdown(f"""
+        <div style="
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 12px;
+            padding: 0.8rem;
+            margin-top: 0rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+            height: 120px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        ">
+            <div style="text-align: center; margin-bottom: 0.5rem;">
+                <div style="font-size: 0.7rem; color: #059669; font-weight: 600; text-transform: uppercase;">
+                    Rata-rata per Mahasiswa
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr; gap: 0.3rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.2rem 0;">
+                    <span style="font-size: 0.6rem; color: #64748b;">Transport:</span>
+                    <span style="font-size: 0.7rem; font-weight: 600; color: #065f46;">{transport_avg:.1f} kg</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.2rem 0;">
+                    <span style="font-size: 0.6rem; color: #64748b;">Elektronik:</span>
+                    <span style="font-size: 0.7rem; font-weight: 600; color: #059669;">{electronic_avg:.1f} kg</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.2rem 0;">
+                    <span style="font-size: 0.6rem; color: #64748b;">Makanan:</span>
+                    <span style="font-size: 0.7rem; font-weight: 600; color: #10b981;">{food_avg:.1f} kg</span>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
     
     with chart_col2:
         # 3. per fakultas
@@ -328,38 +337,54 @@ def show():
             
             st.plotly_chart(fig_fakultas, use_container_width=True, config={'displayModeBar': False})
         
-        # 4. perangkat elektronik
-        device_data = {
-            'Device': ['HP', 'Laptop', 'Tablet'],
-            'Users': [len(df_electronic) * 0.9, len(df_electronic) * 0.6, len(df_electronic) * 0.3],
-            'Avg_Duration': [120, 180, 90]
+        # 4. Total Emisi Comparison Chart
+        categories_data = {
+            'Kategori': ['Transportasi', 'Elektronik', 'Makanan'],
+            'Total_Emisi': [total_emisi_transport, total_emisi_electronic, total_emisi_food + total_emisi_daily_food],
+            'Persentase': [
+                (total_emisi_transport / total_emisi_kampus * 100) if total_emisi_kampus > 0 else 0,
+                (total_emisi_electronic / total_emisi_kampus * 100) if total_emisi_kampus > 0 else 0,
+                ((total_emisi_food + total_emisi_daily_food) / total_emisi_kampus * 100) if total_emisi_kampus > 0 else 0
+            ]
         }
         
-        device_df = pd.DataFrame(device_data)
-        
-        fig_device = px.scatter(
-            device_df,
-            x='Users',
-            y='Avg_Duration',
-            size='Users',
-            color='Device',
-            color_discrete_sequence=['#065f46', '#059669', '#10b981'],
-            size_max=20
+        fig_comparison = px.bar(
+            x=categories_data['Kategori'],
+            y=categories_data['Total_Emisi'],
+            color=categories_data['Total_Emisi'],
+            color_continuous_scale=[[0, '#34d399'], [0.5, '#10b981'], [1, '#065f46']]
         )
         
-        fig_device.update_layout(
+        fig_comparison.update_traces(
+            texttemplate='%{y:.0f}',
+            textposition='outside',
+            textfont=dict(size=7, color="#065f46")
+        )
+        
+        fig_comparison.update_layout(
             height=120,
             margin=dict(t=12, b=2, l=2, r=2),
-            title=dict(text="Device Usage", x=0.5, y=0.95, font=dict(size=8, color="#059669")),
+            title=dict(text="Total per Kategori", x=0.5, y=0.95, font=dict(size=8, color="#059669")),
             font=dict(size=6),
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
-            showlegend=False,
-            xaxis=dict(showgrid=False, title="", tickfont=dict(size=5)),
-            yaxis=dict(showgrid=False, title="", tickfont=dict(size=5))
+            coloraxis_showscale=False,
+            xaxis=dict(
+                showgrid=False, 
+                title="", 
+                tickfont=dict(size=6),
+                tickangle=0
+            ),
+            yaxis=dict(
+                showgrid=True, 
+                gridcolor='rgba(16, 185, 129, 0.1)',
+                title="", 
+                tickfont=dict(size=5),
+                showticklabels=False
+            )
         )
         
-        st.plotly_chart(fig_device, use_container_width=True, config={'displayModeBar': False})
+        st.plotly_chart(fig_comparison, use_container_width=True, config={'displayModeBar': False})
     
     with chart_col3:
         # 5. GAUGE - Gradasi Hijau
@@ -494,7 +519,7 @@ def show():
         fig_heatmap.update_layout(
             title=dict(
                 text="Heatmap Emisi per Fakultas",
-                x=0.5,
+                x=0.4,
                 y=0.95,
                 font=dict(size=14, color="#065f46")
             ),
