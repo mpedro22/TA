@@ -10,7 +10,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-
 # Load CSS
 with open("style.css") as f:
     st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
@@ -31,37 +30,49 @@ def create_sidebar():
         </div>
         """, unsafe_allow_html=True)
         
-        # Navigation Menu
+        # Navigation Menu Container
         st.markdown('<div class="nav-menu">', unsafe_allow_html=True)
         
         # Menu items
         menu_items = [
-            ("", "Overview", "overview"),
-            ("", "Transportation", "transportation"),
-            ("", "Electronic", "electronic"),
-            ("", "Food & Drink Waste", "food"),
-            ("", "About", "about")
+            ("", "Ringkasan", "overview"),
+            ("", "Transportasi", "transportation"),
+            ("", "Elektronik", "electronic"),
+            ("", "Sampah", "sampah"),
+            ("", "Tentang Kami", "about")
         ]
         
         # Initialize session state
         if 'current_page' not in st.session_state:
             st.session_state.current_page = 'overview'
         
-        # Create navigation
+        # Create navigation items
         for icon, label, page_id in menu_items:
-            active_class = "nav-active" if st.session_state.current_page == page_id else ""
+            is_active = st.session_state.current_page == page_id
             
-            # Custom navigation button
-            if st.button(f"{icon} {label}", key=f"nav_{page_id}", use_container_width=True):
-                st.session_state.current_page = page_id
-                st.rerun()
+            # Navigation item wrapper
+            st.markdown('<div class="nav-item-wrapper">', unsafe_allow_html=True)
+            
+            if is_active:
+                # Active state - styled div
+                st.markdown(f"""
+                <div class="nav-item-active">{label}</div>
+                """, unsafe_allow_html=True)
+            else:
+                # Inactive state - clickable button
+                if st.button(f"{label}", key=f"nav_{page_id}", use_container_width=True):
+                    st.session_state.current_page = page_id
+                    st.rerun()
+            
+            st.markdown('</div>', unsafe_allow_html=True)
         
+        # Close navigation menu container
         st.markdown('</div>', unsafe_allow_html=True)
         
         # Sidebar footer
         st.markdown("""
         <div class="sidebar-footer">
-            <p class="footer-text">© 2025 ITB Dashboard</p>
+            <p class="footer-text">© ITB 2025</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -69,7 +80,7 @@ def create_sidebar():
 def main():
     create_sidebar()
     
-    # Page routing
+    # Page routing based on session state
     if st.session_state.current_page == 'overview':
         import overview
         overview.show()
@@ -79,7 +90,7 @@ def main():
     elif st.session_state.current_page == 'electronic':
         import electronic
         electronic.show()
-    elif st.session_state.current_page == 'food':
+    elif st.session_state.current_page == 'sampah':
         import food_drink_waste
         food_drink_waste.show()
     elif st.session_state.current_page == 'about':

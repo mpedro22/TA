@@ -2,10 +2,6 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import numpy as np
-import base64
-from io import BytesIO
-import plotly.io as pio
 
 @st.cache_data(ttl=3600)
 def load_data():
@@ -82,27 +78,14 @@ def get_fakultas_mapping():
         'Informatika': 'STEI', 'Teknik Telekomunikasi': 'STEI', 'Teknik Tenaga Listrik': 'STEI'
     }
 
-def initialize_filters():
-    """Initialize session state for filters"""
-    if 'transport_emission_filter' not in st.session_state:
-        st.session_state.transport_emission_filter = []
-    if 'transport_mode_filter' not in st.session_state:
-        st.session_state.transport_mode_filter = []
-    if 'transport_fakultas_filter' not in st.session_state:
-        st.session_state.transport_fakultas_filter = []
-    if 'transport_reset_counter' not in st.session_state:
-        st.session_state.transport_reset_counter = 0
-    if 'just_reset' not in st.session_state:
-        st.session_state.just_reset = False
-
-def apply_filters(df, df_responden=None):
+def apply_filters(df, selected_days, selected_modes, selected_fakultas, df_responden=None):
     """Apply filters to the dataframe"""
     filtered_df = df.copy()
     
     # Filter by day (using daily emission columns if available)
-    if st.session_state.transport_emission_filter:
+    if selected_days:
         day_cols = []
-        for day in st.session_state.transport_emission_filter:
+        for day in selected_days:
             day_col = f'emisi_transportasi_{day.lower()}'
             if day_col in filtered_df.columns:
                 day_cols.append(day_col)
@@ -112,15 +95,15 @@ def apply_filters(df, df_responden=None):
             filtered_df = filtered_df[mask]
     
     # Filter by transport mode
-    if st.session_state.transport_mode_filter:
-        filtered_df = filtered_df[filtered_df['transportasi'].isin(st.session_state.transport_mode_filter)]
+    if selected_modes:
+        filtered_df = filtered_df[filtered_df['transportasi'].isin(selected_modes)]
     
     # Filter by fakultas
-    if st.session_state.transport_fakultas_filter and df_responden is not None and not df_responden.empty:
+    if selected_fakultas and df_responden is not None and not df_responden.empty:
         fakultas_mapping = get_fakultas_mapping()
         if 'program_studi' in df_responden.columns:
             df_responden['fakultas'] = df_responden['program_studi'].map(fakultas_mapping).fillna('Lainnya')
-            fakultas_students = df_responden[df_responden['fakultas'].isin(st.session_state.transport_fakultas_filter)]
+            fakultas_students = df_responden[df_responden['fakultas'].isin(selected_fakultas)]
             if 'id_responden' in fakultas_students.columns and 'id_responden' in filtered_df.columns:
                 filtered_df = filtered_df[filtered_df['id_responden'].isin(fakultas_students['id_responden'])]
     
@@ -217,9 +200,6 @@ def generate_pdf_report(filtered_df, total_emisi, avg_emisi, eco_percentage):
     return html_content
 
 def show():
-
-    # Initialize filters
-    initialize_filters()
     
     st.markdown("""
     <div class="wow-header">
@@ -246,39 +226,24 @@ def show():
     df = df.dropna(subset=['transportasi'])
     df['emission_category'] = df['transportasi'].apply(categorize_emission_level)
     
-    filter_col1, filter_col2, filter_col3, reset_col, export_col1, export_col2 = st.columns([2, 2, 2, 1, 1, 1])
+    # Simple filters - 3 columns untuk filter, 2 untuk export
+    filter_col1, filter_col2, filter_col3, export_col1, export_col2 = st.columns([2, 2, 2, 1, 1])
 
-    reset_counter = st.session_state.transport_reset_counter
-
-    if st.session_state.just_reset:
-        default_days = []
-        default_modes = []
-        default_fakultas = []
-        st.session_state.just_reset = False
-    else:
-        default_days = st.session_state.transport_emission_filter
-        default_modes = st.session_state.transport_mode_filter
-        default_fakultas = st.session_state.transport_fakultas_filter
-    
     with filter_col1:
         day_options = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
         selected_days = st.multiselect(
             "Hari:",
             options=day_options,
-            default=default_days,
-            key=f'day_multiselect_{reset_counter}'
+            key='day_filter'
         )
-        st.session_state.transport_emission_filter = selected_days
     
     with filter_col2:
         available_modes = sorted(df['transportasi'].unique())
         selected_modes = st.multiselect(
             "Moda Transportasi:",
             options=available_modes,
-            default=default_modes,
-            key=f'mode_multiselect_{reset_counter}'
+            key='mode_filter'
         )
-        st.session_state.transport_mode_filter = selected_modes
     
     with filter_col3:
         if df_responden is not None and not df_responden.empty and 'program_studi' in df_responden.columns:
@@ -288,61 +253,16 @@ def show():
             selected_fakultas = st.multiselect(
                 "Fakultas:",
                 options=available_fakultas,
-                default=default_fakultas,
-                key=f'fakultas_multiselect_{reset_counter}'
+                key='fakultas_filter'
             )
-            st.session_state.transport_fakultas_filter = selected_fakultas
         else:
-            st.markdown('<div style="height: 58px;"></div>', unsafe_allow_html=True)
-    
-    with reset_col:
-        st.markdown('''
-        <style>
-        /* Multiple targeting untuk reset button */
-        div[data-testid="column"]:nth-child(4) .stButton > button,
-        div[data-testid="column"]:nth-child(4) button,
-        .reset-button-custom .stButton > button,
-        .reset-button-custom button {
-            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
-            color: white !important;
-            border: 2px solid #ef4444 !important;
-            border-radius: 10px !important;
-            font-weight: 700 !important;
-            font-size: 0.85rem !important;
-            font-family: 'Poppins', sans-serif !important;
-            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25) !important;
-            width: 100% !important;
-            height: 40px !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-        }
-        
-        div[data-testid="column"]:nth-child(4) .stButton > button:hover,
-        .reset-button-custom .stButton > button:hover {
-            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important;
-            transform: translateY(-2px) scale(1.03) !important;
-            box-shadow: 0 8px 20px rgba(239, 68, 68, 0.35) !important;
-        }
-        </style>
-        <div class="reset-button-custom">
-        ''', unsafe_allow_html=True)
-        
-        if st.button("Reset", use_container_width=True, key="reset_transport_filters"):
-            st.session_state.transport_emission_filter = []
-            st.session_state.transport_mode_filter = []
-            st.session_state.transport_fakultas_filter = []
-            st.session_state.just_reset = True
-            st.session_state.transport_reset_counter += 1
-            st.rerun()
-        
-        st.markdown('</div>', unsafe_allow_html=True)
+            selected_fakultas = []
 
     # Apply filters 
-    filtered_df = apply_filters(df, df_responden)
+    filtered_df = apply_filters(df, selected_days, selected_modes, selected_fakultas, df_responden)
     
     if filtered_df.empty:
-        st.warning("Tidak ada data yang sesuai dengan filter yang dipilih. Silakan ubah filter atau reset.")
+        st.warning("Tidak ada data yang sesuai dengan filter yang dipilih. Silakan ubah atau kosongkan filter.")
         return
     
     # Calculate metrics for export
@@ -381,11 +301,11 @@ def show():
 
     st.markdown('<div style="margin: 0.2rem 0;"></div>', unsafe_allow_html=True)
 
-    # Row 1: Main Charts - Height dikurangi untuk kompaktifitas
+    # Row 1: Main Charts
     col1, col2 = st.columns([1.2, 1])
 
     with col1:
-        # Chart 1: Compact Donut Chart
+        # Chart 1: Donut Chart
         transport_counts = filtered_df['transportasi'].value_counts()
         transport_colors = get_transport_colors()
         colors = [transport_colors.get(mode, '#94a3b8') for mode in transport_counts.index]
@@ -437,7 +357,7 @@ def show():
         st.plotly_chart(fig_donut, use_container_width=True, config={'displayModeBar': False})
     
     with col2:
-        # Chart 2: Compact Fakultas Comparison
+        # Chart 2: Fakultas Comparison
         if df_responden is not None and not df_responden.empty and 'program_studi' in df_responden.columns:
             fakultas_mapping = get_fakultas_mapping()
             df_responden['fakultas'] = df_responden['program_studi'].map(fakultas_mapping).fillna('Lainnya')
@@ -514,14 +434,13 @@ def show():
         else:
             st.info("Data fakultas tidak tersedia")
 
-    # Minimal spacing untuk mencegah tabrakan
     st.markdown('<div style="margin: 0.1rem 0;"></div>', unsafe_allow_html=True)
 
-    # Row 2: Compact Secondary Charts
+    # Row 2: Secondary Charts
     col1, col2, col3 = st.columns([1, 1, 1])
 
     with col1:
-        # Chart 3: Compact Scatter
+        # Chart 3: Scatter
         stats = filtered_df.groupby('transportasi')['emisi_mingguan'].agg(['mean', 'count']).reset_index()
         stats.columns = ['transportasi', 'avg_emisi', 'frekuensi']
         stats['color'] = stats['transportasi'].map(get_transport_colors()).fillna('#94a3b8')
@@ -539,14 +458,14 @@ def show():
                 y=category_data['avg_emisi'],
                 mode='markers+text',
                 marker=dict(
-                    size=category_data['frekuensi'] * 1.5 + 6,  # Marker lebih kecil
+                    size=category_data['frekuensi'] * 1.5 + 6,
                     color=color,
                     line=dict(color='white', width=1),
                     opacity=0.8
                 ),
                 text=category_data['transportasi'],
                 textposition="top center",
-                textfont=dict(size=6, family="Poppins", color=color, weight='bold'),  # Font lebih kecil
+                textfont=dict(size=6, family="Poppins", color=color, weight='bold'),
                 name=category,
                 hovertemplate='<b>%{text}</b><br>Pengguna: %{x}<br>Emisi: %{y:.2f} kg CO₂<extra></extra>'
             ))
@@ -590,7 +509,7 @@ def show():
         st.plotly_chart(fig_scatter, use_container_width=True, config={'displayModeBar': False})
 
     with col2:
-        # Chart 4: Compact Daily Trend
+        # Chart 4: Daily Trend
         hari_cols = [c for c in filtered_df.columns if 'emisi_transportasi_' in c]
         
         if hari_cols:
@@ -611,7 +530,7 @@ def show():
                 mode='lines+markers',
                 line=dict(color='#8e44ad', width=2, shape='spline'),  
                 marker=dict(
-                    size=5,  # Marker lebih kecil
+                    size=5,
                     color='#8e44ad',
                     line=dict(color='white', width=1)
                 ),
@@ -652,7 +571,7 @@ def show():
             st.info("Data emisi harian tidak tersedia")
 
     with col3:
-        # Chart 5: Compact Efficiency ranking
+        # Chart 5: Efficiency ranking
         efficiency_data = filtered_df.groupby('transportasi').agg({
             'emisi_mingguan': ['mean', 'count']
         }).round(2)
@@ -679,7 +598,7 @@ def show():
         )
         
         fig_efficiency.update_layout(
-            height=220,  # Kembalikan ke ukuran yang lebih besar
+            height=220,
             margin=dict(t=20, b=5, l=5, r=5),  
             xaxis_title="Skor Efisiensi",
             yaxis_title="",

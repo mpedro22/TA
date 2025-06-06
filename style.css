@@ -40,24 +40,113 @@ div.block-container {
     display: none !important;
 }
 
-/* Sidebar Container - ADDED FLEXBOX STRUCTURE */
+/* ===========================================
+   SIDEBAR NAVIGATION STYLING - KOMPAK & KONSISTEN
+   =========================================== */
+
+/* RESET SEMUA margin/padding default streamlit */
+.stSidebar .element-container {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.stSidebar div[data-testid="stMarkdownContainer"] {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.stSidebar div[data-testid="stButton"] {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Hide scrollbar in the main sidebar container */
+.stSidebar > div:first-child {
+    overflow: hidden !important;
+}
+
+/* CONTAINER untuk setiap nav item - SUPER KOMPAK */
+.nav-menu > div {
+    margin: 0 0 2px 0 !important;
+    padding: 0 !important;
+    height: 32px !important;
+    display: block !important;
+}
+
+/* LAST CHILD tidak ada margin bottom */
+.nav-menu > div:last-child {
+    margin-bottom: 0 !important;
+}
+
+/* Button styling - EXACT dimensions */
+div[data-testid="stButton"] > button {
+    background: transparent !important;
+    border: none !important;
+    color: #6B7280 !important;
+    font-weight: 500 !important;
+    font-family: 'Poppins', sans-serif !important;
+    padding: 0 16px !important;
+    border-radius: 8px !important;
+    width: 100% !important;
+    text-align: left !important;
+    transition: all 0.2s ease !important;
+    height: 36px !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    align-items: center !important;
+    line-height: 1 !important;
+    margin-bottom: -1.5rem !important;
+}
+
+div[data-testid="stButton"] > button:hover {
+    background: rgba(0,0,0,0.05) !important;
+    color: #374151 !important;
+}
+
+/* Active item - EXACT SAME dimensions sebagai button */
+.nav-item-active {
+    padding: 0 16px !important;
+    color: #059669 !important; 
+    font-weight: 700 !important; 
+    font-family: 'Poppins', sans-serif !important;
+    background: rgba(5, 150, 105, 0.1) !important;
+    border-radius: 8px !important;
+    border-left: 4px solid #059669 !important;
+    height: 36px !important;
+    display: flex !important;
+    align-items: center !important;
+    box-sizing: border-box !important;
+    margin-bottom: -1.5rem !important;
+    line-height: 1 !important;
+}
+
+/* FORCE container spacing untuk consistency */
+.stSidebar .nav-menu .element-container {
+    margin-bottom: 0 !important;
+}
+
+.stSidebar .nav-menu .element-container:last-child {
+    margin-bottom: 0 !important;
+}
+
+/* Sidebar Styling */
 .sidebar {
     display: flex;
     flex-direction: column;
     height: 100vh;
     position: relative;
 }
-
-/* Sidebar Styling */
 .sidebar-header {
     text-align: center;
-    padding: 1rem 0rem;
+    padding: 1rem 1rem;
     border-bottom: 2px solid rgba(5, 150, 105, 0.1);
-    margin-bottom: 1rem;
+    margin-bottom: -2rem;
 }
 
 .logo-container {
-    margin-bottom: 1rem;
+    margin-bottom: 0rem;
+    margin-top: -2rem;
 }
 
 .logo-circle {
@@ -118,25 +207,21 @@ div.block-container {
     font-family: 'Poppins', sans-serif;
 }
 
-/* Navigation Area - ADDED TO FILL SPACE */
-.sidebar-nav {
-    flex: 1;
-    overflow-y: auto;
+/* Navigation Menu */
+.nav-menu {
     padding: 0 1rem;
 }
 
-/* Sidebar Footer - FIXED POSITIONING */
+/* Sidebar Footer */
 .sidebar-footer {
-    margin-top: auto;
-    padding: 1.5rem;
-    background: linear-gradient(180deg, transparent 0%, rgba(248, 250, 252, 0.8) 100%);
-    border-top: 1px solid rgba(5, 150, 105, 0.1);
+    margin-top: 2rem;
+    padding: 2rem;
 }
 
 .footer-stats {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 1rem;
+    margin-bottom: 0rem;
 }
 
 .stat-item {
@@ -163,12 +248,6 @@ div.block-container {
     font-size: 0.75rem;
     color: #94a3b8;
     font-weight: 400;
-    font-family: 'Poppins', sans-serif;
-}
-
-/* Navigation Menu */
-.nav-menu {
-    padding: 0 1rem;
 }
 
 .stButton > button {
@@ -222,7 +301,7 @@ div.block-container {
     box-shadow: 0 6px 20px rgba(5, 150, 105, 0.4) !important;
 }
 
-/* KPI Cards - Smaller and more compact */
+/* KPI Cards */
 .kpi-card {
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(20px);
@@ -340,6 +419,33 @@ div.block-container {
     font-family: 'Poppins', sans-serif;
 }
 
+/* KPI Circle Cards */
+.kpi-circle {
+    background: rgba(255, 255, 255, 0.95) !important;
+    backdrop-filter: blur(20px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    border-radius: 50% !important;
+    padding: 1.8rem !important;
+    text-align: center !important;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06) !important;
+    margin: 0.7rem auto !important;
+    width: 170px !important;
+    height: 170px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+    position: relative !important;
+    overflow: hidden !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    cursor: pointer !important;
+}
+
+.kpi-circle:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 12px 25px rgba(5, 150, 105, 0.15) !important;
+}
+
 /* COMPACT: Plotly Chart Containers */
 .stPlotlyChart {
     background: rgba(255, 255, 255, 0.95) !important;
@@ -430,93 +536,22 @@ div.block-container {
     font-family: 'Poppins', sans-serif !important;
 }
 
-/* Responsive Design */
-@media (max-width: 768px) {
-    .css-1lcbmhc {
-        width: 280px !important;
-    }
-    
-    div.block-container {
-        padding-top: 0.25rem !important;
-        padding-left: 1rem !important;
-        padding-right: 1rem !important;
-    }
-    
-    .kpi-card {
-        height: 90px;
-        padding: 1rem;
-        margin-bottom: 0.75rem;
-    }
-    
-    .kpi-square {
-        padding: 0.3rem;
-        margin-bottom: 0.5rem; 
-        max-width: 80px;
-    }
-    
-    .kpi-square .kpi-value {
-        font-size: 0.7rem;
-    }
-    
-    .kpi-square .kpi-label {
-        font-size: 0.45rem;
-    }
-    
-    .kpi-value {
-        font-size: 1.6rem;
-    }
-    
-    .stColumn {
-        padding: 0 0.1rem !important; 
-    }
-    
-    .stPlotlyChart {
-        margin-bottom: 0.75rem !important; 
-    }
+/* Button styling */
+.stDownloadButton > button {
+    background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(5, 150, 105, 0.2);
 }
 
-/* Animations */
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.kpi-card, .stPlotlyChart {
-    animation: fadeInUp 0.5s ease-out;
-}
-
-.kpi-square {
-    animation: fadeInUp 0.5s ease-out;
-}
-
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-    width: 8px;
-}
-
-::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb {
-    background: linear-gradient(135deg, var(--primary-green) 0%, var(--secondary-green) 100%);
-    border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(135deg, var(--secondary-green) 0%, var(--primary-green) 100%);
-}
-
-/* Global Font Override */
-.stApp, .stApp * {
-    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif !important;
+.stDownloadButton > button:hover {
+    background: linear-gradient(135deg, #047857 0%, #059669 100%);
+    box-shadow: 0 4px 8px rgba(5, 150, 105, 0.3);
+    transform: translateY(-1px);
+    color: white;
 }
 
 .wow-header {
@@ -554,14 +589,17 @@ div.block-container {
         patternRotate 30s linear infinite;
 }
 
-.header-float-1 {
+.header-float-1, .header-float-2, .header-float-3, .header-float-4, .header-float-5 {
     position: absolute;
+    border-radius: 50%;
+}
+
+.header-float-1 {
     top: 15%;
     left: 8%;
     width: 50px;
     height: 50px;
     background: radial-gradient(circle, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.05) 100%);
-    border-radius: 50%;
     animation: 
         float 6s ease-in-out infinite,
         glow 3s ease-in-out infinite alternate;
@@ -569,13 +607,11 @@ div.block-container {
 }
 
 .header-float-2 {
-    position: absolute;
     top: 65%;
     right: 12%;
     width: 35px;
     height: 35px;
     background: radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.03) 100%);
-    border-radius: 50%;
     animation: 
         floatReverse 8s ease-in-out infinite,
         pulse 2s ease-in-out infinite;
@@ -583,40 +619,33 @@ div.block-container {
 }
 
 .header-float-3 {
-    position: absolute;
     top: 25%;
     right: 25%;
     width: 18px;
     height: 18px;
     background: radial-gradient(circle, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.08) 100%);
-    border-radius: 50%;
     animation: 
         float 10s ease-in-out infinite,
         sparkle 1.5s ease-in-out infinite;
 }
 
-/* Tambahan floating particles */
 .header-float-4 {
-    position: absolute;
     top: 45%;
     left: 25%;
     width: 12px;
     height: 12px;
     background: rgba(255, 255, 255, 0.12);
-    border-radius: 50%;
     animation: 
         floatSlow 12s ease-in-out infinite,
         twinkle 2.5s ease-in-out infinite;
 }
 
 .header-float-5 {
-    position: absolute;
     top: 80%;
     left: 70%;
     width: 8px;
     height: 8px;
     background: rgba(255, 255, 255, 0.18);
-    border-radius: 50%;
     animation: 
         floatTiny 7s ease-in-out infinite,
         fade 3s ease-in-out infinite;
@@ -654,7 +683,6 @@ div.block-container {
     text-align: center !important;
 }
 
-/* Amazing Animations */
 @keyframes borderGlow {
     0% { 
         background: linear-gradient(45deg, transparent 0%, rgba(255,255,255,0.2) 25%, transparent 50%, rgba(255,255,255,0.2) 75%, transparent 100%);
@@ -837,55 +865,66 @@ div.block-container {
     }
 }
 
-::-webkit-scrollbar {
-    display: none !important;
-}
-
-/* KPI Circle Cards */
-.kpi-circle {
-    background: rgba(255, 255, 255, 0.95) !important;
-    backdrop-filter: blur(20px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.3) !important;
-    border-radius: 50% !important;
-    padding: 1.8rem !important;
-    text-align: center !important;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06) !important;
-    margin: 0.7rem auto !important;
-    width: 170px !important;
-    height: 170px !important;
-    display: flex !important;
-    flex-direction: column !important;
-    justify-content: center !important;
-    align-items: center !important;
-    position: relative !important;
-    overflow: hidden !important;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-    cursor: pointer !important;
-}
-
-.kpi-circle:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: 0 12px 25px rgba(5, 150, 105, 0.15) !important;
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .kpi-card, .stPlotlyChart, .kpi-circle, .kpi-square {
     animation: fadeInUp 0.5s ease-out;
 }
 
-/* Button styling untuk Export (hijau) */
-.stDownloadButton > button {
-    background: linear-gradient(135deg, #059669 0%, #10b981 100%);
-    color: white;
-    border: none;
-    border-radius: 6px;
-    font-weight: 500;
-    transition: all 0.2s ease;
-    box-shadow: 0 2px 4px rgba(5, 150, 105, 0.2);
+@media (max-width: 768px) {
+    .css-1lcbmhc {
+        width: 280px !important;
+    }
+    
+    div.block-container {
+        padding-top: 0.25rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+    
+    .kpi-card {
+        height: 90px;
+        padding: 1rem;
+        margin-bottom: 0.75rem;
+    }
+    
+    .kpi-square {
+        padding: 0.3rem;
+        margin-bottom: 0.5rem; 
+        max-width: 80px;
+    }
+    
+    .kpi-square .kpi-value {
+        font-size: 0.7rem;
+    }
+    
+    .kpi-square .kpi-label {
+        font-size: 0.45rem;
+    }
+    
+    .kpi-value {
+        font-size: 1.6rem;
+    }
+    
+    .stColumn {
+        padding: 0 0.1rem !important; 
+    }
+    
+    .stPlotlyChart {
+        margin-bottom: 0.75rem !important; 
+    }
 }
 
-.stDownloadButton > button:hover {
-    background: linear-gradient(135deg, #047857 0%, #059669 100%);
-    box-shadow: 0 4px 8px rgba(5, 150, 105, 0.3);
-    transform: translateY(-1px);
-    color: white;
+/* Global Font Override */
+.stApp, .stApp * {
+    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif !important;
 }
