@@ -25,13 +25,17 @@
 }
 
 div.block-container {
-    padding-top: 0rem !important;
-    padding-bottom: 0.2rem !important;
+    padding-top: 1rem !important;
     margin-top: 0rem !important;
     max-height: 100vh;
     padding-left: 2rem !important;
     padding-right: 2rem !important;
     max-width: none !important;
+}
+
+.main > div:first-child {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
 }
 
 /* Hide Streamlit Elements */
@@ -40,11 +44,349 @@ div.block-container {
     display: none !important;
 }
 
-/* ===========================================
-   SIDEBAR NAVIGATION STYLING - KOMPAK & KONSISTEN
-   =========================================== */
 
-/* RESET SEMUA margin/padding default streamlit */
+/* Header halaman*/
+.wow-header {
+    position: relative;
+    text-align: center;
+    margin: -1rem 0rem 0.5rem 0rem !important; 
+    height: 70px;
+    background: linear-gradient(135deg, #059669 0%, #10b981 30%, #34d399 70%, #6ee7b7 100%);
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 
+        0 15px 30px rgba(5, 150, 105, 0.25),
+        0 0 50px rgba(5, 150, 105, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.header-bg-pattern {
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: 
+        radial-gradient(circle at 20% 30%, rgba(255,255,255,0.1) 2px, transparent 2px),
+        radial-gradient(circle at 80% 70%, rgba(255,255,255,0.08) 1px, transparent 1px),
+        radial-gradient(circle at 50% 50%, rgba(255,255,255,0.06) 1.5px, transparent 1.5px);
+    background-size: 40px 40px, 30px 30px, 50px 50px;
+    opacity: 0.6;
+    animation: 
+        dotPattern 20s ease-in-out infinite,
+        patternRotate 30s linear infinite;
+}
+
+.header-float-1, .header-float-2, .header-float-3, .header-float-4, .header-float-5 {
+    position: absolute;
+    border-radius: 50%;
+}
+
+.header-float-1 {
+    top: 15%;
+    left: 8%;
+    width: 50px;
+    height: 50px;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.05) 100%);
+    animation: float 6s ease-in-out infinite, glow 3s ease-in-out infinite alternate;
+    filter: blur(0.5px);
+}
+
+.header-float-2 {
+    top: 65%;
+    right: 12%;
+    width: 35px;
+    height: 35px;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.03) 100%);
+    animation: floatReverse 8s ease-in-out infinite, pulse 2s ease-in-out infinite;
+    filter: blur(0.3px);
+}
+
+.header-float-3 {
+    top: 25%;
+    right: 25%;
+    width: 18px;
+    height: 18px;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.08) 100%);
+    animation: float 10s ease-in-out infinite, sparkle 1.5s ease-in-out infinite;
+}
+
+.header-float-4 {
+    top: 45%;
+    left: 25%;
+    width: 12px;
+    height: 12px;
+    background: rgba(255, 255, 255, 0.12);
+    animation: floatSlow 12s ease-in-out infinite, twinkle 2.5s ease-in-out infinite;
+}
+
+.header-float-5 {
+    top: 80%;
+    left: 70%;
+    width: 8px;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.18);
+    animation: floatTiny 7s ease-in-out infinite, fade 3s ease-in-out infinite;
+}
+
+.header-content {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    animation: contentFloat 6s ease-in-out infinite;
+}
+
+.header-title {
+    font-size: 1.9rem !important; 
+    font-weight: 600 !important;
+    color: #ffffff !important;
+    margin: 0 !important;
+    font-family: 'Poppins', sans-serif !important;
+    text-shadow: 
+        0 2px 8px rgba(0,0,0,0.3),
+        0 0 20px rgba(255, 255, 255, 0.2),
+        0 0 30px rgba(16, 185, 129, 0.3) !important;
+    letter-spacing: -0.02em !important;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)) !important;
+    text-align: center !important;
+}
+
+/* Multiselect styling */
+
+/* Font Poppins untuk semua multiselect */
+.stMultiSelect, .stMultiSelect * {
+    font-family: 'Poppins', sans-serif !important;
+}
+
+.stMultiSelect {
+    height: 75px !important;
+    max-height: 75px !important;
+    overflow: visible !important;
+    position: relative !important;
+    padding-bottom: 3px !important;
+}
+
+.stMultiSelect > div > div > div {
+    border-color: #27ae60 !important;
+    border-radius: 8px !important;
+    transition: all 0.3s ease !important;
+    font-family: 'Poppins', sans-serif !important;
+    height: 42px !important;
+    max-height: 42px !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-content: flex-start !important;
+    border-width: 1px !important;
+    border-style: solid !important;
+}
+
+/* Selected tags container dengan scroll */
+.stMultiSelect > div > div > div > div {
+    max-height: 38px !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 2px !important;
+    scrollbar-width: thin !important;
+    scrollbar-color: #2ecc71 transparent !important;
+}
+
+/* Dropdown arrow styling yang lebih smooth */
+.stMultiSelect svg {
+    transition: transform 0.3s ease !important;
+    width: 16px !important;
+    height: 16px !important;
+}
+
+/* Custom scrollbar untuk tags container */
+.stMultiSelect > div > div > div > div::-webkit-scrollbar {
+    width: 4px !important;
+    height: 4px !important;
+}
+
+.stMultiSelect > div > div > div > div::-webkit-scrollbar-track {
+    background: transparent !important;
+}
+
+.stMultiSelect > div > div > div > div::-webkit-scrollbar-thumb {
+    background: #2ecc71 !important;
+    border-radius: 2px !important;
+}
+
+.stMultiSelect > div > div > div:focus-within {
+    border-color: #2ecc71 !important;
+    box-shadow: 0 0 0 2px rgba(46, 204, 113, 0.2) !important;
+    transform: translateY(-1px) !important;
+}
+
+/* Selected option tags hijau dengan efek */
+.stMultiSelect span[data-baseweb="tag"] {
+    background: linear-gradient(135deg, #2ecc71, #27ae60) !important;
+    color: white !important;
+    border: 1px solid #27ae60 !important;
+    border-radius: 15px !important;
+    font-family: 'Poppins', sans-serif !important;
+    font-weight: 500 !important;
+    font-size: 10px !important;
+    padding: 2px 8px !important;
+    margin: 1px !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 1px 3px rgba(46, 204, 113, 0.2) !important;
+    max-height: 20px !important;
+    line-height: 16px !important;
+}
+
+/* Hover effect pada tags dengan animasi */
+.stMultiSelect span[data-baseweb="tag"]:hover {
+    background: linear-gradient(135deg, #27ae60, #229954) !important;
+    transform: translateY(-1px) scale(1.02) !important;
+    box-shadow: 0 4px 8px rgba(46, 204, 113, 0.3) !important;
+}
+
+
+.stMultiSelect span[data-baseweb="tag"] svg {
+    fill: white !important;
+    transition: all 0.2s ease !important;
+}
+
+.stMultiSelect span[data-baseweb="tag"]:hover svg {
+    fill: #f8f9fa !important;
+    transform: rotate(90deg) !important;
+}
+
+.stMultiSelect > div > div > div > div > div > svg {
+    fill: #2ecc71 !important;
+    transition: all 0.3s ease !important;
+}
+
+.stMultiSelect > div > div > div:focus-within > div > div > svg {
+    fill: #27ae60 !important;
+    transform: rotate(180deg) !important;
+}
+
+.stMultiSelect > div > div {
+    border-color: #bdc3c7 !important;
+    transition: all 0.3s ease !important;
+}
+
+.stMultiSelect:has(span[data-baseweb="tag"]) > div > div {
+    border-color: #2ecc71 !important;
+    box-shadow: 0 0 0 1px rgba(46, 204, 113, 0.1) !important;
+}
+
+.stMultiSelect input::placeholder {
+    color: #7f8c8d !important;
+    font-family: 'Poppins', sans-serif !important;
+    font-weight: 400 !important;
+    font-size: 11px !important;
+}
+
+.stMultiSelect div[role="listbox"] > div:hover {
+    background: linear-gradient(90deg, #e8f5e8, #f0fdf4) !important;
+    color: #27ae60 !important;
+    transform: translateX(2px) !important;
+    transition: all 0.2s ease !important;
+    font-family: 'Poppins', sans-serif !important;
+    font-weight: 500 !important;
+    font-size: 11px !important;
+    padding: 6px 12px !important;
+}
+
+.stMultiSelect div[role="listbox"] > div[aria-selected="true"] {
+    background: linear-gradient(90deg, #d5f4e6, #e8f5e8) !important;
+    color: #229954 !important;
+    font-family: 'Poppins', sans-serif !important;
+    font-weight: 600 !important;
+    border-left: 3px solid #2ecc71 !important;
+    font-size: 11px !important;
+    padding: 6px 12px !important;
+}
+
+.stMultiSelect div[role="listbox"] {
+    border: 1px solid #2ecc71 !important;
+    border-radius: 12px !important;
+    box-shadow: 0 8px 25px rgba(46, 204, 113, 0.15) !important;
+    backdrop-filter: blur(10px) !important;
+    max-height: 100px !important;
+    overflow-y: auto !important;
+    position: absolute !important;
+    z-index: 999 !important;
+    background: white !important;
+    width: 100% !important;
+    margin-top: 1px !important;
+    font-size: 11px !important;
+    animation: slideDown 0.3s ease !important;
+}
+
+.stMultiSelect > label {
+    font-family: 'Poppins', sans-serif !important;
+    font-weight: 600 !important;
+    color: #2c3e50 !important;
+    font-size: 14px !important;
+    margin-bottom: 4px !important;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.stMultiSelect:hover > div > div > div {
+    border-color: #2ecc71 !important;
+    box-shadow: 0 2px 8px rgba(46, 204, 113, 0.1) !important;
+}
+
+.stMultiSelect input {
+    height: 18px !important;
+    max-height: 18px !important;
+    font-size: 11px !important;
+    line-height: 18px !important;
+    font-family: 'Poppins', sans-serif !important;
+}
+
+.stMultiSelect > div > div > div > div:last-child {
+    height: 40px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+}
+
+.stMultiSelect div[role="listbox"]::-webkit-scrollbar {
+    width: 6px !important;
+}
+
+.stMultiSelect div[role="listbox"]::-webkit-scrollbar-track {
+    background: #f1f1f1 !important;
+    border-radius: 3px !important;
+}
+
+.stMultiSelect div[role="listbox"]::-webkit-scrollbar-thumb {
+    background: #2ecc71 !important;
+    border-radius: 3px !important;
+}
+
+.stMultiSelect div[role="listbox"]::-webkit-scrollbar-thumb:hover {
+    background: #27ae60 !important;
+}
+
+/* Sidebar styling */
+
 .stSidebar .element-container {
     margin: 0 !important;
     padding: 0 !important;
@@ -65,7 +407,6 @@ div.block-container {
     overflow: hidden !important;
 }
 
-/* CONTAINER untuk setiap nav item - SUPER KOMPAK */
 .nav-menu > div {
     margin: 0 0 2px 0 !important;
     padding: 0 !important;
@@ -137,6 +478,7 @@ div[data-testid="stButton"] > button:hover {
     height: 100vh;
     position: relative;
 }
+
 .sidebar-header {
     text-align: center;
     padding: 1rem 1rem;
@@ -172,11 +514,6 @@ div[data-testid="stButton"] > button:hover {
     height: 200%;
     background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.2), transparent);
     animation: shimmer 3s infinite;
-}
-
-@keyframes shimmer {
-    0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
-    100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
 }
 
 .logo-text {
@@ -250,6 +587,8 @@ div[data-testid="stButton"] > button:hover {
     font-weight: 400;
 }
 
+
+/* Regular Streamlit Buttons */
 .stButton > button {
     width: 100% !important;
     height: 40px !important;
@@ -300,6 +639,29 @@ div[data-testid="stButton"] > button:hover {
     color: white !important;
     box-shadow: 0 6px 20px rgba(5, 150, 105, 0.4) !important;
 }
+
+/* Download Buttons */
+.stDownloadButton > button {
+    background: linear-gradient(135deg, #059669 0%, #10b981 100%) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-weight: 500 !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 2px 4px rgba(5, 150, 105, 0.2) !important;
+    margin-top: 28.5px !important;
+    font-family: 'Poppins', sans-serif !important;
+    height: 40px !important;
+}
+
+.stDownloadButton > button:hover {
+    background: linear-gradient(135deg, #047857 0%, #059669 100%) !important;
+    box-shadow: 0 4px 8px rgba(5, 150, 105, 0.3) !important;
+    transform: translateY(-1px) !important;
+    color: white !important;
+}
+
+/* KPI Styling */
 
 /* KPI Cards */
 .kpi-card {
@@ -360,65 +722,6 @@ div[data-testid="stButton"] > button:hover {
     font-family: 'Poppins', sans-serif;
 }
 
-/* KPI Square Cards */
-.kpi-square {
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: var(--border-radius);
-    text-align: center;
-    box-shadow: var(--card-shadow);
-    transition: var(--transition);
-    overflow: hidden;
-    width: 100%;
-    max-width: 172px;
-    aspect-ratio: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    margin: 1rem 0;
-    position: relative;
-}
-
-.kpi-square::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: var(--gradient, linear-gradient(135deg, var(--primary-green) 0%, var(--secondary-green) 100%));
-}
-
-.kpi-square:hover {
-    transform: translateY(-2px) scale(1.02);
-    box-shadow: 0 6px 15px rgba(5, 150, 105, 0.15);
-}
-
-.kpi-square.primary { --gradient: linear-gradient(135deg, #059669 0%, #10b981 100%); }
-.kpi-square.secondary { --gradient: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); }
-.kpi-square.tertiary { --gradient: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
-.kpi-square.quaternary { --gradient: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
-
-.kpi-square .kpi-value {
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: #059669;
-    margin-bottom: 0.1rem;
-    line-height: 1;
-    font-family: 'Poppins', sans-serif;
-}
-
-.kpi-square .kpi-label {
-    font-size: 0.5rem;
-    color: #64748b;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-    line-height: 1;
-    font-family: 'Poppins', sans-serif;
-}
-
 /* KPI Circle Cards */
 .kpi-circle {
     background: rgba(255, 255, 255, 0.95) !important;
@@ -446,6 +749,7 @@ div[data-testid="stButton"] > button:hover {
     box-shadow: 0 12px 25px rgba(5, 150, 105, 0.15) !important;
 }
 
+
 /* COMPACT: Plotly Chart Containers */
 .stPlotlyChart {
     background: rgba(255, 255, 255, 0.95) !important;
@@ -454,7 +758,7 @@ div[data-testid="stButton"] > button:hover {
     border-radius: 16px !important;
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06) !important;
     padding: 0 !important;
-    margin-bottom: 1rem !important;
+    margin-bottom: 0.5rem !important;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
@@ -468,17 +772,14 @@ div[data-testid="stButton"] > button:hover {
     overflow: hidden !important;
 }
 
-/* Fix untuk chart titles yang integrated */
 .js-plotly-plot .plotly {
     border-radius: 16px !important;
 }
 
-/* Remove default plotly margins */
 .modebar {
     display: none !important;
 }
 
-/* Consistent Streamlit columns spacing */
 .stColumn {
     padding: 0 0.3rem !important;
 }
@@ -536,169 +837,10 @@ div[data-testid="stButton"] > button:hover {
     font-family: 'Poppins', sans-serif !important;
 }
 
-/* Button styling */
-.stDownloadButton > button {
-    background: linear-gradient(135deg, #059669 0%, #10b981 100%);
-    color: white;
-    border: none;
-    border-radius: 6px;
-    font-weight: 500;
-    transition: all 0.2s ease;
-    box-shadow: 0 2px 4px rgba(5, 150, 105, 0.2);
-}
 
-.stDownloadButton > button:hover {
-    background: linear-gradient(135deg, #047857 0%, #059669 100%);
-    box-shadow: 0 4px 8px rgba(5, 150, 105, 0.3);
-    transform: translateY(-1px);
-    color: white;
-}
-
-.wow-header {
-    position: relative;
-    text-align: center;
-    padding: 0.5rem 1rem;
-    margin-bottom: 1rem; 
-    height: 70px;
-    background: linear-gradient(135deg, #059669 0%, #10b981 30%, #34d399 70%, #6ee7b7 100%);
-    border-radius: 20px;
-    overflow: hidden;
-    box-shadow: 
-        0 15px 30px rgba(5, 150, 105, 0.25),
-        0 0 50px rgba(5, 150, 105, 0.1),
-        inset 0 1px 0 rgba(255, 255, 255, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.header-bg-pattern {
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: 
-        radial-gradient(circle at 20% 30%, rgba(255,255,255,0.1) 2px, transparent 2px),
-        radial-gradient(circle at 80% 70%, rgba(255,255,255,0.08) 1px, transparent 1px),
-        radial-gradient(circle at 50% 50%, rgba(255,255,255,0.06) 1.5px, transparent 1.5px);
-    background-size: 40px 40px, 30px 30px, 50px 50px;
-    opacity: 0.6;
-    animation: 
-        dotPattern 20s ease-in-out infinite,
-        patternRotate 30s linear infinite;
-}
-
-.header-float-1, .header-float-2, .header-float-3, .header-float-4, .header-float-5 {
-    position: absolute;
-    border-radius: 50%;
-}
-
-.header-float-1 {
-    top: 15%;
-    left: 8%;
-    width: 50px;
-    height: 50px;
-    background: radial-gradient(circle, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.05) 100%);
-    animation: 
-        float 6s ease-in-out infinite,
-        glow 3s ease-in-out infinite alternate;
-    filter: blur(0.5px);
-}
-
-.header-float-2 {
-    top: 65%;
-    right: 12%;
-    width: 35px;
-    height: 35px;
-    background: radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.03) 100%);
-    animation: 
-        floatReverse 8s ease-in-out infinite,
-        pulse 2s ease-in-out infinite;
-    filter: blur(0.3px);
-}
-
-.header-float-3 {
-    top: 25%;
-    right: 25%;
-    width: 18px;
-    height: 18px;
-    background: radial-gradient(circle, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.08) 100%);
-    animation: 
-        float 10s ease-in-out infinite,
-        sparkle 1.5s ease-in-out infinite;
-}
-
-.header-float-4 {
-    top: 45%;
-    left: 25%;
-    width: 12px;
-    height: 12px;
-    background: rgba(255, 255, 255, 0.12);
-    animation: 
-        floatSlow 12s ease-in-out infinite,
-        twinkle 2.5s ease-in-out infinite;
-}
-
-.header-float-5 {
-    top: 80%;
-    left: 70%;
-    width: 8px;
-    height: 8px;
-    background: rgba(255, 255, 255, 0.18);
-    animation: 
-        floatTiny 7s ease-in-out infinite,
-        fade 3s ease-in-out infinite;
-}
-
-.header-content {
-    position: relative;
-    z-index: 10;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    animation: contentFloat 6s ease-in-out infinite;
-}
-
-.header-icon {
-    font-size: 1.5rem;
-    margin-right: 0.6rem;
-    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
-    transition: all 0.3s ease;
-}
-
-.header-title {
-    font-size: 1.9rem !important; 
-    font-weight: 600 !important;
-    color: #ffffff !important;
-    margin: 0 !important;
-    font-family: 'Poppins', sans-serif !important;
-    text-shadow: 
-        0 2px 8px rgba(0,0,0,0.3),
-        0 0 20px rgba(255, 255, 255, 0.2),
-        0 0 30px rgba(16, 185, 129, 0.3) !important;
-    letter-spacing: -0.02em !important;
-    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)) !important;
-    text-align: center !important;
-}
-
-@keyframes borderGlow {
-    0% { 
-        background: linear-gradient(45deg, transparent 0%, rgba(255,255,255,0.2) 25%, transparent 50%, rgba(255,255,255,0.2) 75%, transparent 100%);
-    }
-    25% { 
-        background: linear-gradient(135deg, transparent 0%, rgba(255,255,255,0.3) 25%, transparent 50%, rgba(255,255,255,0.15) 75%, transparent 100%);
-    }
-    50% { 
-        background: linear-gradient(225deg, transparent 0%, rgba(255,255,255,0.15) 25%, transparent 50%, rgba(255,255,255,0.3) 75%, transparent 100%);
-    }
-    75% { 
-        background: linear-gradient(315deg, transparent 0%, rgba(255,255,255,0.25) 25%, transparent 50%, rgba(255,255,255,0.2) 75%, transparent 100%);
-    }
-    100% { 
-        background: linear-gradient(45deg, transparent 0%, rgba(255,255,255,0.2) 25%, transparent 50%, rgba(255,255,255,0.2) 75%, transparent 100%);
-    }
+@keyframes shimmer {
+    0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+    100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
 }
 
 @keyframes dotPattern {
@@ -847,24 +989,6 @@ div[data-testid="stButton"] > button:hover {
     }
 }
 
-@keyframes textGlow {
-    0%, 100% { 
-        filter: brightness(1) drop-shadow(0 2px 4px rgba(0,0,0,0.2)); 
-    }
-    50% { 
-        filter: brightness(1.1) drop-shadow(0 4px 8px rgba(0,0,0,0.3)); 
-    }
-}
-
-@keyframes textFloat {
-    0%, 100% { 
-        transform: translateY(0px) scale(1); 
-    }
-    50% { 
-        transform: translateY(-1px) scale(1.01); 
-    }
-}
-
 @keyframes fadeInUp {
     from {
         opacity: 0;
@@ -876,9 +1000,11 @@ div[data-testid="stButton"] > button:hover {
     }
 }
 
-.kpi-card, .stPlotlyChart, .kpi-circle, .kpi-square {
+.kpi-card, .stPlotlyChart, .kpi-circle {
     animation: fadeInUp 0.5s ease-out;
 }
+
+/* responsive design */
 
 @media (max-width: 768px) {
     .css-1lcbmhc {
@@ -897,20 +1023,6 @@ div[data-testid="stButton"] > button:hover {
         margin-bottom: 0.75rem;
     }
     
-    .kpi-square {
-        padding: 0.3rem;
-        margin-bottom: 0.5rem; 
-        max-width: 80px;
-    }
-    
-    .kpi-square .kpi-value {
-        font-size: 0.7rem;
-    }
-    
-    .kpi-square .kpi-label {
-        font-size: 0.45rem;
-    }
-    
     .kpi-value {
         font-size: 1.6rem;
     }
@@ -921,6 +1033,12 @@ div[data-testid="stButton"] > button:hover {
     
     .stPlotlyChart {
         margin-bottom: 0.75rem !important; 
+    }
+    
+
+    
+    .header-title {
+        font-size: 1.5rem !important;
     }
 }
 
