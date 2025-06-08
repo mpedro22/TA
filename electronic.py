@@ -4,6 +4,17 @@ import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
 
+MAIN_PALETTE = ['#9e0142', '#d53e4f', '#f46d43', '#fdae61', '#fee08b', 
+                '#e6f598', '#abdda4', '#66c2a5', '#3288bd', '#5e4fa2']
+
+DEVICE_COLORS = {
+    'Smartphone': '#d53e4f',  
+    'Laptop': '#3288bd',      
+    'Tablet': '#66c2a5',     
+    'AC': '#f46d43',         
+    'Lampu': '#fdae61'        
+}
+
 @st.cache_data(ttl=3600)
 def load_electronic_data():
     """Load electronic data from Google Sheets"""
@@ -145,7 +156,7 @@ def calculate_device_emissions(df, activities_df):
     return device_emissions
 
 def generate_electronic_pdf_report(filtered_df, activities_df, device_emissions, df_responden=None):
-    """Generate comprehensive PDF report content for electronic emissions"""
+    """Generate professional HTML report optimized for PDF printing"""
     from datetime import datetime
     import pandas as pd
     
@@ -231,6 +242,54 @@ def generate_electronic_pdf_report(filtered_df, activities_df, device_emissions,
     avg_laptop_duration = valid_responden['durasi_laptop'].mean() if 'durasi_laptop' in valid_responden.columns else 0
     avg_tablet_duration = valid_responden['durasi_tab'].mean() if 'durasi_tab' in valid_responden.columns else 0
     
+    # Duration distribution analysis
+    duration_stats = {}
+    if 'durasi_hp' in valid_responden.columns:
+        smartphone_data = valid_responden[valid_responden['durasi_hp'] > 0]['durasi_hp']
+        if not smartphone_data.empty:
+            duration_stats['Smartphone'] = {
+                'median': smartphone_data.median(),
+                'q75': smartphone_data.quantile(0.75),
+                'q25': smartphone_data.quantile(0.25),
+                'max': smartphone_data.max(),
+                'users': len(smartphone_data)
+            }
+    
+    if 'durasi_laptop' in valid_responden.columns:
+        laptop_data = valid_responden[valid_responden['durasi_laptop'] > 0]['durasi_laptop']
+        if not laptop_data.empty:
+            duration_stats['Laptop'] = {
+                'median': laptop_data.median(),
+                'q75': laptop_data.quantile(0.75),
+                'q25': laptop_data.quantile(0.25),
+                'max': laptop_data.max(),
+                'users': len(laptop_data)
+            }
+    
+    if 'durasi_tab' in valid_responden.columns:
+        tablet_data = valid_responden[valid_responden['durasi_tab'] > 0]['durasi_tab']
+        if not tablet_data.empty:
+            duration_stats['Tablet'] = {
+                'median': tablet_data.median(),
+                'q75': tablet_data.quantile(0.75),
+                'q25': tablet_data.quantile(0.25),
+                'max': tablet_data.max(),
+                'users': len(tablet_data)
+            }
+    
+    # Heatmap analysis
+    heatmap_conclusion = "Data aktivitas harian tidak tersedia."
+    peak_time_range = "N/A"
+    peak_day = "N/A"
+    if not activities_df.empty:
+        # Find peak emission time and day
+        activities_df['total_emisi_activity'] = activities_df['emisi_ac'] + activities_df['emisi_lampu']
+        if not activities_df.empty:
+            peak_activity = activities_df.loc[activities_df['total_emisi_activity'].idxmax()]
+            peak_time_range = peak_activity.get('time_range', 'N/A')
+            peak_day = peak_activity.get('day', 'N/A')
+            heatmap_conclusion = f"Aktivitas tertinggi terjadi pada hari {peak_day} di jam {peak_time_range} dengan emisi {peak_activity['total_emisi_activity']:.2f} kg CO₂."
+    
     # Device emissions analysis for insights
     if device_emissions:
         dominant_device = max(device_emissions.items(), key=lambda x: x[1])
@@ -251,537 +310,547 @@ def generate_electronic_pdf_report(filtered_df, activities_df, device_emissions,
         infrastructure_percentage = 0
         personal_percentage = 0
     
-    # Generate dynamic insights
-    insights = []
-    
-    # Device usage insights - find most used device dynamically
-    device_usage = {
-        'Smartphone': smartphone_users,
-        'Laptop': laptop_users, 
-        'Tablet': tablet_users
-    }
-    
-    if any(device_usage.values()):
-        most_used_device = max(device_usage.items(), key=lambda x: x[1])
-        most_used_percentage = (most_used_device[1] / total_responden * 100) if total_responden > 0 else 0
-        
-        if most_used_percentage > 80:
-            insights.append(f"{most_used_device[0]} digunakan oleh hampir semua mahasiswa ({most_used_device[1]} dari {total_responden} responden atau {most_used_percentage:.1f}%), menunjukkan ketergantungan tinggi pada perangkat ini")
-        elif most_used_percentage > 60:
-            insights.append(f"{most_used_device[0]} adalah perangkat dominan dengan {most_used_device[1]} pengguna ({most_used_percentage:.1f}% dari total responden)")
-        else:
-            insights.append(f"Penggunaan perangkat relatif terdistribusi merata, dengan {most_used_device[0]} sebagai yang tertinggi ({most_used_percentage:.1f}%)")
-    
-    # Daily pattern insights with better explanation
-    if daily_analysis and len(daily_analysis) >= 5:
-        if avg_weekday > avg_weekend * 1.2:  # 20% higher threshold
-            difference = ((avg_weekday - avg_weekend) / avg_weekend * 100)
-            insights.append(f"Aktivitas kampus pada hari kerja menghasilkan emisi {difference:.1f}% lebih tinggi dari weekend, mengindikasikan pola akademik yang konsisten")
-        elif avg_weekend > avg_weekday * 1.2:
-            difference = ((avg_weekend - avg_weekday) / avg_weekday * 100)
-            insights.append(f"Emisi weekend {difference:.1f}% lebih tinggi dari hari kerja, kemungkinan karena aktivitas non-akademik atau fasilitas yang tetap beroperasi")
-        else:
-            insights.append(f"Pola emisi relatif stabil sepanjang minggu (weekday: {avg_weekday:.1f} vs weekend: {avg_weekend:.1f} kg CO₂), menunjukkan konsistensi penggunaan fasilitas")
-    
-    # Device dominance insights with context
-    if dominant_percentage > 60:
-        insights.append(f"{dominant_device[0]} sangat mendominasi dengan {dominant_percentage:.1f}% total emisi - ini adalah area prioritas utama untuk efisiensi energi")
-    elif dominant_percentage > 40:
-        insights.append(f"{dominant_device[0]} memberikan kontribusi terbesar ({dominant_percentage:.1f}%) namun tidak mendominasi sepenuhnya - diperlukan pendekatan holistik")
-    elif dominant_percentage < 25:
-        insights.append(f"Emisi terdistribusi merata antar perangkat (tertinggi {dominant_device[0]}: {dominant_percentage:.1f}%) - efisiensi perlu ditingkatkan di semua lini")
-    
-    # Infrastructure vs Personal insight with actionable context
-    if infrastructure_percentage > personal_percentage * 1.5:
-        insights.append(f"Infrastruktur kampus (AC, lampu) berkontribusi {infrastructure_percentage:.1f}% vs perangkat personal {personal_percentage:.1f}% - fokus pada optimasi building management system akan memberikan dampak terbesar")
-    elif personal_percentage > infrastructure_percentage * 1.5:
-        insights.append(f"Perangkat personal mendominasi ({personal_percentage:.1f}% vs infrastruktur {infrastructure_percentage:.1f}%) - program edukasi digital sustainability kepada mahasiswa menjadi kunci")
-    else:
-        insights.append(f"Kontribusi infrastruktur dan perangkat personal relatif seimbang - diperlukan strategi terintegrasi untuk kedua aspek")
-    
-    # Usage duration insights with health/productivity context
-    if avg_smartphone_duration > 10:
-        insights.append(f"Intensitas smartphone sangat tinggi ({avg_smartphone_duration:.1f} jam/hari) - berpotensi mempengaruhi produktivitas akademik dan meningkatkan jejak karbon digital")
-    elif avg_laptop_duration > 12:
-        insights.append(f"Penggunaan laptop intensif ({avg_laptop_duration:.1f} jam/hari) mengindikasikan beban akademik tinggi - perlu optimasi power management")
-    elif avg_smartphone_duration < 3 and avg_laptop_duration < 4:
-        insights.append(f"Penggunaan perangkat relatif rendah (smartphone: {avg_smartphone_duration:.1f}h, laptop: {avg_laptop_duration:.1f}h) - pola yang baik untuk sustainability")
-    
-    # Outlier insights with actionable explanation
-    if not top_fakultas.empty:
-        highest_fakultas_emission = top_fakultas.iloc[0]['avg_emission']
-        if highest_fakultas_emission > avg_emisi_per_person * 2:
-            fakultas_name = top_fakultas.iloc[0]['fakultas']
-            multiplier = highest_fakultas_emission / avg_emisi_per_person
-            insights.append(f"Fakultas {fakultas_name} memiliki rata-rata emisi {multiplier:.1f}x lebih tinggi dari rata-rata umum - kemungkinan karena kebutuhan peralatan khusus atau jam operasional yang berbeda, perlu investigasi lebih lanjut")
-    
-    # Faculty pattern insights
-    if not top_fakultas.empty and len(top_fakultas) >= 2:
-        highest_faculty = top_fakultas.iloc[0]
-        second_faculty = top_fakultas.iloc[1]
-        gap_percentage = ((highest_faculty['avg_emission'] - second_faculty['avg_emission']) / second_faculty['avg_emission'] * 100)
-        
-        if gap_percentage > 50:
-            insights.append(f"Terdapat kesenjangan emisi signifikan antar fakultas - {highest_faculty['fakultas']} {gap_percentage:.1f}% lebih tinggi dari {second_faculty['fakultas']}, menunjukkan perbedaan pola penggunaan yang perlu diselaraskan")
-    
+    # CONSISTENT WITH TRANSPORTATION REPORT STYLING
     html_content = f"""
     <!DOCTYPE html>
     <html>
     <head>
         <meta charset="UTF-8">
+        <title>Laporan Emisi Elektronik ITB</title>
+        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
         <style>
-            * {{
+            @page {{
+                size: A4;
+                margin: 15mm;
+            }}
+            
+            @media print {{
+                body {{
+                    -webkit-print-color-adjust: exact !important;
+                    color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                }}
+                
+                .no-print {{
+                    display: none !important;
+                }}
+                
+                .page-break {{
+                    page-break-before: always;
+                }}
+                
+                .avoid-break {{
+                    page-break-inside: avoid;
+                }}
+            }}
+            
+            body {{
+                font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+                line-height: 1.4;
+                color: #1f2937;
                 margin: 0;
                 padding: 0;
-                box-sizing: border-box;
-            }}
-            
-            body {{ 
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-                line-height: 1.6;
-                color: #2d3748;
-                background-color: #f7fafc;
-                margin: 0;
-                padding: 20px;
-            }}
-            
-            .container {{
-                max-width: 1000px;
-                margin: 0 auto;
+                font-size: 11px;
                 background: white;
-                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-                border-radius: 8px;
-                overflow: hidden;
             }}
             
             .header {{
-                background: #2d5a3d;
-                color: white;
-                padding: 30px;
                 text-align: center;
+                margin-bottom: 25px;
+                padding: 20px 0;
+                border-bottom: 2px solid #16a34a;
             }}
             
             .header h1 {{
-                font-size: 24px;
+                font-size: 20px;
                 font-weight: 600;
-                margin-bottom: 8px;
+                color: #16a34a;
+                margin: 0 0 8px 0;
             }}
             
-            .header h2 {{
-                font-size: 14px;
+            .header .subtitle {{
+                font-size: 12px;
+                color: #6b7280;
+                margin-bottom: 5px;
                 font-weight: 400;
-                opacity: 0.9;
-                margin-bottom: 15px;
             }}
             
             .header .timestamp {{
-                font-size: 12px;
-                opacity: 0.8;
-                background: rgba(255,255,255,0.1);
-                padding: 6px 12px;
+                font-size: 9px;
+                color: #9ca3af;
+                font-weight: 300;
+            }}
+            
+            .print-instruction {{
+                background: #f0fdf4;
+                border: 1px solid #bbf7d0;
                 border-radius: 4px;
-                display: inline-block;
+                padding: 10px;
+                margin-bottom: 20px;
+                text-align: center;
+                font-weight: 500;
+                color: #16a34a;
+                font-size: 10px;
             }}
             
-            .content {{
-                padding: 30px;
+            .executive-summary {{
+                background: #fafafa;
+                border: 1px solid #e5e7eb;
+                border-radius: 6px;
+                padding: 20px;
+                margin-bottom: 25px;
             }}
             
-            .kpi-grid {{
+            .metrics-grid {{
                 display: grid;
                 grid-template-columns: repeat(2, 1fr);
-                gap: 20px;
-                margin-bottom: 30px;
-                max-width: 600px;
-                margin-left: auto;
-                margin-right: auto;
+                gap: 15px;
+                margin-bottom: 10px;
             }}
             
-            .kpi-card {{
-                background: #f8f9fa;
-                padding: 20px;
+            .metric-card {{
+                background: white;
+                border: 1px solid #16a34a;
                 border-radius: 6px;
+                padding: 15px;
                 text-align: center;
-                border: 1px solid #e2e8f0;
             }}
             
-            .kpi-value {{
-                font-size: 28px;
-                font-weight: 700;
-                color: #2d5a3d;
-                margin-bottom: 5px;
+            .metric-value {{
+                font-size: 20px;
+                font-weight: 600;
+                color: #16a34a;
+                margin-bottom: 4px;
                 display: block;
             }}
             
-            .kpi-label {{
-                font-size: 12px;
-                color: #718096;
+            .metric-label {{
+                font-size: 9px;
+                color: #6b7280;
+                font-weight: 400;
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
-                font-weight: 500;
             }}
             
             .section {{
-                margin-bottom: 30px;
-                background: #f8f9fa;
-                padding: 25px;
-                border-radius: 6px;
-                border: 1px solid #e2e8f0;
+                margin-bottom: 20px;
+                page-break-inside: avoid;
             }}
             
             .section-title {{
-                font-size: 18px;
+                font-size: 13px;
                 font-weight: 600;
-                color: #2d3748;
-                margin-bottom: 20px;
-                padding-bottom: 10px;
-                border-bottom: 2px solid #10b981;
+                color: #16a34a;
+                margin-bottom: 10px;
+                padding-bottom: 5px;
+                border-bottom: 1px solid #16a34a;
             }}
             
-            .insights-grid {{
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-                gap: 15px;
-                margin-bottom: 20px;
-            }}
-            
-            .insight-box {{
-                background: white;
+            .section-content {{
+                background: #fafafa;
+                border: 1px solid #e5e7eb;
+                border-radius: 4px;
                 padding: 15px;
-                border-radius: 4px;
-                border: 1px solid #e2e8f0;
             }}
             
-            .insight-title {{
-                font-weight: 600;
-                color: #2d3748;
-                margin-bottom: 8px;
-                font-size: 14px;
-            }}
-            
-            .insight-value {{
-                font-size: 22px;
-                font-weight: 700;
-                color: #10b981;
-                margin-bottom: 5px;
-            }}
-            
-            .insight-description {{
-                color: #718096;
-                font-size: 12px;
-            }}
-            
-            .table-container {{
-                background: white;
-                border-radius: 4px;
-                overflow: hidden;
-                border: 1px solid #e2e8f0;
-                margin-bottom: 15px;
+            .conclusion {{
+                background: #f0fdf4;
+                border-left: 3px solid #16a34a;
+                padding: 10px;
+                margin-top: 10px;
+                font-style: italic;
+                color: #374151;
+                font-size: 10px;
             }}
             
             table {{
                 width: 100%;
                 border-collapse: collapse;
+                margin-bottom: 10px;
+                background: white;
+                font-size: 9px;
             }}
             
             th {{
-                background: #f0fdf4;
-                color: #2d3748;
-                padding: 12px 15px;
-                text-align: left;
-                font-weight: 600;
-                font-size: 13px;
-                border-bottom: 1px solid #e2e8f0;
+                background: #16a34a !important;
+                color: white !important;
+                padding: 8px 5px;
+                text-align: center;
+                font-weight: 500;
+                border: 1px solid #16a34a;
+                font-size: 8px;
             }}
             
             td {{
-                padding: 10px 15px;
-                border-bottom: 1px solid #f1f5f9;
-                font-size: 13px;
+                padding: 6px 5px;
+                text-align: center;
+                border: 1px solid #e5e7eb;
+                font-size: 8px;
             }}
             
             tr:nth-child(even) {{
-                background-color: #f8f9fa;
-            }}
-            
-            .key-insights {{
-                background: white;
-                padding: 20px;
-                border-radius: 6px;
-                border-left: 4px solid #10b981;
-                margin: 20px 0;
-            }}
-            
-            .key-insights h3 {{
-                color: #2d3748;
-                margin-bottom: 15px;
-                font-size: 16px;
-                font-weight: 600;
-            }}
-            
-            .insights-list {{
-                list-style: none;
-                padding: 0;
-            }}
-            
-            .insights-list li {{
-                padding: 8px 0;
-                color: #4a5568;
-                border-bottom: 1px solid #f1f5f9;
-                font-size: 14px;
-                line-height: 1.5;
-            }}
-            
-            .insights-list li:last-child {{
-                border-bottom: none;
-            }}
-            
-            .insights-list li::before {{
-                content: '•';
-                color: #10b981;
-                font-weight: bold;
-                margin-right: 8px;
+                background: #f9fafb !important;
             }}
             
             .footer {{
-                background: #2d5a3d;
-                color: white;
-                padding: 20px;
+                margin-top: 25px;
+                padding-top: 15px;
+                border-top: 1px solid #16a34a;
                 text-align: center;
+                font-size: 9px;
+                color: #6b7280;
+                page-break-inside: avoid;
             }}
-            
-            .footer p {{
-                margin-bottom: 3px;
-                opacity: 0.9;
-                font-size: 12px;
-            }}
-            
-            .status-badge {{
-                padding: 3px 8px;
-                border-radius: 3px;
-                font-size: 11px;
-                font-weight: 500;
-            }}
-            
-            .status-high {{ background: #fecaca; color: #dc2626; }}
-            .status-medium {{ background: #fef3c7; color: #d97706; }}
-            .status-low {{ background: #d1fae5; color: #059669; }}
         </style>
     </head>
     <body>
-        <div class="container">
-            <div class="header">
-                <h1>Laporan Emisi Elektronik ITB</h1>
-                <h2>Analisis Penggunaan Perangkat Elektronik & Infrastruktur Kampus</h2>
-                <div class="timestamp">Generated on {datetime.now().strftime('%d %B %Y, %H:%M:%S WIB')}</div>
+        <div class="print-instruction no-print">
+            <strong>Export PDF:</strong> Tekan Ctrl+P (Windows) atau Cmd+P (Mac), pilih "Save as PDF", lalu klik Save
+        </div>
+        
+        <div class="header">
+            <h1>LAPORAN EMISI ELEKTRONIK</h1>
+            <div class="subtitle">Institut Teknologi Bandung</div>
+            <div class="timestamp">Dibuat pada {datetime.now().strftime('%d %B %Y, %H:%M WIB')}</div>
+        </div>
+        
+        <div class="executive-summary avoid-break">
+            <h2 style="margin-top: 0; color: #16a34a; font-size: 14px; font-weight: 600;">Ringkasan</h2>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <span class="metric-value">{total_emisi:.1f}</span>
+                    <div class="metric-label">Total Emisi (kg CO₂)</div>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-value">{avg_emisi_per_person:.2f}</span>
+                    <div class="metric-label">Rata-rata per Mahasiswa</div>
+                </div>
             </div>
-            
-            <div class="content">
-                <!-- Executive Summary -->
-                <div class="kpi-grid">
-                    <div class="kpi-card">
-                        <div class="kpi-value">{total_responden:,}</div>
-                        <div class="kpi-label">Total Responden</div>
-                    </div>
-                    <div class="kpi-card">
-                        <div class="kpi-value">{avg_emisi_per_person:.2f}</div>
-                        <div class="kpi-label">Rata-rata Emisi per Orang</div>
-                    </div>
-                </div>
-                
-                <!-- Device Usage Statistics -->
-                <div class="section">
-                    <h3 class="section-title">Statistik Penggunaan Perangkat</h3>
-                    <div class="insights-grid">
-                        <div class="insight-box">
-                            <div class="insight-title">Pengguna Smartphone</div>
-                            <div class="insight-value">{smartphone_users}</div>
-                            <div class="insight-description">dari {total_responden} responden ({smartphone_users/total_responden*100 if total_responden > 0 else 0:.1f}%)</div>
-                        </div>
-                        <div class="insight-box">
-                            <div class="insight-title">Pengguna Laptop</div>
-                            <div class="insight-value">{laptop_users}</div>
-                            <div class="insight-description">dari {total_responden} responden ({laptop_users/total_responden*100 if total_responden > 0 else 0:.1f}%)</div>
-                        </div>
-                        <div class="insight-box">
-                            <div class="insight-title">Pengguna Tablet</div>
-                            <div class="insight-value">{tablet_users}</div>
-                            <div class="insight-description">dari {total_responden} responden ({tablet_users/total_responden*100 if total_responden > 0 else 0:.1f}%)</div>
-                        </div>
-                        <div class="insight-box">
-                            <div class="insight-title">Rata-rata Durasi Smartphone</div>
-                            <div class="insight-value">{avg_smartphone_duration:.1f}</div>
-                            <div class="insight-description">jam per hari</div>
-                        </div>
-                        <div class="insight-box">
-                            <div class="insight-title">Rata-rata Durasi Laptop</div>
-                            <div class="insight-value">{avg_laptop_duration:.1f}</div>
-                            <div class="insight-description">jam per hari</div>
-                        </div>
-                        <div class="insight-box">
-                            <div class="insight-title">Rata-rata Durasi Tablet</div>
-                            <div class="insight-value">{avg_tablet_duration:.1f}</div>
-                            <div class="insight-description">jam per hari</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Device Emissions Breakdown -->
-                <div class="section">
-                    <h3 class="section-title">Breakdown Emisi per Perangkat</h3>
-                    <div class="table-container">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Perangkat</th>
-                                    <th>Total Emisi (kg CO₂)</th>
-                                    <th>Persentase (%)</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
+        </div>
+        
+        <!-- 1. Komposisi Emisi per Perangkat -->
+        <div class="section avoid-break">
+            <h2 class="section-title">1. Komposisi Emisi per Perangkat</h2>
+            <div class="section-content">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Perangkat</th>
+                            <th>Total Emisi (kg CO₂)</th>
+                            <th>Persentase (%)</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
     """
     
     # Add device emissions data
     for device, emisi in device_emissions.items():
         percentage = (emisi / total_emisi * 100) if total_emisi > 0 else 0
         if percentage > 30:
-            status = '<span class="status-badge status-high">Tinggi</span>'
+            status = 'Tinggi'
         elif percentage > 15:
-            status = '<span class="status-badge status-medium">Sedang</span>'
+            status = 'Sedang'
         else:
-            status = '<span class="status-badge status-low">Rendah</span>'
+            status = 'Rendah'
         
         html_content += f"""
-                                <tr>
-                                    <td><strong>{device}</strong></td>
-                                    <td>{emisi:.2f}</td>
-                                    <td>{percentage:.1f}%</td>
-                                    <td>{status}</td>
-                                </tr>
+                        <tr>
+                            <td style="text-align: left; font-weight: 500;">{device}</td>
+                            <td>{emisi:.2f}</td>
+                            <td>{percentage:.1f}%</td>
+                            <td>{status}</td>
+                        </tr>
         """
     
     html_content += f"""
-                            </tbody>
-                        </table>
-                    </div>
+                    </tbody>
+                </table>
+                <div class="conclusion">
+                    <strong>Kesimpulan:</strong> {dominant_device[0]} mendominasi dengan {dominant_percentage:.1f}% total emisi perangkat elektronik.
                 </div>
-                
-                <!-- Daily Emissions Analysis -->
-                <div class="section">
-                    <h3 class="section-title">Analisis Emisi Harian</h3>
-                    <div class="insights-grid">
-                        <div class="insight-box">
-                            <div class="insight-title">Hari dengan Emisi Tertinggi</div>
-                            <div class="insight-value">{highest_day['day']}</div>
-                            <div class="insight-description">{highest_day['emission']:.2f} kg CO₂</div>
-                        </div>
-                        <div class="insight-box">
-                            <div class="insight-title">Hari dengan Emisi Terendah</div>
-                            <div class="insight-value">{lowest_day['day']}</div>
-                            <div class="insight-description">{lowest_day['emission']:.2f} kg CO₂</div>
-                        </div>
-                        <div class="insight-box">
-                            <div class="insight-title">Rata-rata Hari Kerja</div>
-                            <div class="insight-value">{avg_weekday:.1f}</div>
-                            <div class="insight-description">kg CO₂ (Senin-Jumat)</div>
-                        </div>
-                        <div class="insight-box">
-                            <div class="insight-title">Rata-rata Weekend</div>
-                            <div class="insight-value">{avg_weekend:.1f}</div>
-                            <div class="insight-description">kg CO₂ (Sabtu-Minggu)</div>
-                        </div>
-                    </div>
-                    
-                    <div class="table-container">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Hari</th>
-                                    <th>Emisi (kg CO₂)</th>
-                                    <th>Persentase dari Total</th>
-                                </tr>
-                            </thead>
-                            <tbody>
+            </div>
+        </div>
+        
+        <!-- 2. Tren Emisi Harian -->
+        <div class="section avoid-break">
+            <h2 class="section-title">2. Tren Emisi Harian</h2>
+            <div class="section-content">
     """
     
-    # Add daily emissions data
-    total_daily_emissions = sum([d['emission'] for d in daily_analysis])
-    for day_data in daily_analysis:
-        percentage = (day_data['emission'] / total_daily_emissions * 100) if total_daily_emissions > 0 else 0
-        html_content += f"""
-                                <tr>
-                                    <td><strong>{day_data['day']}</strong></td>
-                                    <td>{day_data['emission']:.2f}</td>
-                                    <td>{percentage:.1f}%</td>
-                                </tr>
+    if daily_analysis:
+        html_content += """
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Hari</th>
+                            <th>Total Emisi (kg CO₂)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
         """
+        for day_data in daily_analysis:
+            html_content += f"""
+                        <tr>
+                            <td style="text-align: left; font-weight: 500;">{day_data['day']}</td>
+                            <td>{day_data['emission']:.2f}</td>
+                        </tr>
+            """
+        html_content += "</tbody></table>"
+    else:
+        html_content += "<p>Data emisi harian tidak tersedia.</p>"
     
-    html_content += """
-                            </tbody>
-                        </table>
-                    </div>
+    html_content += f"""
+                <div class="conclusion">
+                    <strong>Kesimpulan:</strong> Hari {highest_day['day']} mencatat emisi tertinggi ({highest_day['emission']:.1f} kg CO₂), hari {lowest_day['day']} terendah ({lowest_day['emission']:.1f} kg CO₂).
                 </div>
+            </div>
+        </div>
+        
+        <!-- 3. Emisi per Fakultas -->
+        <div class="section avoid-break">
+            <h2 class="section-title">3. Emisi per Fakultas</h2>
+            <div class="section-content">
     """
     
-    # Add top fakultas if available
     if not top_fakultas.empty:
-        html_content += f"""
-                <div class="section">
-                    <h3 class="section-title">Fakultas dengan Rata-rata Emisi Tertinggi</h3>
-                    <div class="table-container">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Ranking</th>
-                                    <th>Fakultas</th>
-                                    <th>Rata-rata Emisi (kg CO₂/minggu)</th>
-                                    <th>Jumlah Mahasiswa</th>
-                                </tr>
-                            </thead>
-                            <tbody>
+        html_content += """
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Ranking</th>
+                            <th>Fakultas</th>
+                            <th>Rata-rata Emisi (kg CO₂/minggu)</th>
+                            <th>Jumlah Mahasiswa</th>
+                        </tr>
+                    </thead>
+                    <tbody>
         """
         
         for idx, (_, row) in enumerate(top_fakultas.iterrows(), 1):
             html_content += f"""
-                                <tr>
-                                    <td><strong>#{idx}</strong></td>
-                                    <td>{row['fakultas']}</td>
-                                    <td>{row['avg_emission']:.2f}</td>
-                                    <td>{row['student_count']} mahasiswa</td>
-                                </tr>
+                        <tr>
+                            <td><strong>#{idx}</strong></td>
+                            <td style="text-align: left; font-weight: 500;">{row['fakultas']}</td>
+                            <td>{row['avg_emission']:.2f}</td>
+                            <td>{row['student_count']} mahasiswa</td>
+                        </tr>
             """
         
         html_content += """
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                    </tbody>
+                </table>
         """
-    
-    # Add dynamic insights
-    if insights:
-        html_content += f"""
-                <div class="key-insights">
-                    <h3>Key Insights</h3>
-                    <ul class="insights-list">
-        """
-        for insight in insights:
-            html_content += f"<li>{insight}</li>"
-        
-        html_content += """
-                    </ul>
-                </div>
-        """
+        fakultas_conclusion = f"{top_fakultas.iloc[0]['fakultas']} memiliki rata-rata emisi elektronik tertinggi sebesar {top_fakultas.iloc[0]['avg_emission']:.2f} kg CO₂ per minggu."
+    else:
+        html_content += "<p>Data fakultas tidak tersedia.</p>"
+        fakultas_conclusion = "Data fakultas tidak tersedia."
     
     html_content += f"""
+                <div class="conclusion">
+                    <strong>Kesimpulan:</strong> {fakultas_conclusion}
+                </div>
             </div>
+        </div>
+        
+        <!-- 4. Analisis Waktu dan Ruang (Heatmap) -->
+        <div class="section avoid-break">
+            <h2 class="section-title">4. Analisis Waktu dan Ruang</h2>
+            <div class="section-content">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Metrik</th>
+                            <th>Nilai</th>
+                            <th>Keterangan</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="text-align: left; font-weight: 500;">Waktu Puncak</td>
+                            <td>{peak_time_range}</td>
+                            <td>Jam dengan aktivitas tertinggi</td>
+                        </tr>
+                        <tr>
+                            <td style="text-align: left; font-weight: 500;">Hari Puncak</td>
+                            <td>{peak_day}</td>
+                            <td>Hari dengan aktivitas tertinggi</td>
+                        </tr>
+                        <tr>
+                            <td style="text-align: left; font-weight: 500;">Total Aktivitas</td>
+                            <td>{len(activities_df)} sesi</td>
+                            <td>Jumlah sesi pembelajaran</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="conclusion">
+                    <strong>Kesimpulan:</strong> {heatmap_conclusion}
+                </div>
+            </div>
+        </div>
+        
+        <!-- 5. Pola Emisi per Responden -->
+        <div class="section avoid-break">
+            <h2 class="section-title">5. Pola Emisi per Responden</h2>
+            <div class="section-content">
+    """
+    
+    # Calculate user categorization for report
+    if not filtered_df.empty:
+        user_emissions_report = filtered_df[['id_responden', 'emisi_elektronik_mingguan']].copy()
+        Q1 = user_emissions_report['emisi_elektronik_mingguan'].quantile(0.25)
+        Q3 = user_emissions_report['emisi_elektronik_mingguan'].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        median_val = user_emissions_report['emisi_elektronik_mingguan'].median()
+        
+        # Count categories
+        heavy_users = len(user_emissions_report[user_emissions_report['emisi_elektronik_mingguan'] > upper_bound])
+        light_users = len(user_emissions_report[user_emissions_report['emisi_elektronik_mingguan'] < lower_bound])
+        eco_users = len(user_emissions_report[user_emissions_report['emisi_elektronik_mingguan'] < median_val * 0.5])
+        high_users = len(user_emissions_report[user_emissions_report['emisi_elektronik_mingguan'] > median_val * 1.5])
+        normal_users = total_responden - heavy_users - light_users - eco_users - high_users
+        
+        html_content += f"""
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Kategori Pengguna</th>
+                            <th>Jumlah</th>
+                            <th>Persentase</th>
+                            <th>Range Emisi (kg CO₂)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="text-align: left; font-weight: 500;">Eco User</td>
+                            <td>{eco_users}</td>
+                            <td>{eco_users/total_responden*100:.1f}%</td>
+                            <td>< {median_val * 0.5:.2f}</td>
+                        </tr>
+                        <tr>
+                            <td style="text-align: left; font-weight: 500;">Light User</td>
+                            <td>{light_users}</td>
+                            <td>{light_users/total_responden*100:.1f}%</td>
+                            <td>< {lower_bound:.2f}</td>
+                        </tr>
+                        <tr>
+                            <td style="text-align: left; font-weight: 500;">Normal User</td>
+                            <td>{normal_users}</td>
+                            <td>{normal_users/total_responden*100:.1f}%</td>
+                            <td>{lower_bound:.2f} - {upper_bound:.2f}</td>
+                        </tr>
+                        <tr>
+                            <td style="text-align: left; font-weight: 500;">High User</td>
+                            <td>{high_users}</td>
+                            <td>{high_users/total_responden*100:.1f}%</td>
+                            <td>> {median_val * 1.5:.2f}</td>
+                        </tr>
+                        <tr>
+                            <td style="text-align: left; font-weight: 500;">Heavy User</td>
+                            <td>{heavy_users}</td>
+                            <td>{heavy_users/total_responden*100:.1f}%</td>
+                            <td>> {upper_bound:.2f}</td>
+                        </tr>
+                    </tbody>
+                </table>
+        """
+        
+        # Find dominant user category
+        categories = [
+            ('Eco User', eco_users),
+            ('Light User', light_users), 
+            ('Normal User', normal_users),
+            ('High User', high_users),
+            ('Heavy User', heavy_users)
+        ]
+        dominant_category = max(categories, key=lambda x: x[1])
+        user_pattern_conclusion = f"Kategori {dominant_category[0]} mendominasi dengan {dominant_category[1]} mahasiswa ({dominant_category[1]/total_responden*100:.1f}%), menunjukkan pola penggunaan yang {dominant_category[0].lower().replace(' user', '')}."
+    else:
+        html_content += "<p>Data pola emisi per responden tidak tersedia.</p>"
+        user_pattern_conclusion = "Data pola emisi per responden tidak tersedia."
+    
+    html_content += f"""
+                <div class="conclusion">
+                    <strong>Kesimpulan:</strong> {user_pattern_conclusion}
+                </div>
+            </div>
+        </div>
+        
+        <!-- 6. Gedung Kelas Terpopuler -->
+        <div class="section avoid-break">
+            <h2 class="section-title">6. Gedung Kelas Terpopuler</h2>
+            <div class="section-content">
+    """
+    
+    # Calculate location stats for report
+    if not activities_df.empty and 'lokasi' in activities_df.columns:
+        class_activities_report = activities_df[activities_df['kegiatan'].str.contains('kelas', case=False, na=False)]
+        
+        if not class_activities_report.empty:
+            location_stats_report = class_activities_report.groupby('lokasi').agg({
+                'emisi_ac': 'sum',
+                'emisi_lampu': 'sum',
+                'duration': 'sum'
+            }).reset_index()
+            location_stats_report['total_emisi'] = location_stats_report['emisi_ac'] + location_stats_report['emisi_lampu']
+            location_stats_report['session_count'] = class_activities_report.groupby('lokasi').size().values
+            location_stats_report['avg_emisi_per_session'] = location_stats_report['total_emisi'] / location_stats_report['session_count']
             
-            <div class="footer">
-                <p><strong>Institut Teknologi Bandung</strong></p>
-                <p>Carbon Emission Dashboard - Electronic Devices Analysis</p>
-                <p>Data analysis mendukung pencapaian target sustainability ITB</p>
+            # Sort by session count and take top 5 for report
+            top_locations = location_stats_report.sort_values('session_count', ascending=False).head(5)
+            
+            html_content += """
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Ranking</th>
+                            <th>Gedung Kelas</th>
+                            <th>Jumlah Sesi</th>
+                            <th>Total Emisi (kg CO₂)</th>
+                            <th>Emisi per Sesi (kg CO₂)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            """
+            
+            for idx, (_, row) in enumerate(top_locations.iterrows(), 1):
+                html_content += f"""
+                            <tr>
+                                <td><strong>#{idx}</strong></td>
+                                <td style="text-align: left; font-weight: 500;">{row['lokasi']}</td>
+                                <td>{row['session_count']}</td>
+                                <td>{row['total_emisi']:.2f}</td>
+                                <td>{row['avg_emisi_per_session']:.2f}</td>
+                            </tr>
+                """
+            
+            html_content += "</tbody></table>"
+            
+            # Calculate insights for location usage
+            most_used_location = top_locations.iloc[0]
+            total_sessions = top_locations['session_count'].sum()
+            most_used_percentage = (most_used_location['session_count'] / total_sessions * 100)
+            
+            location_conclusion = f"Gedung {most_used_location['lokasi']} merupakan gedung terpopuler dengan {most_used_location['session_count']} sesi ({most_used_percentage:.1f}% dari total aktivitas) dan emisi rata-rata {most_used_location['avg_emisi_per_session']:.2f} kg CO₂ per sesi."
+        else:
+            html_content += "<p>Data aktivitas kelas tidak tersedia.</p>"
+            location_conclusion = "Data aktivitas kelas tidak tersedia."
+    else:
+        html_content += "<p>Data lokasi kelas tidak tersedia.</p>"
+        location_conclusion = "Data lokasi kelas tidak tersedia."
+    
+    html_content += f"""
+                <div class="conclusion">
+                    <strong>Kesimpulan:</strong> {location_conclusion}
+                </div>
             </div>
+        </div>
+        
+        <div class="footer">
+            <p><strong>Institut Teknologi Bandung</strong></p>
+            <p>Carbon Emission Dashboard - Electronic Devices Report</p>
         </div>
     </body>
     </html>
@@ -790,7 +859,6 @@ def generate_electronic_pdf_report(filtered_df, activities_df, device_emissions,
     return html_content
 
 def show():
-    # Header dengan styling dari style.css
     st.markdown("""
     <div class="wow-header">
         <div class="header-bg-pattern"></div>
@@ -814,19 +882,16 @@ def show():
         st.error("Data elektronik tidak tersedia")
         return
 
-    # Data processing
     df_electronic['emisi_elektronik_mingguan'] = pd.to_numeric(df_electronic['emisi_elektronik_mingguan'], errors='coerce')
     df_electronic = df_electronic.dropna(subset=['emisi_elektronik_mingguan'])
     
-    # Process personal device data
     df_electronic['durasi_hp'] = pd.to_numeric(df_electronic['durasi_hp'], errors='coerce').fillna(0)
     df_electronic['durasi_laptop'] = pd.to_numeric(df_electronic['durasi_laptop'], errors='coerce').fillna(0)
     df_electronic['durasi_tab'] = pd.to_numeric(df_electronic['durasi_tab'], errors='coerce').fillna(0)
     
-    # Parse activities data
     activities_parsed = parse_time_activities(df_activities)
 
-    # FILTERS - menggunakan styling dari style.css
+    # Filters
     filter_col1, filter_col2, filter_col3, export_col1, export_col2 = st.columns([2.2, 2.2, 2.2, 1.2, 1.2])
 
     with filter_col1:
@@ -861,7 +926,6 @@ def show():
         else:
             selected_fakultas = []
 
-    # Apply filters to get filtered data for export and charts
     filtered_df = apply_electronic_filters(df_electronic, selected_days, selected_devices, selected_fakultas, df_responden)
 
     # Export buttons
@@ -880,7 +944,7 @@ def show():
         try:
             filtered_activities = activities_parsed[activities_parsed['id_responden'].isin(filtered_df['id_responden'])] if not activities_parsed.empty else pd.DataFrame()
             device_emissions = calculate_device_emissions(filtered_df, filtered_activities)
-            pdf_content = generate_electronic_pdf_report(filtered_df, filtered_activities, device_emissions)
+            pdf_content = generate_electronic_pdf_report(filtered_df, filtered_activities, device_emissions, df_responden)
             st.download_button(
                 "Export PDF", 
                 data=pdf_content, 
@@ -892,29 +956,25 @@ def show():
         except Exception as e:
             st.error(f"Error generating PDF: {e}")
 
-    # Check if filtered data is empty
     if filtered_df.empty:
         st.warning("Tidak ada data yang sesuai dengan filter yang dipilih. Silakan ubah atau kosongkan filter.")
         return
     
-    # Filter activities based on filtered users
     filtered_activities = activities_parsed[activities_parsed['id_responden'].isin(filtered_df['id_responden'])] if not activities_parsed.empty else pd.DataFrame()
     
-    # Calculate device emissions
     device_emissions = calculate_device_emissions(filtered_df, filtered_activities)
 
-    # Row 1: First 3 visualizations
-    col1, col2, col3 = st.columns([0.9, 1.4, 0.7])
+    # Row 1: Main Charts
+    col1, col2, col3 = st.columns([1, 1, 1])
 
     with col1:
-        # 1. Tren Harian - Line chart
+        # 1. Tren Harian - Line chart 
         daily_cols = [col for col in filtered_df.columns if 'emisi_elektronik_' in col and col != 'emisi_elektronik_mingguan']
         
         if daily_cols:
             daily_data = []
             for col in daily_cols:
                 day = col.replace('emisi_elektronik_', '').capitalize()
-                # Apply day filter if selected
                 if not selected_days or day in selected_days:
                     total_emisi = filtered_df[col].sum()
                     daily_data.append({'Hari': day, 'Emisi': total_emisi})
@@ -922,92 +982,86 @@ def show():
             if daily_data:
                 daily_df = pd.DataFrame(daily_data)
                 
-                # Order days properly
                 day_order = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
                 daily_df['Order'] = daily_df['Hari'].map({day: i for i, day in enumerate(day_order)})
                 daily_df = daily_df.sort_values('Order')
                 
                 fig_trend = go.Figure()
                 fig_trend.add_trace(go.Scatter(
-                    x=daily_df['Hari'],
-                    y=daily_df['Emisi'],
-                    fill='tonexty',
-                    mode='lines+markers',
-                    line=dict(color='#8e44ad', width=2, shape='spline'),
-                    marker=dict(size=5, color='#8e44ad', line=dict(color='white', width=1)),
-                    fillcolor='rgba(142, 68, 173, 0.2)',
-                    hovertemplate='<b>%{x}</b><br>Emisi: %{y:.1f} kg CO₂<extra></extra>',
+                    x=daily_df['Hari'], y=daily_df['Emisi'],
+                    fill='tonexty', mode='lines+markers',
+                    line=dict(color='#3288bd', width=2, shape='spline'),
+                    marker=dict(size=6, color='#3288bd', line=dict(color='white', width=1)),
+                    fillcolor="rgba(102, 194, 165, 0.3)",
+                    hovertemplate='<b>%{x}</b><br>%{y:.1f} kg CO₂<extra></extra>',
                     showlegend=False
                 ))
                 
                 fig_trend.update_layout(
-                    height=240, 
-                    margin=dict(t=20, b=0, l=0, r=0),
-                    title=dict(text="<b>Tren Emisi Harian</b>", x=0.38, y=0.95,
-                              font=dict(family="Poppins", size=10, color="#059669")),
-                    font=dict(family="Poppins", size=6),
+                    height=240, margin=dict(t=25, b=5, l=5, r=5),
+                    xaxis_title="", yaxis_title="Emisi (kg CO₂)",
                     paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                    xaxis=dict(showgrid=False, tickfont=dict(size=8), title=dict(text="Hari", font=dict(size=10))),
-                    yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=8), title=dict(text="Emisi (kg CO₂)", font=dict(size=10)))
+                    title=dict(text="<b>Tren Emisi Harian</b>", x=0.38, y=0.95, 
+                              font=dict(size=11, color="#000000")),
+                    xaxis=dict(showgrid=False, tickfont=dict(size=7)),
+                    yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=7))
                 )
                 
                 st.plotly_chart(fig_trend, use_container_width=True, config={'displayModeBar': False})
 
     with col2:
-        # 2. Perbandingan per Fakultas - BOX PLOT untuk distribusi
+        # 2. Emisi per Fakultas - Horizontal Bar (SAME AS TRANSPORTATION)
         if df_responden is not None and not df_responden.empty and 'program_studi' in df_responden.columns:
+            fakultas_mapping = get_fakultas_mapping()
+            df_responden['fakultas'] = df_responden['program_studi'].map(fakultas_mapping).fillna('Lainnya')
+            
             if 'id_responden' in df_responden.columns and 'id_responden' in filtered_df.columns:
                 df_with_fakultas = filtered_df.merge(df_responden[['id_responden', 'fakultas']], on='id_responden', how='left')
+                fakultas_stats = df_with_fakultas.groupby('fakultas')['emisi_elektronik_mingguan'].agg(['mean', 'count']).reset_index()
+                fakultas_stats.columns = ['fakultas', 'avg_emisi', 'count']
+                fakultas_stats = fakultas_stats[fakultas_stats['count'] >= 2].sort_values('avg_emisi')
                 
-                # Apply fakultas filter
-                if selected_fakultas:
-                    df_plot = df_with_fakultas[df_with_fakultas['fakultas'].isin(selected_fakultas)]
-                else:
-                    # Filter fakultas with enough data
-                    fakultas_counts = df_with_fakultas['fakultas'].value_counts()
-                    valid_fakultas = fakultas_counts[fakultas_counts >= 2].index.tolist()
-                    df_plot = df_with_fakultas[df_with_fakultas['fakultas'].isin(valid_fakultas)]
-                    
-                    # Take top 6 fakultas for clarity
-                    top_fakultas = df_plot.groupby('fakultas')['emisi_elektronik_mingguan'].mean().nlargest(6).index
-                    df_plot = df_plot[df_plot['fakultas'].isin(top_fakultas)]
+                max_emisi = fakultas_stats['avg_emisi'].max()
+                min_emisi = fakultas_stats['avg_emisi'].min()
                 
-                if not df_plot.empty:
-                    fig_fakultas = go.Figure()
+                fig_fakultas = go.Figure()
+                for i, (_, row) in enumerate(fakultas_stats.iterrows()):
+                    if max_emisi > min_emisi:
+                        ratio = (row['avg_emisi'] - min_emisi) / (max_emisi - min_emisi)
+                        sequential_warm = ['#fee08b', '#fdae61', '#f46d43', '#d53e4f', '#9e0142']
+                        color_idx = int(ratio * (len(sequential_warm) - 1))
+                        color = sequential_warm[color_idx]
+                    else:
+                        color = MAIN_PALETTE[i % len(MAIN_PALETTE)]
                     
-                    colors = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c']
-                    
-                    for i, fakultas in enumerate(df_plot['fakultas'].unique()):
-                        data = df_plot[df_plot['fakultas'] == fakultas]['emisi_elektronik_mingguan']
-                        
-                        fig_fakultas.add_trace(go.Box(
-                            y=data,
-                            name=fakultas,
-                            marker=dict(color=colors[i % len(colors)]),
-                            boxmean=True,
-                            hovertemplate=f'<b>{fakultas}</b><br>Emisi: %{{y:.2f}} kg CO₂<br><i>Distribusi emisi mahasiswa</i><extra></extra>'
-                        ))
-                    
-                    fig_fakultas.update_layout(
-                        height=240,
-                        margin=dict(t=20, b=0, l=0, r=0),
-                        title=dict(text="<b>Distribusi Emisi per Fakultas</b>", x=0.35, y=0.95,
-                                  font=dict(family="Poppins", size=10, color="#059669")),
-                        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                        showlegend=False,
-                        yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=8), title=dict(text="Emisi (kg CO₂)", font=dict(size=10))),
-                        xaxis=dict(tickfont=dict(size=8), tickangle=-45, title=dict(text="Fakultas", font=dict(size=10)))
-                    )
-                    
-                    st.plotly_chart(fig_fakultas, use_container_width=True, config={'displayModeBar': False})
+                    fig_fakultas.add_trace(go.Bar(
+                        x=[row['avg_emisi']], y=[row['fakultas']], orientation='h',
+                        marker=dict(color=color), showlegend=False,
+                        text=[f"{row['avg_emisi']:.1f}"], textposition='inside',
+                        textfont=dict(color='white', size=7, weight='bold'),
+                        hovertemplate=f'<b>{row["fakultas"]}</b><br>Rata-rata: {row["avg_emisi"]:.1f} kg CO₂<br>Mahasiswa: {row["count"]}<extra></extra>'
+                    ))
+                
+                fig_fakultas.update_layout(
+                    height=240, margin=dict(t=25, b=5, l=5, r=5), showlegend=False,
+                    xaxis_title="Rata-rata Emisi (kg CO₂)", yaxis_title="",
+                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                    title=dict(text="<b>Emisi per Fakultas</b>", x=0.36, y=0.95, 
+                              font=dict(size=11, color="#000000")),
+                    xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=7)),
+                    yaxis=dict(tickfont=dict(size=7))
+                )
+                st.plotly_chart(fig_fakultas, use_container_width=True, config={'displayModeBar': False})
+            else:
+                st.info("Data fakultas tidak tersedia")
+        else:
+            st.info("Data fakultas tidak tersedia")
 
     with col3:
-        # 3. Perbandingan per Perangkat - DONUT CHART
+        # 3. Proporsi Emisi per Perangkat - DONUT CHART
         if device_emissions:
-            # Filter device emissions based on device filter
             filtered_device_emissions = device_emissions.copy()
             if selected_devices:
-                # Keep infrastructure (AC, Lampu) and filter personal devices
                 filtered_device_emissions = {k: v for k, v in device_emissions.items() 
                                            if k in selected_devices or k in ['AC', 'Lampu']}
             
@@ -1015,40 +1069,28 @@ def show():
             emissions = list(filtered_device_emissions.values())
             
             if devices and emissions:
-                # Vibrant colors for each device
-                colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7'][:len(devices)]
+                colors = [DEVICE_COLORS.get(device, MAIN_PALETTE[i % len(MAIN_PALETTE)]) for i, device in enumerate(devices)]
                 
                 fig_devices = go.Figure(data=[go.Pie(
                     labels=devices,
                     values=emissions,
-                    hole=.6,
-                    marker=dict(colors=colors, line=dict(color='#FFFFFF', width=3)),
+                    hole=0.45,
+                    marker=dict(colors=colors, line=dict(color='#FFFFFF', width=2)),
                     textposition='outside',
                     textinfo='label+percent',
-                    textfont=dict(size=8, family="Poppins"),
-                    sort=False
+                    textfont=dict(size=7, family="Poppins"),
+                    hovertemplate='<b>%{label}</b><br>%{value:.2f} kg CO₂ (%{percent})<extra></extra>'
                 )])
                 
-                # Center text with total
                 total_emisi = sum(emissions)
-                center_text = f"<b style='font-size:14px'>{total_emisi:.1f}</b><br><span style='font-size:10px'>kg CO₂</span><br><span style='font-size:8px; opacity:0.8'>Total</span>"
-                fig_devices.add_annotation(
-                    text=center_text, x=0.5, y=0.5, font_size=12, showarrow=False,
-                    font=dict(family="Poppins", color="#1f2937")
-                )
-                
-                fig_devices.update_traces(
-                    hovertemplate='<b>%{label}</b><br>Emisi: %{value:.2f} kg CO₂<br>Proporsi: %{percent}<br><i>Kontribusi total emisi</i><extra></extra>'
-                )
+                center_text = f"<b style='font-size:14px'>{total_emisi:.1f}</b><br><span style='font-size:8px'>kg CO₂</span>"
+                fig_devices.add_annotation(text=center_text, x=0.5, y=0.5, font_size=10, showarrow=False)
                 
                 fig_devices.update_layout(
-                    height=240,
-                    margin=dict(t=60, b=30, l=0, r=0),
-                    title=dict(text="<b>Proporsi Emisi per Perangkat</b>", x=0.21, y=0.95,
-                              font=dict(family="Poppins", size=10, color="#059669")),
-                    font=dict(family="Poppins", size=6),
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    showlegend=False
+                    height=240, margin=dict(t=25, b=5, l=5, r=5), showlegend=False,
+                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                    title=dict(text="<b>Proporsi Emisi per Perangkat</b>", x=0.27, y=0.95, 
+                              font=dict(size=11, color="#000000"))
                 )
                 
                 st.plotly_chart(fig_devices, use_container_width=True, config={'displayModeBar': False})
@@ -1059,13 +1101,11 @@ def show():
     with col1:
         # 4. Heatmap Hari dan Jam
         if not filtered_activities.empty:
-            # Filter activities by selected days
             activities_for_heatmap = filtered_activities.copy()
             if selected_days:
                 activities_for_heatmap = activities_for_heatmap[activities_for_heatmap['day'].isin(selected_days)]
             
             if not activities_for_heatmap.empty:
-                # Create heatmap data using time ranges
                 heatmap_df = activities_for_heatmap.groupby(['day', 'time_range']).agg({
                     'emisi_ac': 'sum',
                     'emisi_lampu': 'sum'
@@ -1075,70 +1115,79 @@ def show():
                 heatmap_data = heatmap_df.pivot(index='day', columns='time_range', values='total_emisi')
                 heatmap_data = heatmap_data.fillna(0)
                 
-                # Reorder days
                 day_order = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
                 heatmap_data = heatmap_data.reindex([day for day in day_order if day in heatmap_data.index])
                 
-                # Sort columns by start time for proper ordering
                 if not heatmap_data.empty and len(heatmap_data.columns) > 0:
                     time_columns = heatmap_data.columns.tolist()
-                    # Sort by extracting start hour from range (e.g., "10:00-12:00" -> 10)
                     time_columns.sort(key=lambda x: int(x.split(':')[0]) if ':' in str(x) else 0)
                     heatmap_data = heatmap_data[time_columns]
                     
-                    fig_heatmap = px.imshow(
-                        heatmap_data,
-                        color_continuous_scale='plasma',
-                        aspect='auto',
-                        labels=dict(x="Jam Range", y="Hari", color="Emisi (kg CO₂)")
-                    )
-                    
-                    fig_heatmap.update_traces(
-                        hovertemplate='<b>%{y}</b><br>Jam: %{x}<br>Emisi: %{z:.2f} kg CO₂<br>'
-                    )
+                    fig_heatmap = go.Figure(data=go.Heatmap(
+                        z=heatmap_data.values,
+                        x=heatmap_data.columns,
+                        y=heatmap_data.index,
+                        colorscale=[[0, '#fee08b'], [0.25, '#fdae61'], [0.5, '#f46d43'], [0.75, '#d53e4f'], [1, '#9e0142']],
+                        hoverongaps=False,
+                        hovertemplate='<b>%{y}</b><br>Jam: %{x}<br>Emisi: %{z:.2f} kg CO₂<br><extra></extra>',
+                        colorbar=dict(
+                            title=dict(text="Emisi", font=dict(size=9)),
+                            tickfont=dict(size=8),
+                            thickness=15,
+                            len=0.7
+                        ),
+                        xgap=1, ygap=1,  
+                        zmin=0
+                    ))
                     
                     fig_heatmap.update_layout(
-                        height=240,
-                        margin=dict(t=25, b=0, l=0, r=30),
-                        coloraxis_showscale=False,
-                        font=dict(family="Poppins", size=6),
-                        paper_bgcolor='rgba(0,0,0,0)',
-                        title=dict(
-                            text="<b>Heatmap Hari dan Jam</b>",
-                            x=0.5, y=0.95, xanchor='center', yanchor='top',
-                            font=dict(family="Poppins", size=10, color="#059669")
-                        ),
-                        xaxis=dict(tickfont=dict(size=8), tickangle=-45, title=dict(text="Jam", font=dict(size=10))),
-                        yaxis=dict(tickfont=dict(size=8), title=dict(text="Hari", font=dict(size=10)))
+                        height=240, margin=dict(t=60, b=20, l=20, r=40),
+                        title=dict(text="<b>Heatmap Hari dan Jam</b>", x=0.2, y=0.95, 
+                                font=dict(size=11, color="#000000")),
+                        xaxis=dict(tickfont=dict(size=7), tickangle=-45, title=dict(text="Jam", font=dict(size=10))),
+                        yaxis=dict(tickfont=dict(size=7)),
+                        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
                     )
                     
                     st.plotly_chart(fig_heatmap, use_container_width=True, config={'displayModeBar': False})
 
     with col2:
-        # 5. Emisi per Responden - SCATTER PLOT
+        # 5. Emisi per Responden - Enhanced Scatter Plot with Palette Colors
         user_emissions = filtered_df[['id_responden', 'emisi_elektronik_mingguan']].copy()
         
         if len(user_emissions) > 0:
-            # Calculate quartiles for outlier detection
             Q1 = user_emissions['emisi_elektronik_mingguan'].quantile(0.25)
             Q3 = user_emissions['emisi_elektronik_mingguan'].quantile(0.75)
             IQR = Q3 - Q1
             lower_bound = Q1 - 1.5 * IQR
             upper_bound = Q3 + 1.5 * IQR
+            median_val = user_emissions['emisi_elektronik_mingguan'].median()
             
-            # Categorize users
             user_emissions['category'] = 'Normal'
-            user_emissions.loc[user_emissions['emisi_elektronik_mingguan'] > upper_bound, 'category'] = 'High User'
-            user_emissions.loc[user_emissions['emisi_elektronik_mingguan'] < lower_bound, 'category'] = 'Low User'
+            user_emissions.loc[user_emissions['emisi_elektronik_mingguan'] > upper_bound, 'category'] = 'Heavy User'
+            user_emissions.loc[user_emissions['emisi_elektronik_mingguan'] < lower_bound, 'category'] = 'Light User'
+            user_emissions.loc[user_emissions['emisi_elektronik_mingguan'] > median_val * 1.5, 'category'] = 'High User'
+            user_emissions.loc[user_emissions['emisi_elektronik_mingguan'] < median_val * 0.5, 'category'] = 'Eco User'
             
-            # Create index for x-axis
             user_emissions['user_index'] = range(len(user_emissions))
             
             fig_users = go.Figure()
             
-            # Color mapping for categories
-            color_map = {'Normal': '#3498db', 'High User': '#e74c3c', 'Low User': '#2ecc71'}
-            size_map = {'Normal': 6, 'High User': 10, 'Low User': 8}
+            color_map = {
+                'Eco User': '#66c2a5',     
+                'Light User': '#abdda4',    
+                'Normal': '#3288bd',        
+                'High User': '#fdae61',     
+                'Heavy User': '#d53e4f'     
+            }
+            
+            size_map = {
+                'Eco User': 8, 
+                'Light User': 7, 
+                'Normal': 6, 
+                'High User': 9, 
+                'Heavy User': 12
+            }
             
             for category in user_emissions['category'].unique():
                 category_data = user_emissions[user_emissions['category'] == category]
@@ -1151,49 +1200,49 @@ def show():
                     marker=dict(
                         color=color_map[category],
                         size=size_map[category],
-                        line=dict(color='white', width=1),
-                        opacity=0.8
+                        line=dict(color='white', width=1.5),
+                        opacity=0.85,
+                        symbol='circle'
                     ),
-                    hovertemplate=f'<b>User %{{text}}</b><br>Emisi: %{{y:.2f}} kg CO₂<br>Kategori: {category}<br><i>Analisis outlier</i><extra></extra>',
+                    hovertemplate=f'<b>User %{{text}}</b><br>Emisi: %{{y:.2f}} kg CO₂<br>Kategori: {category}<br><i>Pola penggunaan individual</i><extra></extra>',
                     text=[f"{str(row['id_responden'])[-3:]}" for _, row in category_data.iterrows()]
                 ))
             
-            # Add median line
-            median_emisi = user_emissions['emisi_elektronik_mingguan'].median()
             fig_users.add_hline(
-                y=median_emisi,
+                y=median_val,
                 line_dash="dash",
-                line_color="gray",
-                annotation_text=f"Median: {median_emisi:.1f}",
-                annotation_position="bottom right"
+                line_color="#5e4fa2",  
+                line_width=2,
+                annotation_text=f"Median: {median_val:.1f} kg CO₂",
+                annotation_position="top right",
+                annotation=dict(bgcolor="white", bordercolor="#5e4fa2", borderwidth=1)
             )
             
             fig_users.update_layout(
-                height=240,
-                margin=dict(t=20, b=0, l=0, r=0),
-                title=dict(
-                    text="<b>Distribusi Emisi per Responden</b>",
-                    x=0.5, y=0.95, xanchor='center', yanchor='top',
-                    font=dict(family="Poppins", size=10, color="#059669")
-                ),
-                font=dict(family="Poppins", size=8),
+                height=240, margin=dict(t=20, b=5, l=5, r=5),
+                title=dict(text="<b>Pola Emisi per Responden</b>", x=0.35, y=0.95, 
+                          font=dict(size=11, color="#000000")),
                 paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=8), title=dict(text="Index Responden", font=dict(size=10))),
-                yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=8), title=dict(text="Emisi (kg CO₂)", font=dict(size=10))),
-                legend=dict(orientation="h", yanchor="bottom", y=0.7, xanchor="center", x=0.7, font=dict(size=8))
+                xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.05)', tickfont=dict(size=7), 
+                          title=dict(text="Index Responden", font=dict(size=9))),
+                yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=7), 
+                          title=dict(text="Emisi (kg CO₂)", font=dict(size=9))),
+                legend=dict(orientation="v", yanchor="top", y=0.98, xanchor="left", x=0.02, 
+                           font=dict(size=7), bgcolor="rgba(255,255,255,0.9)", 
+                           bordercolor="rgba(0,0,0,0.1)", borderwidth=1)
             )
             
             st.plotly_chart(fig_users, use_container_width=True, config={'displayModeBar': False})
+        else:
+            st.info("Data emisi per responden tidak tersedia")
 
     with col3:
-        # 6. Ruang Kelas Tersering - POLAR BAR CHART
+        # 6. Gedung Kelas Terpopuler - Diagram Batang (Vertical Bar Chart)
         if not filtered_activities.empty and 'lokasi' in filtered_activities.columns:
-            # Filter by selected days
             activities_for_location = filtered_activities.copy()
             if selected_days:
                 activities_for_location = activities_for_location[activities_for_location['day'].isin(selected_days)]
             
-            # Filter for class activities only
             class_activities = activities_for_location[activities_for_location['kegiatan'].str.contains('kelas', case=False, na=False)]
             
             if not class_activities.empty:
@@ -1204,48 +1253,92 @@ def show():
                 }).reset_index()
                 location_stats['total_emisi'] = location_stats['emisi_ac'] + location_stats['emisi_lampu']
                 location_stats['session_count'] = class_activities.groupby('lokasi').size().values
+                location_stats['avg_emisi_per_session'] = location_stats['total_emisi'] / location_stats['session_count']
                 
-                # Sort by session count and take top 8
-                location_stats = location_stats.sort_values('session_count', ascending=False).head(8)
+                location_stats = location_stats.sort_values('session_count', ascending=False).head(6)
                 
                 fig_location = go.Figure()
                 
-                # Create polar bar chart
-                fig_location.add_trace(go.Barpolar(
-                    r=location_stats['session_count'],
-                    theta=location_stats['lokasi'],
-                    marker=dict(
-                        color=location_stats['total_emisi'],
-                        colorscale='plasma',
-                        line=dict(color='white', width=1),
-                        colorbar=dict(thickness=8, len=0.5, x=1.1)
-                    ),
-                    hovertemplate='<b>%{theta}</b><br>Sesi: %{r}<br>Emisi: %{marker.color:.2f} kg CO₂<br><i>Ruang paling aktif</i><extra></extra>',
-                    showlegend=False
-                ))
+                max_sessions = location_stats['session_count'].max()
+                min_sessions = location_stats['session_count'].min()
                 
-                fig_location.update_layout(
-                    height=240,
-                    margin=dict(t=50, b=30, l=0, r=0),
-                    title=dict(text="<b>Ruang Kelas Tersering</b>", x=0.375, y=0.95,
-                              font=dict(family="Poppins", size=10, color="#059669")),
-                    font=dict(family="Poppins", size=5),
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    polar=dict(
-                        radialaxis=dict(
-                            visible=True,
-                            range=[0, location_stats['session_count'].max() * 1.1],
-                            tickfont=dict(size=8)
+                colors = []
+                for _, row in location_stats.iterrows():
+                    if max_sessions > min_sessions:
+                        ratio = (row['session_count'] - min_sessions) / (max_sessions - min_sessions)
+                        if ratio < 0.2:
+                            colors.append('#e6f598') 
+                        elif ratio < 0.4:
+                            colors.append('#abdda4') 
+                        elif ratio < 0.6:
+                            colors.append('#66c2a5')  
+                        elif ratio < 0.8:
+                            colors.append('#3288bd') 
+                        else:
+                            colors.append('#d53e4f') 
+                    else:
+                        colors.append('#3288bd')  
+                
+                # Add bars
+                for i, (_, row) in enumerate(location_stats.iterrows()):
+                    fig_location.add_trace(go.Bar(
+                        x=[row['lokasi']],
+                        y=[row['session_count']],
+                        marker=dict(
+                            color=colors[i],
+                            line=dict(color='white', width=1.5),
+                            opacity=0.85
                         ),
-                        angularaxis=dict(
-                            tickfont=dict(size=8),
-                            rotation=90,
-                            direction="clockwise"
-                        )
+                        showlegend=False,
+                        text=[f"{row['session_count']}"],
+                        textposition='outside',
+                        textfont=dict(size=9, color='#2d3748', weight='bold'),
+                        hovertemplate=f'<b>{row["lokasi"]}</b><br>Jumlah Sesi: {row["session_count"]}<br>Total Emisi: {row["total_emisi"]:.2f} kg CO₂<br>Emisi per Sesi: {row["avg_emisi_per_session"]:.2f} kg CO₂<br><i>Frekuensi penggunaan gedung</i><extra></extra>',
+                        name=row['lokasi']
+                    ))
+                
+                avg_sessions = location_stats['session_count'].mean()
+                fig_location.add_hline(
+                    y=avg_sessions,
+                    line_dash="dash",
+                    line_color="#5e4fa2",  
+                    line_width=2,
+                    annotation_text=f"Rata-rata: {avg_sessions:.1f}",
+                    annotation_position="top right",
+                    annotation=dict(
+                        bgcolor="white", 
+                        bordercolor="#5e4fa2", 
+                        borderwidth=1,
+                        font=dict(size=8)
                     )
                 )
                 
+                fig_location.update_layout(
+                    height=240,
+                    margin=dict(t=50, b=10, l=5, r=5),
+                    title=dict(text="<b>Gedung Kelas Terpopuler</b>", x=0.35, y=0.95,
+                              font=dict(size=11, color="#000000")),
+                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                    xaxis=dict(
+                        showgrid=False, 
+                        tickfont=dict(size=7), 
+                        tickangle=-45,
+                        title=dict(text="Gedung Kelas", font=dict(size=9))
+                    ),
+                    yaxis=dict(
+                        showgrid=True, 
+                        gridcolor='rgba(0,0,0,0.1)', 
+                        tickfont=dict(size=7),
+                        title=dict(text="Jumlah Sesi", font=dict(size=9))
+                    ),
+                    showlegend=False
+                )
+                
                 st.plotly_chart(fig_location, use_container_width=True, config={'displayModeBar': False})
+            else:
+                st.info("Data aktivitas kelas tidak tersedia")
+        else:
+            st.info("Data lokasi kelas tidak tersedia")
 
 if __name__ == "__main__":
     show()
