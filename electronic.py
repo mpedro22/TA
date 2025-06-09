@@ -79,7 +79,6 @@ def parse_time_activities(df_activities):
                     start_hour = int(time_str[:2])
                     end_hour = int(time_str[2:])
                     
-                    # Create time range label
                     time_range = f"{start_hour:02d}:00-{end_hour:02d}:00"
                     
                     parsed_data.append({
@@ -103,7 +102,7 @@ def apply_electronic_filters(df, selected_days, selected_devices, selected_fakul
     """Apply filters to the electronic dataframe"""
     filtered_df = df.copy()
     
-    # Filter by day (using hari_datang)
+    # Filter by day
     if selected_days and 'hari_datang' in filtered_df.columns:
         day_mask = pd.Series(False, index=filtered_df.index)
         for day in selected_days:
@@ -207,8 +206,8 @@ def generate_electronic_pdf_report(filtered_df, activities_df, device_emissions,
     if daily_analysis:
         highest_day = max(daily_analysis, key=lambda x: x['emission'])
         lowest_day = min(daily_analysis, key=lambda x: x['emission'])
-        weekday_emissions = [d['emission'] for d in daily_analysis[:5]]  # Mon-Fri
-        weekend_emissions = [d['emission'] for d in daily_analysis[5:]]  # Sat-Sun
+        weekday_emissions = [d['emission'] for d in daily_analysis[:5]]  
+        weekend_emissions = [d['emission'] for d in daily_analysis[5:]]  
         avg_weekday = sum(weekday_emissions) / len(weekday_emissions) if weekday_emissions else 0
         avg_weekend = sum(weekend_emissions) / len(weekend_emissions) if weekend_emissions else 0
     else:
@@ -230,17 +229,12 @@ def generate_electronic_pdf_report(filtered_df, activities_df, device_emissions,
                 'emisi_elektronik_mingguan': ['mean', 'count']
             }).reset_index()
             fakultas_emissions.columns = ['fakultas', 'avg_emission', 'student_count']
-            fakultas_emissions = fakultas_emissions[fakultas_emissions['student_count'] >= 2]  # At least 2 students
+            fakultas_emissions = fakultas_emissions[fakultas_emissions['student_count'] >= 2]  
             top_fakultas = fakultas_emissions.nlargest(3, 'avg_emission')
         else:
             top_fakultas = pd.DataFrame()
     else:
         top_fakultas = pd.DataFrame()
-    
-    # Usage duration analysis - use valid responden
-    avg_smartphone_duration = valid_responden['durasi_hp'].mean() if 'durasi_hp' in valid_responden.columns else 0
-    avg_laptop_duration = valid_responden['durasi_laptop'].mean() if 'durasi_laptop' in valid_responden.columns else 0
-    avg_tablet_duration = valid_responden['durasi_tab'].mean() if 'durasi_tab' in valid_responden.columns else 0
     
     # Duration distribution analysis
     duration_stats = {}
@@ -307,8 +301,6 @@ def generate_electronic_pdf_report(filtered_df, activities_df, device_emissions,
     else:
         dominant_device = ('N/A', 0)
         dominant_percentage = 0
-        infrastructure_percentage = 0
-        personal_percentage = 0
     
     # CONSISTENT WITH TRANSPORTATION REPORT STYLING
     html_content = f"""
@@ -1096,7 +1088,7 @@ def show():
                 st.plotly_chart(fig_devices, use_container_width=True, config={'displayModeBar': False})
 
     # Row 2: Second 3 visualizations
-    col1, col2, col3 = st.columns([1, 0.8, 1])
+    col1, col2, col3 = st.columns([1, 1, 1])
 
     with col1:
         # 4. Heatmap Hari dan Jam
@@ -1174,11 +1166,11 @@ def show():
             fig_users = go.Figure()
             
             color_map = {
-                'Eco User': '#66c2a5',     
-                'Light User': '#abdda4',    
-                'Normal': '#3288bd',        
-                'High User': '#fdae61',     
-                'Heavy User': '#d53e4f'     
+                    'Eco User': '#66c2a5',    
+                    'Light User': '#abdda4',   
+                    'Normal': '#3288bd',        
+                    'High User': '#fdae61',     
+                    'Heavy User': '#d53e4f'  
             }
             
             size_map = {
@@ -1237,7 +1229,7 @@ def show():
             st.info("Data emisi per responden tidak tersedia")
 
     with col3:
-        # 6. Gedung Kelas Terpopuler - Diagram Batang (Vertical Bar Chart)
+        # 6. Gedung Kelas Terpopuler
         if not filtered_activities.empty and 'lokasi' in filtered_activities.columns:
             activities_for_location = filtered_activities.copy()
             if selected_days:
