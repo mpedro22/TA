@@ -1,4 +1,4 @@
-import streamlit as st
+﻿import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -1133,11 +1133,11 @@ def show():
                     ))
                     
                     fig_heatmap.update_layout(
-                        height=240, margin=dict(t=60, b=20, l=20, r=40),
-                        title=dict(text="<b>Heatmap Hari dan Jam</b>", x=0.2, y=0.95, 
+                        height=240, margin=dict(t=30, b=0, l=0, r=0),
+                        title=dict(text="<b>Heatmap Hari dan Jam</b>", x=0.32, y=0.95, 
                                 font=dict(size=11, color="#000000")),
-                        xaxis=dict(tickfont=dict(size=7), tickangle=-45, title=dict(text="Jam", font=dict(size=10))),
-                        yaxis=dict(tickfont=dict(size=7)),
+                        xaxis=dict(tickfont=dict(size=8), tickangle=-25, title=dict(text="Jam", font=dict(size=10))),
+                        yaxis=dict(tickfont=dict(size=8), title=dict(text="Hari", font=dict(size=10))),
                         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
                     )
                     
@@ -1212,13 +1212,13 @@ def show():
             
             fig_users.update_layout(
                 height=240, margin=dict(t=20, b=5, l=5, r=5),
-                title=dict(text="<b>Pola Emisi per Responden</b>", x=0.35, y=0.95, 
+                title=dict(text="<b>Pola Emisi per Responden</b>", x=0.32, y=0.95, 
                           font=dict(size=11, color="#000000")),
                 paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                 xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.05)', tickfont=dict(size=7), 
-                          title=dict(text="Index Responden", font=dict(size=9))),
+                          title=dict(text="Index Responden", font=dict(size=10))),
                 yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=7), 
-                          title=dict(text="Emisi (kg CO₂)", font=dict(size=9))),
+                          title=dict(text="Emisi (kg CO₂)", font=dict(size=10))),
                 legend=dict(orientation="v", yanchor="top", y=0.98, xanchor="left", x=0.02, 
                            font=dict(size=7), bgcolor="rgba(255,255,255,0.9)", 
                            bordercolor="rgba(0,0,0,0.1)", borderwidth=1)
