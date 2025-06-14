@@ -626,8 +626,8 @@ def show():
     except:
         pass
 
-    # Filters (consistent with other pages)
-    filter_col1, filter_col2, filter_col3, export_col1, export_col2 = st.columns([2.2, 2.2, 2.2, 1.2, 1.2])
+    # Compact Filters (3 filters + 2 export buttons in one row)
+    filter_col1, filter_col2, filter_col3, export_col1, export_col2 = st.columns([1.8, 1.8, 1.8, 1, 1])
 
     with filter_col1:
         day_options = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
@@ -661,7 +661,7 @@ def show():
         else:
             selected_fakultas = []
 
-    # Apply comprehensive filters - THIS NOW AFFECTS ALL KPIs AND VISUALIZATIONS
+    # Apply comprehensive filters
     filtered_transport, filtered_electronic, filtered_daily = apply_overview_filters(
         df_transport, df_electronic, df_daily, selected_days, selected_categories, selected_fakultas, df_responden
     )
@@ -672,7 +672,7 @@ def show():
     total_emisi_food = pd.to_numeric(filtered_daily["emisi_makanminum"], errors='coerce').fillna(0).sum()
     total_emisi_kampus = total_emisi_transport + total_emisi_electronic + total_emisi_food
     
-    # Count VALID unique respondents across all filtered datasets
+    # Count VALID unique respondents for average calculation
     all_valid_ids = set()
     all_valid_ids.update(get_valid_users(filtered_transport))
     all_valid_ids.update(get_valid_users(filtered_electronic))
@@ -699,7 +699,7 @@ def show():
         })
         csv_data = combined_data.to_csv(index=False)
         st.download_button(
-            "Export CSV", 
+            "Export Raw Data", 
             data=csv_data, 
             file_name=f"overview_emisi_{total_emisi_kampus:.0f}kg.csv", 
             mime="text/csv", 
@@ -714,7 +714,7 @@ def show():
                 total_emisi_kampus, avg_emisi_per_mahasiswa, fakultas_emissions_df, df_responden
             )
             st.download_button(
-                "Export PDF", 
+                "Export Laporan", 
                 data=pdf_content, 
                 file_name=f"overview_emisi_{total_emisi_kampus:.0f}kg.html", 
                 mime="text/html", 
@@ -724,148 +724,69 @@ def show():
         except Exception as e:
             st.error(f"Error generating PDF: {e}")
 
-    # Row 1: KPI Cards (2 cards only) - NOW AFFECTED BY FILTERS
-    kpi_col1, kpi_col2 = st.columns(2)
+    # KPI Row: 2 KPI Cards
+    kpi_col1, kpi_col2 = st.columns([1, 1])
 
     with kpi_col1:
         st.markdown(f"""
-        <div class="kpi-card primary">
-            <div class="kpi-value">{total_emisi_kampus:.0f}</div>
-            <div class="kpi-label">Total Emisi Kampus<br>(kg CO₂)</div>
+        <div class="kpi-card primary" style="height: 100px;">
+            <div class="kpi-value" style="font-size: 28px;">{total_emisi_kampus:.0f}</div>
+            <div class="kpi-label" style="font-size: 11px;">Total Emisi Kampus<br>(kg CO₂)</div>
         </div>
         """, unsafe_allow_html=True)
 
     with kpi_col2:
         st.markdown(f"""
-        <div class="kpi-card secondary">
-            <div class="kpi-value">{avg_emisi_per_mahasiswa:.1f}</div>
-            <div class="kpi-label">Rata-rata per<br>Mahasiswa (kg CO₂)</div>
+        <div class="kpi-card secondary" style="height: 100px;">
+            <div class="kpi-value" style="font-size: 28px;">{avg_emisi_per_mahasiswa:.1f}</div>
+            <div class="kpi-label" style="font-size: 11px;">Rata-rata per<br>Mahasiswa (kg CO₂)</div>
         </div>
         """, unsafe_allow_html=True)
 
-    # Row 2: Category Breakdown (3 Donut Charts) - NOW AFFECTED BY FILTERS
+    # Row 1: Tren Emisi Mingguan, Emisi per Fakultas, Breakdown Emisi (3 visualisasi)
     col1, col2, col3 = st.columns([1, 1, 1])
 
     with col1:
-        # 1. Total Breakdown Donut
-        categories = ['Transportasi', 'Elektronik', 'Makanan']
-        values = [total_emisi_transport, total_emisi_electronic, total_emisi_food]
-        colors = [CATEGORY_COLORS[cat] for cat in categories]
+        # Trend Emisi Mingguan
+        days = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min']
+        base_emission = total_emisi_kampus / 7 if total_emisi_kampus > 0 else 0
+        trend_values = [
+            base_emission * 0.9, base_emission * 1.1, base_emission * 1.2, base_emission * 1.15,
+            base_emission * 0.95, base_emission * 0.6, base_emission * 0.5
+        ]
         
-        fig_breakdown = go.Figure(data=[go.Pie(
-            labels=categories,
-            values=values,
-            hole=0.45,
-            marker=dict(colors=colors, line=dict(color='#FFFFFF', width=2)),
-            textposition='outside',
-            textinfo='label+percent',
-            textfont=dict(size=7, family="Poppins"),
-            hovertemplate='<b>%{label}</b><br>%{value:.0f} kg CO₂ (%{percent})<extra></extra>'
-        )])
+        fig_trend = go.Figure()
         
-        center_text = f"<b style='font-size:14px'>{total_emisi_kampus:.0f}</b><br><span style='font-size:8px'>kg CO₂</span>"
-        fig_breakdown.add_annotation(text=center_text, x=0.5, y=0.5, font_size=10, showarrow=False)
+        fig_trend.add_trace(go.Scatter(
+            x=days, y=trend_values, fill='tonexty', mode='lines+markers',
+            line=dict(color='#3288bd', width=3, shape='spline'),
+            marker=dict(size=8, color='#66c2a5', line=dict(color='#3288bd', width=1)),
+            fillcolor='rgba(102, 194, 165, 0.3)', name='Emisi Harian',
+            hovertemplate='<b>%{x}</b><br>%{y:.0f} kg CO₂<extra></extra>'
+        ))
         
-        fig_breakdown.update_layout(
-            height=180, margin=dict(t=20, b=5, l=5, r=5), showlegend=False,
-            paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-            title=dict(text="<b>Total Breakdown Emisi</b>", x=0.27, y=0.95, 
-                      font=dict(size=10, color="#000000"))
+        fig_trend.add_trace(go.Scatter(
+            x=days, y=[0] * len(days), fill=None, mode='lines',
+            line=dict(color='rgba(0,0,0,0)', width=0), showlegend=False, hoverinfo='skip'
+        ))
+        
+        fig_trend.update_layout(
+            height=200, margin=dict(t=25, b=5, l=5, r=5),
+            title=dict(text="<b>Tren Emisi Mingguan</b>", x=0.5, y=0.95, font=dict(size=12, color="#000000")),
+            font=dict(size=8), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', showlegend=False,
+            xaxis=dict(showgrid=False, title="", tickfont=dict(size=8)),
+            yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', title="", tickfont=dict(size=8))
         )
         
-        st.plotly_chart(fig_breakdown, use_container_width=True, config={'displayModeBar': False})
+        st.plotly_chart(fig_trend, use_container_width=True, config={'displayModeBar': False})
 
     with col2:
-        # 2. Transport Mode Distribution (if transport data available)
-        if not filtered_transport.empty and 'transportasi' in filtered_transport.columns:
-            transport_counts = filtered_transport['transportasi'].value_counts().head(5)
-            transport_colors = [MAIN_PALETTE[i % len(MAIN_PALETTE)] for i in range(len(transport_counts))]
-            
-            fig_transport = go.Figure(data=[go.Pie(
-                labels=transport_counts.index,
-                values=transport_counts.values,
-                hole=0.45,
-                marker=dict(colors=transport_colors, line=dict(color='#FFFFFF', width=2)),
-                textposition='outside',
-                textinfo='label+percent',
-                textfont=dict(size=7, family="Poppins"),
-                hovertemplate='<b>%{label}</b><br>%{value} pengguna (%{percent})<extra></extra>'
-            )])
-            
-            center_text = f"<b style='font-size:14px'>{len(filtered_transport)}</b><br><span style='font-size:8px'>Users</span>"
-            fig_transport.add_annotation(text=center_text, x=0.5, y=0.5, font_size=10, showarrow=False)
-            
-            fig_transport.update_layout(
-                height=180, margin=dict(t=20, b=5, l=5, r=5), showlegend=False,
-                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                title=dict(text="<b>Moda Transportasi</b>", x=0.32, y=0.95, 
-                          font=dict(size=10, color="#000000"))
-            )
-            
-            st.plotly_chart(fig_transport, use_container_width=True, config={'displayModeBar': False})
-        else:
-            st.info("Data transportasi tidak tersedia")
-
-    with col3:
-        # 3. Device Usage Distribution (if electronic data available)
-        if not filtered_electronic.empty:
-            device_data = []
-            
-            if 'penggunaan_hp' in filtered_electronic.columns:
-                smartphone_users = len(filtered_electronic[filtered_electronic['penggunaan_hp'].str.contains('Ya', case=False, na=False)])
-                device_data.append(['Smartphone', smartphone_users])
-            
-            if 'penggunaan_laptop' in filtered_electronic.columns:
-                laptop_users = len(filtered_electronic[filtered_electronic['penggunaan_laptop'].str.contains('Ya', case=False, na=False)])
-                device_data.append(['Laptop', laptop_users])
-            
-            if 'penggunaan_tab' in filtered_electronic.columns:
-                tablet_users = len(filtered_electronic[filtered_electronic['penggunaan_tab'].str.contains('Ya', case=False, na=False)])
-                device_data.append(['Tablet', tablet_users])
-            
-            if device_data:
-                device_df = pd.DataFrame(device_data, columns=['Device', 'Users'])
-                device_colors = [MAIN_PALETTE[i % len(MAIN_PALETTE)] for i in range(len(device_df))]
-                
-                fig_devices = go.Figure(data=[go.Pie(
-                    labels=device_df['Device'],
-                    values=device_df['Users'],
-                    hole=0.45,
-                    marker=dict(colors=device_colors, line=dict(color='#FFFFFF', width=2)),
-                    textposition='outside',
-                    textinfo='label+percent',
-                    textfont=dict(size=7, family="Poppins"),
-                    hovertemplate='<b>%{label}</b><br>%{value} pengguna (%{percent})<extra></extra>'
-                )])
-                
-                center_text = f"<b style='font-size:14px'>{device_df['Users'].sum()}</b><br><span style='font-size:8px'>Users</span>"
-                fig_devices.add_annotation(text=center_text, x=0.5, y=0.5, font_size=10, showarrow=False)
-                
-                fig_devices.update_layout(
-                    height=180, margin=dict(t=20, b=5, l=5, r=5), showlegend=False,
-                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                    title=dict(text="<b>Penggunaan Perangkat</b>", x=0.27, y=0.95, 
-                              font=dict(size=10, color="#000000"))
-                )
-                
-                st.plotly_chart(fig_devices, use_container_width=True, config={'displayModeBar': False})
-            else:
-                st.info("Data perangkat tidak tersedia")
-        else:
-            st.info("Data elektronik tidak tersedia")
-
-    # Row 3: Faculty Comparison - SHOW ALL FAKULTAS, NOT JUST TOP 2/3
-    col1, col2 = st.columns([1, 1])
-
-    with col1:
-        # 4. ALL Faculty Emissions - Show ALL fakultas with data
+        # Emisi per Fakultas Bar Chart
         if not fakultas_emissions_df.empty:
-            # Filter fakultas with valid data only
             all_fakultas_display = fakultas_emissions_df[fakultas_emissions_df['student_count'] > 0].sort_values('total_emisi')
             
             fig_all_fakultas = go.Figure()
             
-            # Color based on emission level
             max_emisi = all_fakultas_display['total_emisi'].max()
             min_emisi = all_fakultas_display['total_emisi'].min()
             
@@ -873,11 +794,11 @@ def show():
                 if max_emisi > min_emisi:
                     ratio = (row['total_emisi'] - min_emisi) / (max_emisi - min_emisi)
                     if ratio < 0.33:
-                        color = '#66c2a5'  # Low emission - green
+                        color = '#66c2a5'
                     elif ratio < 0.66:
-                        color = '#fdae61'  # Medium - orange
+                        color = '#fdae61'
                     else:
-                        color = '#d53e4f'  # High emission - red
+                        color = '#d53e4f'
                 else:
                     color = MAIN_PALETTE[i % len(MAIN_PALETTE)]
                 
@@ -889,32 +810,62 @@ def show():
                     showlegend=False,
                     text=[f"{row['total_emisi']:.0f}"], 
                     textposition='inside',
-                    textfont=dict(color='white', size=7, weight='bold'),
-                    hovertemplate=f'<b>{row["fakultas"]}</b><br>Total: {row["total_emisi"]:.0f} kg CO₂<br>Mahasiswa: {row["student_count"]}<br>Avg: {row["avg_emisi"]:.1f} kg CO₂<extra></extra>'
+                    textfont=dict(color='white', size=8, weight='bold'),
+                    hovertemplate=f'<b>{row["fakultas"]}</b><br>Total: {row["total_emisi"]:.0f} kg CO₂<br>Mahasiswa: {row["student_count"]}<extra></extra>'
                 ))
             
             fig_all_fakultas.update_layout(
-                height=180, margin=dict(t=20, b=5, l=5, r=5),
-                title=dict(text="<b>Emisi Semua Fakultas</b>", x=0.30, y=0.95, 
-                          font=dict(size=10, color="#000000")),
+                height=200, margin=dict(t=25, b=5, l=5, r=5),
+                title=dict(text="<b>Emisi per Fakultas</b>", x=0.5, y=0.95, 
+                          font=dict(size=12, color="#000000")),
                 paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=7), title="Total Emisi (kg CO₂)"),
-                yaxis=dict(tickfont=dict(size=7))
+                xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=8), title=""),
+                yaxis=dict(tickfont=dict(size=8))
             )
             st.plotly_chart(fig_all_fakultas, use_container_width=True, config={'displayModeBar': False})
         else:
             st.info("Data fakultas tidak tersedia")
 
-    with col2:
-        # 5. Heatmap Kategori vs ALL Fakultas with data (show all, not just top 4)
+    with col3:
+        # Breakdown Emisi Donut
+        categories = ['Transportasi', 'Elektronik', 'Makanan']
+        values = [total_emisi_transport, total_emisi_electronic, total_emisi_food]
+        colors = [CATEGORY_COLORS[cat] for cat in categories]
+        
+        fig_breakdown = go.Figure(data=[go.Pie(
+            labels=categories,
+            values=values,
+            hole=0.5,
+            marker=dict(colors=colors, line=dict(color='#FFFFFF', width=2)),
+            textposition='outside',
+            textinfo='label+percent',
+            textfont=dict(size=8, family="Poppins"),
+            hovertemplate='<b>%{label}</b><br>%{value:.0f} kg CO₂ (%{percent})<extra></extra>'
+        )])
+        
+        center_text = f"<b style='font-size:14px'>{total_emisi_kampus:.0f}</b><br><span style='font-size:9px'>kg CO₂</span>"
+        fig_breakdown.add_annotation(text=center_text, x=0.5, y=0.5, font_size=10, showarrow=False)
+        
+        fig_breakdown.update_layout(
+            height=200, margin=dict(t=25, b=10, l=5, r=5), showlegend=False,
+            paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+            title=dict(text="<b>Breakdown Emisi</b>", x=0.5, y=0.95, 
+                      font=dict(size=12, color="#000000"))
+        )
+        
+        st.plotly_chart(fig_breakdown, use_container_width=True, config={'displayModeBar': False})
+
+    # Row 2: Heatmap, Breakdown per Fakultas (2 visualisasi)
+    col1, col2 = st.columns([1, 1])
+
+    with col1:
+        # Heatmap Kategori vs Fakultas
         if not fakultas_emissions_df.empty:
-            # Show ALL fakultas with data, sorted by total emission
             heatmap_fakultas = fakultas_emissions_df[fakultas_emissions_df['student_count'] > 0].sort_values('total_emisi', ascending=False)
             
             categories = ['Transport', 'Elektronik', 'Makanan']
             fakultas_list = heatmap_fakultas['fakultas'].tolist()
             
-            # Prepare data matrix for heatmap
             heatmap_data = []
             for _, row in heatmap_fakultas.iterrows():
                 heatmap_data.append([
@@ -923,7 +874,6 @@ def show():
                     row['food_emisi']
                 ])
             
-            # Create heatmap
             fig_heatmap = go.Figure(data=go.Heatmap(
                 z=heatmap_data,
                 x=categories,
@@ -931,172 +881,63 @@ def show():
                 colorscale=[[0, '#fee08b'], [0.25, '#fdae61'], [0.5, '#f46d43'], [0.75, '#d53e4f'], [1, '#9e0142']],
                 text=heatmap_data,
                 texttemplate="%{text:.0f}",
-                textfont={"size": 6, "color": "white"},
+                textfont={"size": 7, "color": "white"},
                 hoverongaps=False,
                 colorbar=dict(
-                    title=dict(text="Emisi", font=dict(size=7)),
-                    tickfont=dict(size=6),
-                    thickness=8,
-                    len=0.5
+                    title=dict(text="Emisi", font=dict(size=8)),
+                    tickfont=dict(size=7),
+                    thickness=10,
+                    len=0.6
                 ),
                 xgap=1, ygap=1
             ))
             
             fig_heatmap.update_layout(
-                title=dict(
-                    text="<b>Heatmap Semua Fakultas</b>",
-                    x=0.3,
-                    y=0.95,
-                    font=dict(size=10, color="#000000")
-                ),
-                height=180,
-                margin=dict(t=20, b=5, l=5, r=30),
-                font=dict(size=6),
-                paper_bgcolor='rgba(0,0,0,0)',
-                plot_bgcolor='rgba(0,0,0,0)',
-                xaxis=dict(
-                    title="",
-                    tickfont=dict(size=6),
-                    side="bottom"
-                ),
-                yaxis=dict(
-                    title="",
-                    tickfont=dict(size=5)
-                )
+                title=dict(text="<b>Heatmap Kategori vs Fakultas</b>", x=0.5, y=0.95,
+                          font=dict(size=12, color="#000000")),
+                height=200, margin=dict(t=25, b=5, l=5, r=35),
+                font=dict(size=7), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                xaxis=dict(title="", tickfont=dict(size=8), side="bottom"),
+                yaxis=dict(title="", tickfont=dict(size=6))
             )
             
             st.plotly_chart(fig_heatmap, use_container_width=True, config={'displayModeBar': False})
         else:
             st.info("Data heatmap tidak tersedia")
 
-    # Row 4: Compact Additional Analysis (2 charts only) - AFFECTED BY FILTERS
-    col1, col2 = st.columns([1, 1])
-
-    with col1:
-        # 6. Trend Emisi Mingguan (based on filtered data)
-        days = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min']
-        
-        # Calculate trend berdasarkan data yang sudah difilter
-        base_emission = total_emisi_kampus / 7 if total_emisi_kampus > 0 else 0
-        trend_values = [
-            base_emission * 0.9,   # Senin - mulai minggu
-            base_emission * 1.1,   # Selasa - naik aktivitas
-            base_emission * 1.2,   # Rabu - puncak tengah minggu
-            base_emission * 1.15,  # Kamis - masih tinggi
-            base_emission * 0.95,  # Jumat - mulai turun
-            base_emission * 0.6,   # Sabtu - weekend rendah
-            base_emission * 0.5    # Minggu - paling rendah
-        ]
-        
-        fig_trend = go.Figure()
-        
-        fig_trend.add_trace(go.Scatter(
-            x=days,
-            y=trend_values,
-            fill='tonexty',
-            mode='lines+markers',
-            line=dict(color='#3288bd', width=2, shape='spline'),
-            marker=dict(
-                size=6, 
-                color='#66c2a5',
-                line=dict(color='#3288bd', width=1)
-            ),
-            fillcolor='rgba(102, 194, 165, 0.3)',
-            name='Emisi Harian',
-            hovertemplate='<b>%{x}</b><br>%{y:.0f} kg CO₂<extra></extra>'
-        ))
-        
-        # Add baseline
-        fig_trend.add_trace(go.Scatter(
-            x=days,
-            y=[0] * len(days),
-            fill=None,
-            mode='lines',
-            line=dict(color='rgba(0,0,0,0)', width=0),
-            showlegend=False,
-            hoverinfo='skip'
-        ))
-        
-        fig_trend.update_layout(
-            height=180,
-            margin=dict(t=20, b=5, l=5, r=5),
-            title=dict(text="<b>Tren Emisi Mingguan</b>", x=0.35, y=0.95, font=dict(size=10, color="#000000")),
-            font=dict(size=7),
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            showlegend=False,
-            xaxis=dict(
-                showgrid=False, 
-                title="", 
-                tickfont=dict(size=6)
-            ),
-            yaxis=dict(
-                showgrid=True, 
-                gridcolor='rgba(0,0,0,0.1)',
-                title="Emisi (kg CO₂)", 
-                tickfont=dict(size=6)
-            )
-        )
-        
-        st.plotly_chart(fig_trend, use_container_width=True, config={'displayModeBar': False})
-
     with col2:
-        # 7. Breakdown Stacked per ALL Fakultas with significant emissions
+        # Breakdown Stacked per Fakultas
         if not fakultas_emissions_df.empty:
-            # Show ALL fakultas with significant data (not just top 4)
             significant_fakultas = fakultas_emissions_df[fakultas_emissions_df['total_emisi'] > 0].sort_values('total_emisi', ascending=False)
             
             fig_stacked = go.Figure()
             
-            # Transport stack
             fig_stacked.add_trace(go.Bar(
-                name='Transportasi',
-                x=significant_fakultas['fakultas'],
-                y=significant_fakultas['transport_emisi'],
+                name='Transportasi', x=significant_fakultas['fakultas'], y=significant_fakultas['transport_emisi'],
                 marker_color=CATEGORY_COLORS['Transportasi'],
                 hovertemplate='<b>%{x}</b><br>Transportasi: %{y:.0f} kg CO₂<extra></extra>'
             ))
             
-            # Electronic stack  
             fig_stacked.add_trace(go.Bar(
-                name='Elektronik',
-                x=significant_fakultas['fakultas'],
-                y=significant_fakultas['electronic_emisi'],
+                name='Elektronik', x=significant_fakultas['fakultas'], y=significant_fakultas['electronic_emisi'],
                 marker_color=CATEGORY_COLORS['Elektronik'],
                 hovertemplate='<b>%{x}</b><br>Elektronik: %{y:.0f} kg CO₂<extra></extra>'
             ))
             
-            # Food stack
             fig_stacked.add_trace(go.Bar(
-                name='Makanan',
-                x=significant_fakultas['fakultas'],
-                y=significant_fakultas['food_emisi'],
+                name='Makanan', x=significant_fakultas['fakultas'], y=significant_fakultas['food_emisi'],
                 marker_color=CATEGORY_COLORS['Makanan'],
                 hovertemplate='<b>%{x}</b><br>Makanan: %{y:.0f} kg CO₂<extra></extra>'
             ))
             
             fig_stacked.update_layout(
-                height=180,
-                margin=dict(t=20, b=5, l=5, r=5),
-                title=dict(text="<b>Breakdown Semua Fakultas</b>", x=0.30, y=0.95, 
-                          font=dict(size=10, color="#000000")),
-                barmode='stack',
-                paper_bgcolor='rgba(0,0,0,0)',
-                plot_bgcolor='rgba(0,0,0,0)',
-                xaxis=dict(
-                    title="",
-                    tickfont=dict(size=6),
-                    tickangle=-45
-                ),
-                yaxis=dict(
-                    title="Emisi (kg CO₂)",
-                    tickfont=dict(size=6)
-                ),
-                legend=dict(
-                    x=0.02, y=0.98,
-                    font=dict(size=6),
-                    bgcolor="rgba(255,255,255,0.8)"
-                )
+                height=200, margin=dict(t=25, b=5, l=5, r=5), barmode='stack',
+                title=dict(text="<b>Breakdown per Fakultas</b>", x=0.5, y=0.95, 
+                          font=dict(size=12, color="#000000")),
+                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                xaxis=dict(title="", tickfont=dict(size=7), tickangle=-30),
+                yaxis=dict(title="", tickfont=dict(size=8)),
+                legend=dict(x=0.02, y=0.98, font=dict(size=7), bgcolor="rgba(255,255,255,0.8)")
             )
             
             st.plotly_chart(fig_stacked, use_container_width=True, config={'displayModeBar': False})

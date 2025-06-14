@@ -35,11 +35,11 @@ def create_sidebar():
         
         # Menu items
         menu_items = [
-            ("", "Ringkasan", "overview"),
+            ("", "Dashboard Utama", "overview"),
             ("", "Transportasi", "transportation"),
             ("", "Elektronik", "electronic"),
             ("", "Sampah", "sampah"),
-            ("", "Tentang Kami", "about")
+            ("", "Tentang Dashboard", "about")
         ]
         
         # Initialize session state
@@ -65,9 +65,6 @@ def create_sidebar():
                     st.rerun()
             
             st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Close navigation menu container
-        st.markdown('</div>', unsafe_allow_html=True)
         
         # Sidebar footer
         st.markdown("""

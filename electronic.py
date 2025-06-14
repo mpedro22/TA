@@ -884,7 +884,7 @@ def show():
     activities_parsed = parse_time_activities(df_activities)
 
     # Filters
-    filter_col1, filter_col2, filter_col3, export_col1, export_col2 = st.columns([2.2, 2.2, 2.2, 1.2, 1.2])
+    filter_col1, filter_col2, filter_col3, export_col1, export_col2 = st.columns([1.8, 1.8, 1.8, 1, 1])
 
     with filter_col1:
         day_options = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
@@ -924,7 +924,7 @@ def show():
     with export_col1:
         csv_data = filtered_df.to_csv(index=False)
         st.download_button(
-            "Export CSV", 
+            "Export Raw Data", 
             data=csv_data, 
             file_name=f"electronic_{len(filtered_df)}.csv", 
             mime="text/csv", 
@@ -938,7 +938,7 @@ def show():
             device_emissions = calculate_device_emissions(filtered_df, filtered_activities)
             pdf_content = generate_electronic_pdf_report(filtered_df, filtered_activities, device_emissions, df_responden)
             st.download_button(
-                "Export PDF", 
+                "Export Laporan", 
                 data=pdf_content, 
                 file_name=f"electronic_{len(filtered_df)}.html", 
                 mime="text/html", 
@@ -990,13 +990,13 @@ def show():
                 ))
                 
                 fig_trend.update_layout(
-                    height=240, margin=dict(t=25, b=5, l=5, r=5),
+                    height=235, margin=dict(t=25, b=0, l=0, r=20),
                     xaxis_title="", yaxis_title="Emisi (kg CO₂)",
                     paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                     title=dict(text="<b>Tren Emisi Harian</b>", x=0.38, y=0.95, 
                               font=dict(size=11, color="#000000")),
-                    xaxis=dict(showgrid=False, tickfont=dict(size=7)),
-                    yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=7))
+                    xaxis=dict(showgrid=False, tickfont=dict(size=8), title=dict(text="Hari", font=dict(size=10))),
+                    yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=8), title=dict(text="Emisi (Kg CO₂)", font=dict(size=10)))
                 )
                 
                 st.plotly_chart(fig_trend, use_container_width=True, config={'displayModeBar': False})
@@ -1006,48 +1006,54 @@ def show():
         if df_responden is not None and not df_responden.empty and 'program_studi' in df_responden.columns:
             fakultas_mapping = get_fakultas_mapping()
             df_responden['fakultas'] = df_responden['program_studi'].map(fakultas_mapping).fillna('Lainnya')
-            
+        
+
             if 'id_responden' in df_responden.columns and 'id_responden' in filtered_df.columns:
                 df_with_fakultas = filtered_df.merge(df_responden[['id_responden', 'fakultas']], on='id_responden', how='left')
-                fakultas_stats = df_with_fakultas.groupby('fakultas')['emisi_elektronik_mingguan'].agg(['mean', 'count']).reset_index()
-                fakultas_stats.columns = ['fakultas', 'avg_emisi', 'count']
-                fakultas_stats = fakultas_stats[fakultas_stats['count'] >= 2].sort_values('avg_emisi')
+                fakultas_stats = df_with_fakultas.groupby('fakultas')['emisi_elektronik_mingguan'].agg(['sum', 'count']).reset_index()
+                fakultas_stats.columns = ['fakultas', 'total_emisi', 'count']
+                fakultas_stats = fakultas_stats[fakultas_stats['count'] >= 1].sort_values('total_emisi', ascending=True).tail(13)
                 
-                max_emisi = fakultas_stats['avg_emisi'].max()
-                min_emisi = fakultas_stats['avg_emisi'].min()
-                
-                fig_fakultas = go.Figure()
-                for i, (_, row) in enumerate(fakultas_stats.iterrows()):
-                    if max_emisi > min_emisi:
-                        ratio = (row['avg_emisi'] - min_emisi) / (max_emisi - min_emisi)
-                        sequential_warm = ['#fee08b', '#fdae61', '#f46d43', '#d53e4f', '#9e0142']
-                        color_idx = int(ratio * (len(sequential_warm) - 1))
-                        color = sequential_warm[color_idx]
-                    else:
-                        color = MAIN_PALETTE[i % len(MAIN_PALETTE)]
+                if not fakultas_stats.empty:
+                    fig_fakultas = go.Figure()
                     
-                    fig_fakultas.add_trace(go.Bar(
-                        x=[row['avg_emisi']], y=[row['fakultas']], orientation='h',
-                        marker=dict(color=color), showlegend=False,
-                        text=[f"{row['avg_emisi']:.1f}"], textposition='inside',
-                        textfont=dict(color='white', size=7, weight='bold'),
-                        hovertemplate=f'<b>{row["fakultas"]}</b><br>Rata-rata: {row["avg_emisi"]:.1f} kg CO₂<br>Mahasiswa: {row["count"]}<extra></extra>'
-                    ))
-                
-                fig_fakultas.update_layout(
-                    height=240, margin=dict(t=25, b=5, l=5, r=5), showlegend=False,
-                    xaxis_title="Rata-rata Emisi (kg CO₂)", yaxis_title="",
-                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                    title=dict(text="<b>Emisi per Fakultas</b>", x=0.36, y=0.95, 
-                              font=dict(size=11, color="#000000")),
-                    xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=7)),
-                    yaxis=dict(tickfont=dict(size=7))
-                )
-                st.plotly_chart(fig_fakultas, use_container_width=True, config={'displayModeBar': False})
+                    # Use color gradient based on emission level
+                    max_emisi = fakultas_stats['total_emisi'].max()
+                    min_emisi = fakultas_stats['total_emisi'].min()
+                    
+                    for i, (_, row) in enumerate(fakultas_stats.iterrows()):
+                        if max_emisi > min_emisi:
+                            ratio = (row['total_emisi'] - min_emisi) / (max_emisi - min_emisi)
+                            color_palette = ['#66c2a5', '#abdda4', '#fdae61', '#f46d43', '#d53e4f', '#9e0142']
+                            color_idx = int(ratio * (len(color_palette) - 1))
+                            color = color_palette[color_idx]
+                        else:
+                            color = MAIN_PALETTE[i % len(MAIN_PALETTE)]
+                        
+                        fig_fakultas.add_trace(go.Bar(
+                            x=[row['total_emisi']], 
+                            y=[row['fakultas']], 
+                            orientation='h',
+                            marker=dict(color=color), 
+                            showlegend=False,
+                            textfont=dict(color='white', size=7, weight='bold'),
+                            hovertemplate=f'<b>{row["fakultas"]}</b><br>Total: {row["total_emisi"]:.1f} kg CO₂<br>Mahasiswa: {row["count"]}<extra></extra>'
+                        ))
+                    
+                    fig_fakultas.update_layout(
+                        height=235, margin=dict(t=25, b=0, l=0, r=20),
+                        title=dict(text="<b>Emisi per Fakultas</b>", x=0.35, y=0.95,
+                                  font=dict(size=11, color="#000000")),
+                        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                        xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=8), title=dict(text="Total Emisi (kg CO₂)", font=dict(size=10))),
+                        yaxis=dict(tickfont=dict(size=8), title=dict(text="Fakultas/Sekolah", font=dict(size=10)))
+                    )
+                    
+                    st.plotly_chart(fig_fakultas, use_container_width=True, config={'displayModeBar': False})
+                else:
+                    st.info("Data fakultas tidak cukup (min 2 mahasiswa)")
             else:
-                st.info("Data fakultas tidak tersedia")
-        else:
-            st.info("Data fakultas tidak tersedia")
+                st.info("Data fakultas tidak dapat digabungkan")
 
     with col3:
         # 3. Proporsi Emisi per Perangkat - DONUT CHART
@@ -1070,7 +1076,7 @@ def show():
                     marker=dict(colors=colors, line=dict(color='#FFFFFF', width=2)),
                     textposition='outside',
                     textinfo='label+percent',
-                    textfont=dict(size=7, family="Poppins"),
+                    textfont=dict(size=8, family="Poppins"),
                     hovertemplate='<b>%{label}</b><br>%{value:.2f} kg CO₂ (%{percent})<extra></extra>'
                 )])
                 
@@ -1079,7 +1085,7 @@ def show():
                 fig_devices.add_annotation(text=center_text, x=0.5, y=0.5, font_size=10, showarrow=False)
                 
                 fig_devices.update_layout(
-                    height=240, margin=dict(t=25, b=5, l=5, r=5), showlegend=False,
+                    height=235, margin=dict(t=35, b=10, l=0, r=0), showlegend=False,
                     paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                     title=dict(text="<b>Proporsi Emisi per Perangkat</b>", x=0.27, y=0.95, 
                               font=dict(size=11, color="#000000"))
@@ -1133,7 +1139,7 @@ def show():
                     ))
                     
                     fig_heatmap.update_layout(
-                        height=240, margin=dict(t=30, b=0, l=0, r=0),
+                        height=235, margin=dict(t=30, b=0, l=0, r=0),
                         title=dict(text="<b>Heatmap Hari dan Jam</b>", x=0.32, y=0.95, 
                                 font=dict(size=11, color="#000000")),
                         xaxis=dict(tickfont=dict(size=8), tickangle=-25, title=dict(text="Jam", font=dict(size=10))),
@@ -1205,22 +1211,22 @@ def show():
                 line_dash="dash",
                 line_color="#5e4fa2",  
                 line_width=2,
-                annotation_text=f"Median: {median_val:.1f} kg CO₂",
+                annotation_text=f"Rata-rata: {median_val:.1f} kg CO₂",
                 annotation_position="top right",
                 annotation=dict(bgcolor="white", bordercolor="#5e4fa2", borderwidth=1)
             )
             
             fig_users.update_layout(
-                height=240, margin=dict(t=20, b=5, l=5, r=5),
+                height=235, margin=dict(t=25, b=5, l=5, r=5),
                 title=dict(text="<b>Pola Emisi per Responden</b>", x=0.32, y=0.95, 
                           font=dict(size=11, color="#000000")),
                 paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.05)', tickfont=dict(size=7), 
+                xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.05)', tickfont=dict(size=8), 
                           title=dict(text="Index Responden", font=dict(size=10))),
-                yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=7), 
+                yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=8), 
                           title=dict(text="Emisi (kg CO₂)", font=dict(size=10))),
                 legend=dict(orientation="v", yanchor="top", y=0.98, xanchor="left", x=0.02, 
-                           font=dict(size=7), bgcolor="rgba(255,255,255,0.9)", 
+                           font=dict(size=8), bgcolor="rgba(255,255,255,0.9)", 
                            bordercolor="rgba(0,0,0,0.1)", borderwidth=1)
             )
             
@@ -1247,7 +1253,7 @@ def show():
                 location_stats['session_count'] = class_activities.groupby('lokasi').size().values
                 location_stats['avg_emisi_per_session'] = location_stats['total_emisi'] / location_stats['session_count']
                 
-                location_stats = location_stats.sort_values('session_count', ascending=False).head(6)
+                location_stats = location_stats.sort_values('session_count', ascending=False).head(10)
                 
                 fig_location = go.Figure()
                 
@@ -1283,8 +1289,8 @@ def show():
                         ),
                         showlegend=False,
                         text=[f"{row['session_count']}"],
-                        textposition='outside',
-                        textfont=dict(size=9, color='#2d3748', weight='bold'),
+                        textposition='inside',
+                        textfont=dict(size=8, color='#2d3748', weight='bold'),
                         hovertemplate=f'<b>{row["lokasi"]}</b><br>Jumlah Sesi: {row["session_count"]}<br>Total Emisi: {row["total_emisi"]:.2f} kg CO₂<br>Emisi per Sesi: {row["avg_emisi_per_session"]:.2f} kg CO₂<br><i>Frekuensi penggunaan gedung</i><extra></extra>',
                         name=row['lokasi']
                     ))
@@ -1306,22 +1312,22 @@ def show():
                 )
                 
                 fig_location.update_layout(
-                    height=240,
-                    margin=dict(t=50, b=10, l=5, r=5),
+                    height=235,
+                    margin=dict(t=25, b=0, l=0, r=0),
                     title=dict(text="<b>Gedung Kelas Terpopuler</b>", x=0.35, y=0.95,
                               font=dict(size=11, color="#000000")),
                     paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                     xaxis=dict(
                         showgrid=False, 
-                        tickfont=dict(size=7), 
+                        tickfont=dict(size=8), 
                         tickangle=-45,
-                        title=dict(text="Gedung Kelas", font=dict(size=9))
+                        title=dict(text="Gedung Kelas", font=dict(size=10))
                     ),
                     yaxis=dict(
                         showgrid=True, 
                         gridcolor='rgba(0,0,0,0.1)', 
-                        tickfont=dict(size=7),
-                        title=dict(text="Jumlah Sesi", font=dict(size=9))
+                        tickfont=dict(size=8),
+                        title=dict(text="Jumlah Sesi", font=dict(size=10))
                     ),
                     showlegend=False
                 )

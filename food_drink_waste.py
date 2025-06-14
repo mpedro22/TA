@@ -801,7 +801,7 @@ def show():
     with export_col1:
         csv_data = filtered_df.to_csv(index=False)
         st.download_button(
-            "Export CSV", 
+            "Export Raw Data", 
             data=csv_data, 
             file_name=f"food_drink_waste_{len(filtered_df)}.csv", 
             mime="text/csv", 
@@ -813,7 +813,7 @@ def show():
         try:
             pdf_content = generate_pdf_report(filtered_df, total_emisi, avg_emisi, df_responden)
             st.download_button(
-                "Export PDF", 
+                "Export Laporan", 
                 data=pdf_content, 
                 file_name=f"food_drink_waste_{len(filtered_df)}.html", 
                 mime="text/html", 
@@ -850,13 +850,13 @@ def show():
         ))
         
         fig_trend.update_layout(
-            height=250, margin=dict(t=25, b=5, l=5, r=5),
+            height=235, margin=dict(t=25, b=0, l=0, r=20),
             xaxis_title="", yaxis_title="Emisi (kg CO₂)",
             paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
             title=dict(text="<b>Tren Emisi Harian</b>", x=0.38, y=0.95, 
                       font=dict(size=11, color="#000000")),
-            xaxis=dict(showgrid=False, tickfont=dict(size=7)),
-            yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=7))
+            xaxis=dict(showgrid=False, tickfont=dict(size=8), title=dict(text="Hari", font=dict(size=10))),
+            yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=8), title=dict(text="Emisi (Kg CO₂)", font=dict(size=10)))
         )
         
         st.plotly_chart(fig_trend, use_container_width=True, config={'displayModeBar': False})
@@ -871,7 +871,7 @@ def show():
             if not df_with_fakultas.empty:
                 fakultas_stats = df_with_fakultas.groupby('fakultas')['emisi_makanminum'].agg(['sum', 'count']).reset_index()
                 fakultas_stats.columns = ['fakultas', 'total_emisi', 'count']
-                fakultas_stats = fakultas_stats[fakultas_stats['count'] >= 3].sort_values('total_emisi', ascending=True).tail(6)
+                fakultas_stats = fakultas_stats[fakultas_stats['count'] >= 1].sort_values('total_emisi', ascending=True).tail(13)
                 
                 if not fakultas_stats.empty:
                     fig_fakultas = go.Figure()
@@ -902,13 +902,12 @@ def show():
                         ))
                     
                     fig_fakultas.update_layout(
-                        height=250, margin=dict(t=25, b=5, l=5, r=5),
+                        height=235, margin=dict(t=25, b=0, l=0, r=20),
                         title=dict(text="<b>Emisi per Fakultas</b>", x=0.35, y=0.95,
                                   font=dict(size=11, color="#000000")),
                         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                        xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=7),
-                                  title=dict(text="Total Emisi (kg CO₂)", font=dict(size=9))),
-                        yaxis=dict(tickfont=dict(size=7))
+                        xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=8), title=dict(text="Rata-Rata Emisi (kg CO₂)", font=dict(size=10))),
+                        yaxis=dict(tickfont=dict(size=8), title=dict(text="Fakultas/Sekolah", font=dict(size=10)))
                     )
                     
                     st.plotly_chart(fig_fakultas, use_container_width=True, config={'displayModeBar': False})
@@ -941,7 +940,7 @@ def show():
         fig_period.add_annotation(text=center_text, x=0.5, y=0.5, font_size=10, showarrow=False)
         
         fig_period.update_layout(
-            height=250, margin=dict(t=25, b=5, l=5, r=5), showlegend=False,
+            height=235, margin=dict(t=25, b=5, l=5, r=5), showlegend=False,
             paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
             title=dict(text="<b>Distribusi Periode Waktu</b>", x=0.27, y=0.95, 
                       font=dict(size=11, color="#000000"))
@@ -982,7 +981,7 @@ def show():
             ))
             
             fig_heatmap.update_layout(
-                height=250, margin=dict(t=25, b=20, l=20, r=40),
+                height=235, margin=dict(t=25, b=20, l=20, r=40),
                 title=dict(text="<b>Heatmap Top Lokasi vs Waktu</b>", x=0.15, y=0.95, 
                         font=dict(size=11, color="#000000")),
                 xaxis=dict(tickfont=dict(size=7), tickangle=-45, title=dict(text="Lokasi", font=dict(size=10))),
@@ -1066,7 +1065,7 @@ def show():
                 )
                 
                 fig_location.update_layout(
-                    height=250,
+                    height=235,
                     margin=dict(t=50, b=10, l=5, r=5),
                     title=dict(text="<b>Lokasi Makan Terpopuler</b>", x=0.30, y=0.95,
                               font=dict(size=11, color="#000000")),
@@ -1166,13 +1165,13 @@ def show():
                             line_dash="dash",
                             line_color="#5e4fa2",
                             line_width=2,
-                            annotation_text=f"Median: {median_val:.2f} kg CO₂",
+                            annotation_text=f"Rata-rata: {median_val:.2f} kg CO₂",
                             annotation_position="top right",
                             annotation=dict(bgcolor="white", bordercolor="#5e4fa2", borderwidth=1, font=dict(size=8))
                         )
                     
                     fig_users_food.update_layout(
-                        height=250, margin=dict(t=25, b=5, l=5, r=5),
+                        height=235, margin=dict(t=25, b=5, l=5, r=5),
                         title=dict(text="<b>Pola Emisi per Responden</b>", x=0.25, y=0.95, 
                                   font=dict(size=11, color="#000000")),
                         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
