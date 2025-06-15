@@ -147,7 +147,7 @@ def apply_filters(df, selected_days, selected_periods, selected_fakultas, df_res
 
 @loading_decorator()
 def generate_pdf_report(filtered_df, total_emisi, avg_emisi, df_responden=None):
-    """Generate professional HTML report optimized for PDF printing"""
+    """Generate professional HTML report optimized for PDF printing - Updated to match 6 visualizations"""
     from datetime import datetime
     import pandas as pd
     
@@ -230,35 +230,58 @@ def generate_pdf_report(filtered_df, total_emisi, avg_emisi, df_responden=None):
     location_stats = location_stats[location_stats['session_count'] >= 2].sort_values('session_count', ascending=False).head(10)
     most_popular_location = location_stats.iloc[0] if not location_stats.empty else None
 
-    # 6. User emission patterns
-    user_pattern_conclusion = "Data pola emisi per responden tidak tersedia."
-    user_categories = {}
-    if not valid_df.empty and 'id_responden' in valid_df.columns:
-        user_emissions = valid_df.groupby('id_responden')['emisi_makanminum'].sum().reset_index()
-        if len(user_emissions) >= 2:
-            Q1 = user_emissions['emisi_makanminum'].quantile(0.25)
-            Q3 = user_emissions['emisi_makanminum'].quantile(0.75)
-            IQR = Q3 - Q1
-            lower_bound = Q1 - 1.5 * IQR
-            upper_bound = Q3 + 1.5 * IQR
-            median_val = user_emissions['emisi_makanminum'].median()
+    # 6. Box plot distribution analysis (sesuai visualisasi)
+    box_plot_analysis = pd.DataFrame()
+    box_plot_conclusion = "Data distribusi emisi per lokasi tidak tersedia."
+    
+    if not valid_df.empty and 'id_responden' in valid_df.columns and 'lokasi' in valid_df.columns:
+        # Aggregate per responden per lokasi (sama seperti di visualisasi)
+        responden_lokasi_agg = valid_df.groupby(['id_responden', 'lokasi']).agg({
+            'emisi_makanminum': 'sum'
+        }).reset_index()
+        
+        # Group by location untuk analisis distribusi
+        location_distribution = responden_lokasi_agg.groupby('lokasi').agg({
+            'emisi_makanminum': ['count', 'mean', 'median', 'std', 'min', 'max']
+        }).reset_index()
+        location_distribution.columns = ['lokasi', 'responden_count', 'mean_emisi', 'median_emisi', 'std_emisi', 'min_emisi', 'max_emisi']
+        
+        # Filter lokasi dengan minimal 3 responden
+        significant_locations = location_distribution[location_distribution['responden_count'] >= 3]
+        
+        if not significant_locations.empty:
+            # Analisis outliers per lokasi
+            outlier_analysis = []
+            for _, loc_row in significant_locations.iterrows():
+                lokasi = loc_row['lokasi']
+                location_emissions = responden_lokasi_agg[responden_lokasi_agg['lokasi'] == lokasi]['emisi_makanminum']
+                
+                q1 = location_emissions.quantile(0.25)
+                q3 = location_emissions.quantile(0.75)
+                iqr = q3 - q1
+                lower_fence = q1 - 1.5 * iqr
+                upper_fence = q3 + 1.5 * iqr
+                
+                outliers = len(location_emissions[(location_emissions > upper_fence) | (location_emissions < lower_fence)])
+                
+                outlier_analysis.append({
+                    'lokasi': lokasi,
+                    'responden': int(loc_row['responden_count']),
+                    'median': loc_row['median_emisi'],
+                    'iqr': q3 - q1,
+                    'outliers': outliers,
+                    'variabilitas': 'Tinggi' if loc_row['std_emisi'] > loc_row['mean_emisi'] * 0.5 else 'Rendah'
+                })
             
-            user_emissions['category'] = 'Normal'
-            user_emissions.loc[user_emissions['emisi_makanminum'] > upper_bound, 'category'] = 'Heavy User'
-            user_emissions.loc[user_emissions['emisi_makanminum'] < lower_bound, 'category'] = 'Light User'
-            user_emissions.loc[user_emissions['emisi_makanminum'] > median_val * 1.5, 'category'] = 'High User'
-            user_emissions.loc[user_emissions['emisi_makanminum'] < median_val * 0.5, 'category'] = 'Eco User'
+            box_plot_analysis = pd.DataFrame(outlier_analysis).sort_values('median', ascending=False)
             
-            # Count each category
-            user_categories = user_emissions['category'].value_counts().to_dict()
-            
-            # Ensure all categories exist (with 0 if not present)
-            for cat in ['Eco User', 'Light User', 'Normal', 'High User', 'Heavy User']:
-                if cat not in user_categories:
-                    user_categories[cat] = 0
-            
-            dominant_category = max(user_categories.items(), key=lambda x: x[1])
-            user_pattern_conclusion = f"Kategori {dominant_category[0]} mendominasi dengan {dominant_category[1]} responden ({dominant_category[1]/len(user_emissions)*100:.1f}%)."
+            if not box_plot_analysis.empty:
+                highest_median = box_plot_analysis.iloc[0]
+                most_outliers = box_plot_analysis.loc[box_plot_analysis['outliers'].idxmax()]
+                most_variable = box_plot_analysis.loc[box_plot_analysis['iqr'].idxmax()]
+                total_outliers = box_plot_analysis['outliers'].sum()
+                
+                box_plot_conclusion = f"Distribusi emisi menunjukkan {total_outliers} responden outlier total. {highest_median['lokasi']} memiliki median tertinggi ({highest_median['median']:.2f} kg CO₂), {most_outliers['lokasi']} memiliki outlier terbanyak ({most_outliers['outliers']} responden), dan {most_variable['lokasi']} paling bervariasi (IQR: {most_variable['iqr']:.2f})."
 
     html_content = f"""
     <!DOCTYPE html>
@@ -633,9 +656,55 @@ def generate_pdf_report(filtered_df, total_emisi, avg_emisi, df_responden=None):
             </div>
         </div>
         
-        <!-- 5. Lokasi Makan Terpopuler -->
+        <!-- 5. Distribusi Emisi per Lokasi Makan -->
         <div class="section avoid-break">
-            <h2 class="section-title">5. Lokasi Makan Terpopuler</h2>
+            <h2 class="section-title">5. Distribusi Emisi per Lokasi Makan</h2>
+            <div class="section-content">
+    """
+    
+    if not box_plot_analysis.empty:
+        html_content += """
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Ranking</th>
+                            <th>Lokasi</th>
+                            <th>Responden</th>
+                            <th>Median (kg CO₂)</th>
+                            <th>IQR</th>
+                            <th>Outlier</th>
+                            <th>Variabilitas</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        """
+        
+        for idx, (_, row) in enumerate(box_plot_analysis.iterrows(), 1):
+            html_content += f"""
+                        <tr>
+                            <td><strong>#{idx}</strong></td>
+                            <td style="text-align: left; font-weight: 500;">{row['lokasi']}</td>
+                            <td>{row['responden']}</td>
+                            <td>{row['median']:.2f}</td>
+                            <td>{row['iqr']:.2f}</td>
+                            <td>{row['outliers']} responden</td>
+                            <td>{row['variabilitas']}</td>
+                        </tr>
+            """
+        
+        html_content += "</tbody></table>"
+    else:
+        html_content += "<p>Data distribusi emisi per lokasi tidak tersedia.</p>"
+    
+    html_content += f"""
+                <div class="conclusion">
+                    <strong>Kesimpulan:</strong> {box_plot_conclusion}
+                </div>
+            </div>
+
+        <!-- 6. Lokasi Makan Terpopuler -->
+        <div class="section avoid-break">
+            <h2 class="section-title">6. Lokasi Makan Terpopuler</h2>
             <div class="section-content">
                 <table>
                     <thead>
@@ -672,57 +741,6 @@ def generate_pdf_report(filtered_df, total_emisi, avg_emisi, df_responden=None):
                 </div>
             </div>
         </div>
-        
-        <!-- 6. Pola Emisi per Responden -->
-        <div class="section avoid-break">
-            <h2 class="section-title">6. Pola Emisi per Responden</h2>
-            <div class="section-content">
-    """
-    
-    if user_categories:
-        html_content += """
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Kategori Pengguna</th>
-                            <th>Jumlah</th>
-                            <th>Persentase</th>
-                            <th>Karakteristik</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        """
-        
-        total_users = sum(user_categories.values())
-        category_descriptions = {
-            'Eco User': 'Emisi sangat rendah, pola konsumsi berkelanjutan',
-            'Light User': 'Emisi di bawah rata-rata, konsumsi efisien',
-            'Normal': 'Emisi dalam rentang normal',
-            'High User': 'Emisi di atas rata-rata, perlu optimasi',
-            'Heavy User': 'Emisi tinggi, target prioritas program'
-        }
-        
-        for category, count in user_categories.items():
-            if count > 0:
-                percentage = (count / total_users * 100) if total_users > 0 else 0
-                html_content += f"""
-                            <tr>
-                                <td style="text-align: left; font-weight: 500;">{category}</td>
-                                <td>{count}</td>
-                                <td>{percentage:.1f}%</td>
-                                <td>{category_descriptions.get(category, '')}</td>
-                            </tr>
-                """
-        
-        html_content += "</tbody></table>"
-    else:
-        html_content += "<p>Data pola emisi per responden tidak tersedia.</p>"
-    
-    html_content += f"""
-                <div class="conclusion">
-                    <strong>Kesimpulan:</strong> {user_pattern_conclusion}
-                </div>
-            </div>
         </div>
         
         <div class="footer">
@@ -732,6 +750,7 @@ def generate_pdf_report(filtered_df, total_emisi, avg_emisi, df_responden=None):
     </body>
     </html>
     """
+
     
     return html_content
 
@@ -939,7 +958,7 @@ def show():
                 st.info("Data fakultas tidak tersedia")
 
         with col3:
-            # 3. Distribusi Periode Waktu - Diagram Lingkaran
+            # 3. Distribusi Periode Waktu - Diagram Lingkaran - DIPERBAIKI CENTER TEXT
             period_data = filtered_df['meal_period'].value_counts()
             colors = [PERIOD_COLORS.get(period, MAIN_PALETTE[i % len(MAIN_PALETTE)]) 
                      for i, period in enumerate(period_data.index)]
@@ -955,8 +974,9 @@ def show():
                 hovertemplate='<b>%{label}</b><br>%{value} aktivitas (%{percent})<extra></extra>'
             )])
             
-            total_activities = period_data.sum()
-            center_text = f"<b style='font-size:14px'>{total_activities}</b><br><span style='font-size:8px'>Aktivitas</span>"
+            # DIPERBAIKI: Center text menampilkan total emisi, bukan total aktivitas
+            total_emisi_chart = filtered_df['emisi_makanminum'].sum()
+            center_text = f"<b style='font-size:14px'>{total_emisi_chart:.1f}</b><br><span style='font-size:8px'>kg CO₂</span>"
             fig_period.add_annotation(text=center_text, x=0.5, y=0.5, font_size=10, showarrow=False)
             
             fig_period.update_layout(
@@ -1016,205 +1036,253 @@ def show():
                 st.info("Data heatmap tidak tersedia")
 
         with col2:
-            # 2. Lokasi Terpopuler
+            # 2. Box Plot Distribusi Emisi per Kantin - DIPERBAIKI DENGAN AGREGASI
             if not filtered_df.empty and 'lokasi' in filtered_df.columns:
-                location_stats = filtered_df.groupby('lokasi').agg({
-                    'emisi_makanminum': ['sum', 'mean'],
-                    'lokasi': 'count'
-                }).reset_index()
-                location_stats.columns = ['lokasi', 'total_emisi', 'avg_emisi', 'session_count']
-                location_stats['avg_emisi_per_session'] = location_stats['total_emisi'] / location_stats['session_count']
+                # Filter data valid
+                valid_data = filtered_df[
+                    (filtered_df['emisi_makanminum'].notna()) & 
+                    (filtered_df['emisi_makanminum'] > 0) &
+                    (filtered_df['lokasi'].notna()) &
+                    (filtered_df['lokasi'] != '') &
+                    (filtered_df['id_responden'].notna()) &
+                    (filtered_df['id_responden'] != '')
+                ]
                 
-                # Filter dan sort berdasarkan jumlah sesi
-                location_stats = location_stats[location_stats['session_count'] >= 2].sort_values('session_count', ascending=False).head(6)
-                
-                if not location_stats.empty:
-                    fig_location = go.Figure()
+                if len(valid_data) > 0:
+                    # KUNCI: Aggregate emisi per responden per lokasi (sum multiple visits)
+                    responden_lokasi_agg = valid_data.groupby(['id_responden', 'lokasi']).agg({
+                        'emisi_makanminum': 'sum'  # Sum all eating sessions per person per location
+                    }).reset_index()
                     
-                    max_sessions = location_stats['session_count'].max()
-                    min_sessions = location_stats['session_count'].min()
+                    # Group by location untuk melihat distribusi
+                    location_stats = responden_lokasi_agg.groupby('lokasi').agg({
+                        'emisi_makanminum': ['count', 'mean', 'std', 'min', 'max']
+                    }).reset_index()
+                    location_stats.columns = ['lokasi', 'responden_count', 'mean_emisi', 'std_emisi', 'min_emisi', 'max_emisi']
                     
-                    colors = []
-                    for _, row in location_stats.iterrows():
-                        if max_sessions > min_sessions:
-                            ratio = (row['session_count'] - min_sessions) / (max_sessions - min_sessions)
-                            if ratio < 0.2:
-                                colors.append('#e6f598') 
-                            elif ratio < 0.4:
-                                colors.append('#abdda4') 
-                            elif ratio < 0.6:
-                                colors.append('#66c2a5')  
-                            elif ratio < 0.8:
-                                colors.append('#3288bd') 
-                            else:
-                                colors.append('#d53e4f') 
-                        else:
-                            colors.append('#3288bd')
+                    # Filter lokasi dengan minimal 3 responden untuk box plot yang meaningful
+                    valid_locations_data = location_stats[location_stats['responden_count'] >= 3]
                     
-                    for i, (_, row) in enumerate(location_stats.iterrows()):
-                        display_name = row['lokasi'] if len(row['lokasi']) <= 10 else row['lokasi'][:8] + '..'
+                    if len(valid_locations_data) >= 2:
+                        # Ambil top 6 lokasi berdasarkan jumlah responden
+                        top_locations = valid_locations_data.nlargest(6, 'responden_count')['lokasi'].tolist()
                         
-                        fig_location.add_trace(go.Bar(
-                            x=[display_name],
-                            y=[row['session_count']],
-                            marker=dict(
-                                color=colors[i],
-                                line=dict(color='white', width=1.5),
-                                opacity=0.85
-                            ),
-                            showlegend=False,
-                            text=[f"{row['session_count']}"],
-                            textposition='outside',
-                            textfont=dict(size=9, color='#2d3748', weight='bold'),
-                            hovertemplate=f'<b>{row["lokasi"]}</b><br>Jumlah Sesi: {row["session_count"]}<br>Total Emisi: {row["total_emisi"]:.2f} kg CO₂<br>Emisi per Sesi: {row["avg_emisi_per_session"]:.2f} kg CO₂<br><i>Frekuensi aktivitas makan</i><extra></extra>',
-                            name=row['lokasi']
-                        ))
-                    
-                    # Garis rata-rata
-                    avg_sessions = location_stats['session_count'].mean()
-                    fig_location.add_hline(
-                        y=avg_sessions,
-                        line_dash="dash",
-                        line_color="#5e4fa2",
-                        line_width=2,
-                        annotation_text=f"Rata-rata: {avg_sessions:.1f}",
-                        annotation_position="top right",
-                        annotation=dict(
-                            bgcolor="white", 
-                            bordercolor="#5e4fa2", 
-                            borderwidth=1,
-                            font=dict(size=8)
-                        )
-                    )
-                    
-                    fig_location.update_layout(
-                        height=235,
-                        margin=dict(t=50, b=10, l=5, r=5),
-                        title=dict(text="<b>Lokasi Makan Terpopuler</b>", x=0.30, y=0.95,
-                                  font=dict(size=11, color="#000000")),
-                        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                        xaxis=dict(
-                            showgrid=False, 
-                            tickfont=dict(size=7), 
-                            tickangle=-45,
-                            title=dict(text="Lokasi", font=dict(size=9))
-                        ),
-                        yaxis=dict(
-                            showgrid=True, 
-                            gridcolor='rgba(0,0,0,0.1)', 
-                            tickfont=dict(size=7),
-                            title=dict(text="Jumlah Sesi", font=dict(size=9))
-                        ),
-                        showlegend=False
-                    )
-                    
-                    st.plotly_chart(fig_location, use_container_width=True, config={'displayModeBar': False})
+                        # Filter aggregated data untuk lokasi-lokasi ini
+                        box_data = responden_lokasi_agg[responden_lokasi_agg['lokasi'].isin(top_locations)]
+                        
+                        if not box_data.empty:
+                            fig_canteen_boxplot = go.Figure()
+                            
+                            # Color palette
+                            colors = ['#66c2a5', '#fdae61', '#f46d43', '#d53e4f', '#5e4fa2', '#9e0142']
+                            
+                            for i, location in enumerate(top_locations):
+                                # Ambil total emisi per responden untuk lokasi ini
+                                location_emissions = box_data[box_data['lokasi'] == location]['emisi_makanminum']
+                                
+                                if len(location_emissions) >= 3:
+                                    color = colors[i % len(colors)]
+                                    
+                                    # Calculate statistics
+                                    q1 = location_emissions.quantile(0.25)
+                                    q3 = location_emissions.quantile(0.75)
+                                    iqr = q3 - q1
+                                    lower_fence = q1 - 1.5 * iqr
+                                    upper_fence = q3 + 1.5 * iqr
+                                    outliers_count = len(location_emissions[
+                                        (location_emissions > upper_fence) | 
+                                        (location_emissions < lower_fence)
+                                    ])
+                                    
+                                    # Convert hex to rgba
+                                    hex_color = color[1:]
+                                    rgb = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+                                    rgba_fill = f"rgba({rgb[0]}, {rgb[1]}, {rgb[2]}, 0.4)"
+                                    
+                                    # Short name for display
+                                    display_name = location if len(location) <= 10 else location[:8] + '..'
+                                    
+                                    fig_canteen_boxplot.add_trace(go.Box(
+                                        y=location_emissions,
+                                        name=display_name,
+                                        marker_color=color,
+                                        boxpoints='outliers',
+                                        pointpos=-1.8,
+                                        marker=dict(
+                                            size=6,
+                                            line=dict(width=1, color='white'),
+                                            opacity=0.9
+                                        ),
+                                        line=dict(width=2),
+                                        fillcolor=rgba_fill,
+                                        hovertemplate=f'<b>{location}</b><br>' +
+                                                    'Median: %{median:.2f} kg CO₂<br>' +
+                                                    f'Outlier: {outliers_count}<br>' +
+                                                    'Total Emisi: %{y:.2f} kg CO₂<br>' +
+                                                    f'Responden: {len(location_emissions)}<extra></extra>'
+                                    ))
+                            
+                            fig_canteen_boxplot.update_layout(
+                                height=235, margin=dict(t=25, b=5, l=5, r=5),
+                                title=dict(text="<b>Distribusi Total Emisi per Responden</b>", x=0.20, y=0.95, 
+                                          font=dict(size=11, color="#000000")),
+                                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                                xaxis=dict(
+                                    showgrid=False, 
+                                    tickfont=dict(size=7), 
+                                    title=dict(text="Lokasi Makan", font=dict(size=9))
+                                ),
+                                yaxis=dict(
+                                    showgrid=True, 
+                                    gridcolor='rgba(0,0,0,0.1)', 
+                                    tickfont=dict(size=7), 
+                                    title=dict(text="Total Emisi per Responden (kg CO₂)", font=dict(size=9))
+                                ),
+                                showlegend=False
+                            )
+                            
+                            st.plotly_chart(fig_canteen_boxplot, use_container_width=True, config={'displayModeBar': False})
+                        else:
+                            st.info("Data lokasi makan kosong setelah agregasi")
+                    else:
+                        # Show debug info yang lebih detail
+                        st.info(f"Tidak cukup lokasi dengan responden memadai. Ditemukan {len(valid_locations_data)} lokasi.")
+                        
+                        # Tampilkan debug info untuk troubleshooting
+                        if not location_stats.empty:
+                            st.write("**Statistik per lokasi (setelah agregasi):**")
+                            st.dataframe(location_stats.head(10))
                 else:
-                    st.info("Data lokasi tidak cukup untuk analisis")
+                    st.info("Tidak ada data aktivitas makan yang valid")
+                    
+                    # Debug info yang lebih detail
+                    st.write("**Debug Info:**")
+                    st.write(f"- Total data: {len(filtered_df)}")
+                    if len(filtered_df) > 0:
+                        st.write(f"- Data dengan emisi > 0: {len(filtered_df[filtered_df['emisi_makanminum'] > 0])}")
+                        st.write(f"- Data dengan lokasi valid: {len(filtered_df[filtered_df['lokasi'].notna()])}")
+                        st.write(f"- Lokasi unique: {filtered_df['lokasi'].nunique()}")
+                        st.write(f"- Sample lokasi: {filtered_df['lokasi'].value_counts().head()}")
             else:
-                st.info("Data lokasi tidak tersedia")
+                st.info("Data tidak tersedia")
 
         with col3:
-            # 3. Pola Emisi per Responden
-            if 'id_responden' in filtered_df.columns and not filtered_df.empty:
-                valid_df = filtered_df[filtered_df['id_responden'].notna() & 
-                                     (filtered_df['id_responden'] != '') & 
-                                     (filtered_df['emisi_makanminum'].notna()) &
-                                     (filtered_df['emisi_makanminum'] > 0)]
+            # 3. Emisi per Kantin
+            if not filtered_df.empty and 'lokasi' in filtered_df.columns:
+                # Filter for canteen-like locations (containing 'kantin', 'cafeteria', 'cafe', etc.)
+                canteen_keywords = ['kantin', 'cafeteria', 'cafe', 'kafe', 'food', 'makan', 'warung', 'resto', 'restaurant']
                 
-                if len(valid_df) > 0:
-                    user_emissions_food = valid_df.groupby('id_responden')['emisi_makanminum'].sum().reset_index()
-                    user_emissions_food.columns = ['id_responden', 'total_emisi']
+                # First try to find locations with canteen keywords
+                canteen_df = filtered_df[
+                    filtered_df['lokasi'].str.contains('|'.join(canteen_keywords), case=False, na=False)
+                ]
+                
+                # If no canteen-specific locations found, use top locations by activity count
+                if canteen_df.empty:
+                    canteen_df = filtered_df.copy()
+                    canteen_title = "Lokasi Makan Teratas"
+                else:
+                    canteen_title = "Emisi per Kantin"
+                
+                if not canteen_df.empty:
+                    canteen_stats = canteen_df.groupby('lokasi').agg({
+                        'emisi_makanminum': ['sum', 'mean', 'count']
+                    }).reset_index()
+                    canteen_stats.columns = ['lokasi', 'total_emisi', 'avg_emisi', 'activity_count']
                     
-                    if len(user_emissions_food) >= 2: 
-                        median_val = user_emissions_food['total_emisi'].median()
-                        Q1 = user_emissions_food['total_emisi'].quantile(0.25)
-                        Q3 = user_emissions_food['total_emisi'].quantile(0.75)
+                    # Filter locations with at least 2 activities and take top 8
+                    canteen_stats = canteen_stats[canteen_stats['activity_count'] >= 2]
+                    canteen_stats = canteen_stats.sort_values('total_emisi', ascending=False).head(8)
+                    
+                    if not canteen_stats.empty:
+                        fig_canteen = go.Figure()
                         
-                        # Simple categorization that works with small datasets
-                        user_emissions_food['category'] = 'Normal'
-                        user_emissions_food.loc[user_emissions_food['total_emisi'] < median_val * 0.7, 'category'] = 'Eco User'
-                        user_emissions_food.loc[(user_emissions_food['total_emisi'] >= median_val * 0.7) & 
-                                              (user_emissions_food['total_emisi'] < median_val), 'category'] = 'Light User'
-                        user_emissions_food.loc[(user_emissions_food['total_emisi'] > median_val) & 
-                                              (user_emissions_food['total_emisi'] <= median_val * 1.3), 'category'] = 'High User'
-                        user_emissions_food.loc[user_emissions_food['total_emisi'] > median_val * 1.3, 'category'] = 'Heavy User'
+                        # Color gradient based on emission level
+                        max_emisi = canteen_stats['total_emisi'].max()
+                        min_emisi = canteen_stats['total_emisi'].min()
                         
-                        user_emissions_food['user_index'] = range(len(user_emissions_food))
+                        colors = []
+                        for _, row in canteen_stats.iterrows():
+                            if max_emisi > min_emisi:
+                                ratio = (row['total_emisi'] - min_emisi) / (max_emisi - min_emisi)
+                                if ratio < 0.2:
+                                    colors.append('#66c2a5')  # Low emission - green
+                                elif ratio < 0.4:
+                                    colors.append('#abdda4')  
+                                elif ratio < 0.6:
+                                    colors.append('#fdae61')  # Medium emission - orange
+                                elif ratio < 0.8:
+                                    colors.append('#f46d43')  
+                                else:
+                                    colors.append('#d53e4f')  # High emission - red
+                            else:
+                                colors.append('#3288bd')  # Default blue
                         
-                        fig_users_food = go.Figure()
-                        
-                        # Color mapping
-                        color_map = {
-                            'Eco User': '#66c2a5',  
-                            'Light User': '#abdda4',  
-                            'Normal': '#3288bd',      
-                            'High User': '#fdae61',     
-                            'Heavy User': '#d53e4f'     
-                        }
-                        
-                        size_map = {
-                            'Eco User': 8, 
-                            'Light User': 7, 
-                            'Normal': 6, 
-                            'High User': 9, 
-                            'Heavy User': 12
-                        }
-                        
-                        for category in user_emissions_food['category'].unique():
-                            category_data = user_emissions_food[user_emissions_food['category'] == category]
+                        for i, (_, row) in enumerate(canteen_stats.iterrows()):
+                            # Shorten location names for display
+                            display_name = row['lokasi'] if len(row['lokasi']) <= 12 else row['lokasi'][:10] + '..'
                             
-                            if len(category_data) > 0: 
-                                fig_users_food.add_trace(go.Scatter(
-                                    x=category_data['user_index'],
-                                    y=category_data['total_emisi'],
-                                    mode='markers',
-                                    name=category,
-                                    marker=dict(
-                                        color=color_map.get(category, '#3288bd'),
-                                        size=size_map.get(category, 6),
-                                        line=dict(color='white', width=1.5),
-                                        opacity=0.85,
-                                        symbol='circle'
-                                    ),
-                                    hovertemplate=f'<b>User %{{text}}</b><br>Total Emisi: %{{y:.2f}} kg CO₂<br>Kategori: {category}<br><i>Total konsumsi individual</i><extra></extra>',
-                                    text=[f"{str(row['id_responden'])[-3:]}" if len(str(row['id_responden'])) >= 3 else str(row['id_responden']) for _, row in category_data.iterrows()]
-                                ))
+                            fig_canteen.add_trace(go.Bar(
+                                x=[display_name],
+                                y=[row['total_emisi']],
+                                marker=dict(
+                                    color=colors[i],
+                                    line=dict(color='white', width=1.5),
+                                    opacity=0.85
+                                ),
+                                showlegend=False,
+                                text=[f"{row['total_emisi']:.1f}"],
+                                textposition='outside',
+                                textfont=dict(size=8, color='#2d3748', weight='bold'),
+                                hovertemplate=f'<b>{row["lokasi"]}</b><br>Total Emisi: {row["total_emisi"]:.2f} kg CO₂<br>Rata-rata: {row["avg_emisi"]:.2f} kg CO₂<br>Aktivitas: {row["activity_count"]}<br><i>Total emisi makanan & minuman</i><extra></extra>',
+                                name=row['lokasi']
+                            ))
                         
-                        # Garis median
-                        if median_val > 0:
-                            fig_users_food.add_hline(
-                                y=median_val,
-                                line_dash="dash",
-                                line_color="#5e4fa2",
-                                line_width=2,
-                                annotation_text=f"Rata-rata: {median_val:.2f} kg CO₂",
-                                annotation_position="top right",
-                                annotation=dict(bgcolor="white", bordercolor="#5e4fa2", borderwidth=1, font=dict(size=8))
+                        # Add average line for reference
+                        avg_emisi = canteen_stats['total_emisi'].mean()
+                        fig_canteen.add_hline(
+                            y=avg_emisi,
+                            line_dash="dash",
+                            line_color="#5e4fa2",
+                            line_width=2,
+                            annotation_text=f"Rata-rata: {avg_emisi:.1f}",
+                            annotation_position="top right",
+                            annotation=dict(
+                                bgcolor="white", 
+                                bordercolor="#5e4fa2", 
+                                borderwidth=1,
+                                font=dict(size=8)
                             )
-                        
-                        fig_users_food.update_layout(
-                            height=235, margin=dict(t=25, b=5, l=5, r=5),
-                            title=dict(text="<b>Pola Emisi per Responden</b>", x=0.25, y=0.95, 
-                                      font=dict(size=11, color="#000000")),
-                            paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                            xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.05)', tickfont=dict(size=7), 
-                                      title=dict(text="Index Responden", font=dict(size=9))),
-                            yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=7), 
-                                      title=dict(text="Total Emisi (kg CO₂)", font=dict(size=9))),
-                            legend=dict(orientation="v", yanchor="top", y=0.98, xanchor="left", x=0.02, 
-                                       font=dict(size=7), bgcolor="rgba(255,255,255,0.9)", 
-                                       bordercolor="rgba(0,0,0,0.1)", borderwidth=1)
                         )
                         
-                        st.plotly_chart(fig_users_food, use_container_width=True, config={'displayModeBar': False})
+                        fig_canteen.update_layout(
+                            height=235,
+                            margin=dict(t=25, b=0, l=0, r=0),
+                            title=dict(text=f"<b>{canteen_title}</b>", x=0.35, y=0.95,
+                                      font=dict(size=11, color="#000000")),
+                            paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                            xaxis=dict(
+                                showgrid=False, 
+                                tickfont=dict(size=7), 
+                                tickangle=-45,
+                                title=dict(text="Lokasi", font=dict(size=9))
+                            ),
+                            yaxis=dict(
+                                showgrid=True, 
+                                gridcolor='rgba(0,0,0,0.1)', 
+                                tickfont=dict(size=8),
+                                title=dict(text="Total Emisi (kg CO₂)", font=dict(size=9))
+                            ),
+                            showlegend=False
+                        )
                         
+                        st.plotly_chart(fig_canteen, use_container_width=True, config={'displayModeBar': False})
                     else:
-                        st.info("Data tidak cukup (min 2 responden)")
+                        st.info("Data kantin tidak cukup untuk analisis")
                 else:
-                    st.info("Tidak ada data emisi yang valid")
+                    st.info("Data lokasi kantin tidak tersedia")
             else:
-                st.info("Data responden tidak tersedia")
+                st.info("Data lokasi tidak tersedia")
 
         time.sleep(0.18)  # Row 2 charts loading time
 

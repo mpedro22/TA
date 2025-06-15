@@ -131,6 +131,12 @@ def apply_electronic_filters(df, selected_days, selected_devices, selected_fakul
                 device_mask |= (filtered_df['penggunaan_laptop'].str.contains('Ya', case=False, na=False))
             elif device == 'Tablet' and 'penggunaan_tab' in filtered_df.columns:
                 device_mask |= (filtered_df['penggunaan_tab'].str.contains('Ya', case=False, na=False))
+            elif device == 'AC':
+                # For AC, we include all users since AC usage comes from activities data
+                device_mask |= pd.Series(True, index=filtered_df.index)
+            elif device == 'Lampu':
+                # For Lampu, we include all users since lamp usage comes from activities data  
+                device_mask |= pd.Series(True, index=filtered_df.index)
         
         if device_mask.any():
             filtered_df = filtered_df[device_mask]
@@ -538,53 +544,9 @@ def generate_electronic_pdf_report(filtered_df, activities_df, device_emissions,
             </div>
         </div>
         
-        <!-- 1. Komposisi Emisi per Perangkat -->
+        <!-- 1. Tren Emisi Harian -->
         <div class="section avoid-break">
-            <h2 class="section-title">1. Komposisi Emisi per Perangkat</h2>
-            <div class="section-content">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Perangkat</th>
-                            <th>Total Emisi (kg CO₂)</th>
-                            <th>Persentase (%)</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-    """
-    
-    # Add device emissions data
-    for device, emisi in device_emissions.items():
-        percentage = (emisi / total_emisi * 100) if total_emisi > 0 else 0
-        if percentage > 30:
-            status = 'Tinggi'
-        elif percentage > 15:
-            status = 'Sedang'
-        else:
-            status = 'Rendah'
-        
-        html_content += f"""
-                        <tr>
-                            <td style="text-align: left; font-weight: 500;">{device}</td>
-                            <td>{emisi:.2f}</td>
-                            <td>{percentage:.1f}%</td>
-                            <td>{status}</td>
-                        </tr>
-        """
-    
-    html_content += f"""
-                    </tbody>
-                </table>
-                <div class="conclusion">
-                    <strong>Kesimpulan:</strong> {dominant_device[0]} mendominasi dengan {dominant_percentage:.1f}% total emisi perangkat elektronik.
-                </div>
-            </div>
-        </div>
-        
-        <!-- 2. Tren Emisi Harian -->
-        <div class="section avoid-break">
-            <h2 class="section-title">2. Tren Emisi Harian</h2>
+            <h2 class="section-title">1. Tren Emisi Harian</h2>
             <div class="section-content">
     """
     
@@ -617,9 +579,9 @@ def generate_electronic_pdf_report(filtered_df, activities_df, device_emissions,
             </div>
         </div>
         
-        <!-- 3. Emisi per Fakultas -->
+        <!-- 2. Emisi per Fakultas -->
         <div class="section avoid-break">
-            <h2 class="section-title">3. Emisi per Fakultas</h2>
+            <h2 class="section-title">2. Emisi per Fakultas</h2>
             <div class="section-content">
     """
     
@@ -662,10 +624,54 @@ def generate_electronic_pdf_report(filtered_df, activities_df, device_emissions,
                 </div>
             </div>
         </div>
-        
-        <!-- 4. Analisis Waktu dan Ruang (Heatmap) -->
+
+        <!-- 3. Proporsi Emisi per Perangkat -->
         <div class="section avoid-break">
-            <h2 class="section-title">4. Analisis Waktu dan Ruang</h2>
+            <h2 class="section-title">3. Proporsi Emisi per Perangkat</h2>
+            <div class="section-content">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Perangkat</th>
+                            <th>Total Emisi (kg CO₂)</th>
+                            <th>Persentase (%)</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+    """
+    
+    # Add device emissions data
+    for device, emisi in device_emissions.items():
+        percentage = (emisi / total_emisi * 100) if total_emisi > 0 else 0
+        if percentage > 30:
+            status = 'Tinggi'
+        elif percentage > 15:
+            status = 'Sedang'
+        else:
+            status = 'Rendah'
+        
+        html_content += f"""
+                        <tr>
+                            <td style="text-align: left; font-weight: 500;">{device}</td>
+                            <td>{emisi:.2f}</td>
+                            <td>{percentage:.1f}%</td>
+                            <td>{status}</td>
+                        </tr>
+        """
+    
+    html_content += f"""
+                    </tbody>
+                </table>
+                <div class="conclusion">
+                    <strong>Kesimpulan:</strong> {dominant_device[0]} mendominasi dengan {dominant_percentage:.1f}% total emisi perangkat elektronik.
+                </div>
+            </div>
+        </div>
+        
+        <!-- 4. Heatmap Hari dan Jam -->
+        <div class="section avoid-break">
+            <h2 class="section-title">4. Heatmap Hari dan Jam</h2>
             <div class="section-content">
                 <table>
                     <thead>
@@ -699,91 +705,137 @@ def generate_electronic_pdf_report(filtered_df, activities_df, device_emissions,
             </div>
         </div>
         
-        <!-- 5. Pola Emisi per Responden -->
+        <!-- 5. Distribusi Emisi per Perangkat -->
         <div class="section avoid-break">
-            <h2 class="section-title">5. Pola Emisi per Responden</h2>
+            <h2 class="section-title">5. Distribusi Emisi per Perangkat</h2>
             <div class="section-content">
     """
     
-    # Calculate user categorization for report
-    if not filtered_df.empty:
-        user_emissions_report = filtered_df[['id_responden', 'emisi_elektronik_mingguan']].copy()
-        Q1 = user_emissions_report['emisi_elektronik_mingguan'].quantile(0.25)
-        Q3 = user_emissions_report['emisi_elektronik_mingguan'].quantile(0.75)
-        IQR = Q3 - Q1
-        lower_bound = Q1 - 1.5 * IQR
-        upper_bound = Q3 + 1.5 * IQR
-        median_val = user_emissions_report['emisi_elektronik_mingguan'].median()
+    # Calculate device distribution analysis for report
+    device_distribution_data = []
+    device_distribution_conclusion = "Data distribusi emisi perangkat tidak tersedia."
+    
+    if not filtered_df.empty and not activities_df.empty:
+        # Personal devices
+        if 'durasi_hp' in filtered_df.columns:
+            smartphone_emissions = (filtered_df['durasi_hp'] * 0.02 * 0.5).replace(0, np.nan).dropna()
+            if len(smartphone_emissions) > 0:
+                device_distribution_data.append({
+                    'perangkat': 'Smartphone',
+                    'jumlah_data': len(smartphone_emissions),
+                    'median': smartphone_emissions.median(),
+                    'q1': smartphone_emissions.quantile(0.25),
+                    'q3': smartphone_emissions.quantile(0.75),
+                    'min_val': smartphone_emissions.min(),
+                    'max_val': smartphone_emissions.max(),
+                    'outliers': len(smartphone_emissions[(smartphone_emissions > smartphone_emissions.quantile(0.75) + 1.5 * (smartphone_emissions.quantile(0.75) - smartphone_emissions.quantile(0.25))) | 
+                                                        (smartphone_emissions < smartphone_emissions.quantile(0.25) - 1.5 * (smartphone_emissions.quantile(0.75) - smartphone_emissions.quantile(0.25)))])
+                })
         
-        # Count categories
-        heavy_users = len(user_emissions_report[user_emissions_report['emisi_elektronik_mingguan'] > upper_bound])
-        light_users = len(user_emissions_report[user_emissions_report['emisi_elektronik_mingguan'] < lower_bound])
-        eco_users = len(user_emissions_report[user_emissions_report['emisi_elektronik_mingguan'] < median_val * 0.5])
-        high_users = len(user_emissions_report[user_emissions_report['emisi_elektronik_mingguan'] > median_val * 1.5])
-        normal_users = total_responden - heavy_users - light_users - eco_users - high_users
+        if 'durasi_laptop' in filtered_df.columns:
+            laptop_emissions = (filtered_df['durasi_laptop'] * 0.08 * 0.5).replace(0, np.nan).dropna()
+            if len(laptop_emissions) > 0:
+                device_distribution_data.append({
+                    'perangkat': 'Laptop',
+                    'jumlah_data': len(laptop_emissions),
+                    'median': laptop_emissions.median(),
+                    'q1': laptop_emissions.quantile(0.25),
+                    'q3': laptop_emissions.quantile(0.75),
+                    'min_val': laptop_emissions.min(),
+                    'max_val': laptop_emissions.max(),
+                    'outliers': len(laptop_emissions[(laptop_emissions > laptop_emissions.quantile(0.75) + 1.5 * (laptop_emissions.quantile(0.75) - laptop_emissions.quantile(0.25))) | 
+                                                   (laptop_emissions < laptop_emissions.quantile(0.25) - 1.5 * (laptop_emissions.quantile(0.75) - laptop_emissions.quantile(0.25)))])
+                })
         
-        html_content += f"""
+        if 'durasi_tab' in filtered_df.columns:
+            tablet_emissions = (filtered_df['durasi_tab'] * 0.03 * 0.5).replace(0, np.nan).dropna()
+            if len(tablet_emissions) > 0:
+                device_distribution_data.append({
+                    'perangkat': 'Tablet',
+                    'jumlah_data': len(tablet_emissions),
+                    'median': tablet_emissions.median(),
+                    'q1': tablet_emissions.quantile(0.25),
+                    'q3': tablet_emissions.quantile(0.75),
+                    'min_val': tablet_emissions.min(),
+                    'max_val': tablet_emissions.max(),
+                    'outliers': len(tablet_emissions[(tablet_emissions > tablet_emissions.quantile(0.75) + 1.5 * (tablet_emissions.quantile(0.75) - tablet_emissions.quantile(0.25))) | 
+                                                   (tablet_emissions < tablet_emissions.quantile(0.25) - 1.5 * (tablet_emissions.quantile(0.75) - tablet_emissions.quantile(0.25)))])
+                })
+        
+        # Infrastructure devices
+        ac_emissions = activities_df['emisi_ac'].replace(0, np.nan).dropna()
+        if len(ac_emissions) > 0:
+            device_distribution_data.append({
+                'perangkat': 'AC',
+                'jumlah_data': len(ac_emissions),
+                'median': ac_emissions.median(),
+                'q1': ac_emissions.quantile(0.25),
+                'q3': ac_emissions.quantile(0.75),
+                'min_val': ac_emissions.min(),
+                'max_val': ac_emissions.max(),
+                'outliers': len(ac_emissions[(ac_emissions > ac_emissions.quantile(0.75) + 1.5 * (ac_emissions.quantile(0.75) - ac_emissions.quantile(0.25))) | 
+                                            (ac_emissions < ac_emissions.quantile(0.25) - 1.5 * (ac_emissions.quantile(0.75) - ac_emissions.quantile(0.25)))])
+            })
+        
+        lamp_emissions = activities_df['emisi_lampu'].replace(0, np.nan).dropna()
+        if len(lamp_emissions) > 0:
+            device_distribution_data.append({
+                'perangkat': 'Lampu',
+                'jumlah_data': len(lamp_emissions),
+                'median': lamp_emissions.median(),
+                'q1': lamp_emissions.quantile(0.25),
+                'q3': lamp_emissions.quantile(0.75),
+                'min_val': lamp_emissions.min(),
+                'max_val': lamp_emissions.max(),
+                'outliers': len(lamp_emissions[(lamp_emissions > lamp_emissions.quantile(0.75) + 1.5 * (lamp_emissions.quantile(0.75) - lamp_emissions.quantile(0.25))) | 
+                                             (lamp_emissions < lamp_emissions.quantile(0.25) - 1.5 * (lamp_emissions.quantile(0.75) - lamp_emissions.quantile(0.25)))])
+            })
+        
+        if device_distribution_data:
+            html_content += """
                 <table>
                     <thead>
                         <tr>
-                            <th>Kategori Pengguna</th>
-                            <th>Jumlah</th>
-                            <th>Persentase</th>
-                            <th>Range Emisi (kg CO₂)</th>
+                            <th>Perangkat</th>
+                            <th>Jumlah Data</th>
+                            <th>Median (kg CO₂)</th>
+                            <th>Q1 (kg CO₂)</th>
+                            <th>Q3 (kg CO₂)</th>
+                            <th>Outlier</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr>
-                            <td style="text-align: left; font-weight: 500;">Eco User</td>
-                            <td>{eco_users}</td>
-                            <td>{eco_users/total_responden*100:.1f}%</td>
-                            <td>< {median_val * 0.5:.2f}</td>
-                        </tr>
-                        <tr>
-                            <td style="text-align: left; font-weight: 500;">Light User</td>
-                            <td>{light_users}</td>
-                            <td>{light_users/total_responden*100:.1f}%</td>
-                            <td>< {lower_bound:.2f}</td>
-                        </tr>
-                        <tr>
-                            <td style="text-align: left; font-weight: 500;">Normal User</td>
-                            <td>{normal_users}</td>
-                            <td>{normal_users/total_responden*100:.1f}%</td>
-                            <td>{lower_bound:.2f} - {upper_bound:.2f}</td>
-                        </tr>
-                        <tr>
-                            <td style="text-align: left; font-weight: 500;">High User</td>
-                            <td>{high_users}</td>
-                            <td>{high_users/total_responden*100:.1f}%</td>
-                            <td>> {median_val * 1.5:.2f}</td>
-                        </tr>
-                        <tr>
-                            <td style="text-align: left; font-weight: 500;">Heavy User</td>
-                            <td>{heavy_users}</td>
-                            <td>{heavy_users/total_responden*100:.1f}%</td>
-                            <td>> {upper_bound:.2f}</td>
-                        </tr>
-                    </tbody>
-                </table>
-        """
-        
-        # Find dominant user category
-        categories = [
-            ('Eco User', eco_users),
-            ('Light User', light_users), 
-            ('Normal User', normal_users),
-            ('High User', high_users),
-            ('Heavy User', heavy_users)
-        ]
-        dominant_category = max(categories, key=lambda x: x[1])
-        user_pattern_conclusion = f"Kategori {dominant_category[0]} mendominasi dengan {dominant_category[1]} mahasiswa ({dominant_category[1]/total_responden*100:.1f}%), menunjukkan pola penggunaan yang {dominant_category[0].lower().replace(' user', '')}."
+            """
+            
+            for device_data in device_distribution_data:
+                html_content += f"""
+                            <tr>
+                                <td style="text-align: left; font-weight: 500;">{device_data['perangkat']}</td>
+                                <td>{device_data['jumlah_data']}</td>
+                                <td>{device_data['median']:.3f}</td>
+                                <td>{device_data['q1']:.3f}</td>
+                                <td>{device_data['q3']:.3f}</td>
+                                <td>{device_data['outliers']} data</td>
+                            </tr>
+                """
+            
+            html_content += "</tbody></table>"
+            
+            # Find insights
+            highest_median = max(device_distribution_data, key=lambda x: x['median'])
+            most_outliers = max(device_distribution_data, key=lambda x: x['outliers'])
+            most_variable = max(device_distribution_data, key=lambda x: x['q3'] - x['q1'])
+            total_outliers = sum([d['outliers'] for d in device_distribution_data])
+            
+            device_distribution_conclusion = f"Distribusi emisi menunjukkan {total_outliers} data outlier total. {highest_median['perangkat']} memiliki median tertinggi ({highest_median['median']:.3f} kg CO₂), {most_outliers['perangkat']} memiliki outlier terbanyak ({most_outliers['outliers']} data), dan {most_variable['perangkat']} paling bervariasi (IQR: {most_variable['q3'] - most_variable['q1']:.3f})."
+        else:
+            html_content += "<p>Data distribusi emisi perangkat tidak tersedia.</p>"
     else:
-        html_content += "<p>Data pola emisi per responden tidak tersedia.</p>"
-        user_pattern_conclusion = "Data pola emisi per responden tidak tersedia."
+        html_content += "<p>Data distribusi emisi perangkat tidak tersedia.</p>"
     
     html_content += f"""
                 <div class="conclusion">
-                    <strong>Kesimpulan:</strong> {user_pattern_conclusion}
+                    <strong>Kesimpulan:</strong> {device_distribution_conclusion}
                 </div>
             </div>
         </div>
@@ -921,7 +973,7 @@ def show():
         )
     
     with filter_col2:
-        device_options = ['Smartphone', 'Laptop', 'Tablet']
+        device_options = ['Smartphone', 'Laptop', 'Tablet', 'AC', 'Lampu']
         selected_devices = st.multiselect(
             "Perangkat:", 
             options=device_options, 
@@ -1182,118 +1234,121 @@ def show():
                         st.plotly_chart(fig_heatmap, use_container_width=True, config={'displayModeBar': False})
 
         with col2:
-            # 5. Box Plot Distribusi Emisi per Kategori Pengguna - Untuk Identifikasi Outlier
-            if 'id_responden' in filtered_df.columns and not filtered_df.empty:
-                valid_df = filtered_df[filtered_df['id_responden'].notna() & 
-                                     (filtered_df['id_responden'] != '') & 
-                                     (filtered_df['emisi_elektronik_mingguan'].notna()) &
-                                     (filtered_df['emisi_elektronik_mingguan'] > 0)]
+            # 5. Box Plot Distribusi Emisi per Perangkat
+            if not filtered_df.empty and not filtered_activities.empty:
+                device_emissions_data = []
                 
-                if len(valid_df) > 0:
-                    user_emissions = valid_df[['id_responden', 'emisi_elektronik_mingguan']].copy()
+                # Personal devices data from main dataframe
+                if 'durasi_hp' in filtered_df.columns:
+                    smartphone_emissions = (filtered_df['durasi_hp'] * 0.02 * 0.5).replace(0, np.nan).dropna()
+                    for emission in smartphone_emissions:
+                        device_emissions_data.append({'device': 'Smartphone', 'emission': emission})
+                
+                if 'durasi_laptop' in filtered_df.columns:
+                    laptop_emissions = (filtered_df['durasi_laptop'] * 0.08 * 0.5).replace(0, np.nan).dropna()
+                    for emission in laptop_emissions:
+                        device_emissions_data.append({'device': 'Laptop', 'emission': emission})
+                
+                if 'durasi_tab' in filtered_df.columns:
+                    tablet_emissions = (filtered_df['durasi_tab'] * 0.03 * 0.5).replace(0, np.nan).dropna()
+                    for emission in tablet_emissions:
+                        device_emissions_data.append({'device': 'Tablet', 'emission': emission})
+                
+                # Infrastructure devices data from activities
+                ac_emissions = filtered_activities['emisi_ac'].replace(0, np.nan).dropna()
+                for emission in ac_emissions:
+                    device_emissions_data.append({'device': 'AC', 'emission': emission})
+                
+                lamp_emissions = filtered_activities['emisi_lampu'].replace(0, np.nan).dropna()
+                for emission in lamp_emissions:
+                    device_emissions_data.append({'device': 'Lampu', 'emission': emission})
+                
+                if device_emissions_data:
+                    device_df = pd.DataFrame(device_emissions_data)
                     
-                    # Categorize users based on emission levels
-                    Q1 = user_emissions['emisi_elektronik_mingguan'].quantile(0.25)
-                    Q3 = user_emissions['emisi_elektronik_mingguan'].quantile(0.75)
-                    IQR = Q3 - Q1
-                    lower_bound = Q1 - 1.5 * IQR
-                    upper_bound = Q3 + 1.5 * IQR
-                    median_val = user_emissions['emisi_elektronik_mingguan'].median()
+                    # Filter by selected devices if any
+                    if selected_devices:
+                        device_df = device_df[device_df['device'].isin(selected_devices)]
                     
-                    user_emissions['category'] = 'Normal'
-                    user_emissions.loc[user_emissions['emisi_elektronik_mingguan'] > upper_bound, 'category'] = 'Heavy User'
-                    user_emissions.loc[user_emissions['emisi_elektronik_mingguan'] < lower_bound, 'category'] = 'Light User'
-                    user_emissions.loc[user_emissions['emisi_elektronik_mingguan'] > median_val * 1.5, 'category'] = 'High User'
-                    user_emissions.loc[user_emissions['emisi_elektronik_mingguan'] < median_val * 0.5, 'category'] = 'Eco User'
-                    
-                    fig_boxplot = go.Figure()
-                    
-                    # Color mapping for categories
-                    category_colors = {
-                        'Eco User': '#66c2a5',    
-                        'Light User': '#abdda4',   
-                        'Normal': '#3288bd',        
-                        'High User': '#fdae61',     
-                        'Heavy User': '#d53e4f'  
-                    }
-                    
-                    # Create box plots for each category
-                    categories = ['Eco User', 'Light User', 'Normal', 'High User', 'Heavy User']
-                    
-                    for category in categories:
-                        category_data = user_emissions[user_emissions['category'] == category]['emisi_elektronik_mingguan']
+                    if not device_df.empty:
+                        fig_device_boxplot = go.Figure()
                         
-                        if len(category_data) > 0:  # Only create box if category has data
-                            color = category_colors.get(category, '#3288bd')
-                            
-                            # Calculate outliers for this category
-                            q1_cat = category_data.quantile(0.25)
-                            q3_cat = category_data.quantile(0.75)
-                            iqr_cat = q3_cat - q1_cat
-                            lower_fence_cat = q1_cat - 1.5 * iqr_cat
-                            upper_fence_cat = q3_cat + 1.5 * iqr_cat
-                            outliers_count = len(category_data[(category_data > upper_fence_cat) | (category_data < lower_fence_cat)])
-                            
-                            # Convert hex color to rgba for fill
-                            hex_color = color[1:]  # Remove #
-                            rgb = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
-                            rgba_fill = f"rgba({rgb[0]}, {rgb[1]}, {rgb[2]}, 0.4)"
-                            
-                            fig_boxplot.add_trace(go.Box(
-                                y=category_data,
-                                name=category,
-                                marker_color=color,
-                                boxpoints='outliers',  # Show outliers
-                                pointpos=-1.8,
-                                marker=dict(
-                                    size=6,
-                                    line=dict(width=1, color='white'),
-                                    opacity=0.9
-                                ),
-                                line=dict(width=2),
-                                fillcolor=rgba_fill,
-                                hovertemplate=f'<b>{category}</b><br>' +
-                                            'Median: %{median:.2f} kg CO₂<br>' +
-                                            f'Outlier: {outliers_count} responden<br>' +
-                                            'Nilai: %{y:.2f} kg CO₂<extra></extra>'
-                            ))
-                    
-                    # Calculate overall statistics untuk insight
-                    all_emissions = user_emissions['emisi_elektronik_mingguan']
-                    Q1_all = all_emissions.quantile(0.25)
-                    Q3_all = all_emissions.quantile(0.75)
-                    IQR_all = Q3_all - Q1_all
-                    lower_fence_all = Q1_all - 1.5 * IQR_all
-                    upper_fence_all = Q3_all + 1.5 * IQR_all
-                    
-                    outliers_high = len(all_emissions[all_emissions > upper_fence_all])
-                    outliers_low = len(all_emissions[all_emissions < lower_fence_all])
-                    
-                    fig_boxplot.update_layout(
-                        height=235, margin=dict(t=25, b=5, l=5, r=5),
-                        title=dict(text="<b>Distribusi Emisi per Kategori Pengguna</b>", x=0.20, y=0.95, 
-                                  font=dict(size=11, color="#000000")),
-                        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                        xaxis=dict(
-                            showgrid=False, 
-                            tickfont=dict(size=7), 
-                            title=dict(text="Kategori Pengguna", font=dict(size=9))
-                        ),
-                        yaxis=dict(
-                            showgrid=True, 
-                            gridcolor='rgba(0,0,0,0.1)', 
-                            tickfont=dict(size=7), 
-                            title=dict(text="Emisi Elektronik (kg CO₂)", font=dict(size=9))
-                        ),
-                        showlegend=False
-                    )
-                    
-                    st.plotly_chart(fig_boxplot, use_container_width=True, config={'displayModeBar': False})
+                        # Color mapping for devices
+                        device_color_map = {
+                            'Smartphone': '#d53e4f',
+                            'Laptop': '#3288bd', 
+                            'Tablet': '#66c2a5',
+                            'AC': '#f46d43',
+                            'Lampu': '#fdae61'
+                        }
                         
+                        # Create box plots for each device
+                        available_devices = device_df['device'].unique()
+                        
+                        for device in available_devices:
+                            device_data = device_df[device_df['device'] == device]['emission']
+                            
+                            if len(device_data) > 0:
+                                color = device_color_map.get(device, '#3288bd')
+                                
+                                # Calculate outliers for this device
+                                q1_dev = device_data.quantile(0.25)
+                                q3_dev = device_data.quantile(0.75)
+                                iqr_dev = q3_dev - q1_dev
+                                lower_fence_dev = q1_dev - 1.5 * iqr_dev
+                                upper_fence_dev = q3_dev + 1.5 * iqr_dev
+                                outliers_count = len(device_data[(device_data > upper_fence_dev) | (device_data < lower_fence_dev)])
+                                
+                                # Convert hex color to rgba for fill
+                                hex_color = color[1:]  # Remove #
+                                rgb = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+                                rgba_fill = f"rgba({rgb[0]}, {rgb[1]}, {rgb[2]}, 0.4)"
+                                
+                                fig_device_boxplot.add_trace(go.Box(
+                                    y=device_data,
+                                    name=device,
+                                    marker_color=color,
+                                    boxpoints='outliers',
+                                    pointpos=-1.8,
+                                    marker=dict(
+                                        size=6,
+                                        line=dict(width=1, color='white'),
+                                        opacity=0.9
+                                    ),
+                                    line=dict(width=2),
+                                    fillcolor=rgba_fill,
+                                    hovertemplate=f'<b>{device}</b><br>' +
+                                                'Median: %{median:.3f} kg CO₂<br>' +
+                                                f'Outlier: {outliers_count} data<br>' +
+                                                'Nilai: %{y:.3f} kg CO₂<extra></extra>'
+                                ))
+                        
+                        fig_device_boxplot.update_layout(
+                            height=235, margin=dict(t=25, b=5, l=5, r=5),
+                            title=dict(text="<b>Distribusi Emisi per Perangkat</b>", x=0.25, y=0.95, 
+                                      font=dict(size=11, color="#000000")),
+                            paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                            xaxis=dict(
+                                showgrid=False, 
+                                tickfont=dict(size=7), 
+                                title=dict(text="Perangkat Elektronik", font=dict(size=9))
+                            ),
+                            yaxis=dict(
+                                showgrid=True, 
+                                gridcolor='rgba(0,0,0,0.1)', 
+                                tickfont=dict(size=7), 
+                                title=dict(text="Emisi (kg CO₂)", font=dict(size=9))
+                            ),
+                            showlegend=False
+                        )
+                        
+                        st.plotly_chart(fig_device_boxplot, use_container_width=True, config={'displayModeBar': False})
+                    else:
+                        st.info("Tidak ada data emisi perangkat yang valid")
                 else:
-                    st.info("Tidak ada data emisi yang valid")
+                    st.info("Tidak ada data emisi perangkat")
             else:
-                st.info("Data emisi per responden tidak tersedia")
+                st.info("Data emisi perangkat tidak tersedia")
 
         with col3:
             # 6. Gedung Kelas Terpopuler

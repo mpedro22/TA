@@ -964,7 +964,7 @@ def show():
                     st.info("Data fakultas tidak dapat digabungkan")
 
         with col3:
-            # Chart 3: Komposisi Moda Transportasi - Donut Chart (SAME AS ELECTRONIC)
+            # Chart 3: Proporsi Emisi per Moda Transportasi
             transport_counts = filtered_df['transportasi'].value_counts()
             colors = [TRANSPORT_COLORS.get(mode, MAIN_PALETTE[i % len(MAIN_PALETTE)]) 
                      for i, mode in enumerate(transport_counts.index)]
@@ -977,10 +977,13 @@ def show():
                 textposition='outside',
                 textinfo='label+percent',
                 textfont=dict(size=8, family="Poppins"),
-                hovertemplate='<b>%{label}</b><br>%{value} pengguna (%{percent})<extra></extra>'
+                hovertemplate='<b>%{label}</b><br>%{value:.2f} kg CO₂ (%{percent})<extra></extra>'
             )])
             
-            
+            total_emisi_chart = filtered_df['emisi_mingguan'].sum()
+            center_text = f"<b style='font-size:14px'>{total_emisi_chart:.1f}</b><br><span style='font-size:8px'>kg CO₂</span>"
+            fig_donut.add_annotation(text=center_text, x=0.5, y=0.5, font_size=10, showarrow=False)
+
             fig_donut.update_layout(
                 height=235, margin=dict(t=25, b=5, l=5, r=5), showlegend=False,
                 paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
@@ -1064,7 +1067,7 @@ def show():
                     fig_boxplot = go.Figure()
                     
                     # Get top transport modes untuk perbandingan yang meaningful
-                    top_modes = valid_df['transportasi'].value_counts().head(5).index.tolist()
+                    top_modes = valid_df['transportasi'].value_counts().head(6).index.tolist()
                     
                     colors_box = []
                     for i, mode in enumerate(top_modes):
