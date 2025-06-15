@@ -4,6 +4,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
 from datetime import datetime
+from loading import loading, loading_decorator
+import time
+
 
 # CONSISTENT COLOR PALETTE (same as other pages)
 MAIN_PALETTE = ['#9e0142', '#d53e4f', '#f46d43', '#fdae61', '#fee08b', 
@@ -16,7 +19,8 @@ CATEGORY_COLORS = {
 }
 
 @st.cache_data(ttl=3600)
-def load_overview_data():
+@loading_decorator()  
+def load_data():
     """Load data from multiple Google Sheets tabs"""
     base_url = "https://docs.google.com/spreadsheets/d/11Y7cx9SqtLeG5S09F34nDQSnwaZDfUkZKVnNwRLi8V4/export?format=csv&gid="
     
@@ -62,6 +66,7 @@ def get_valid_users(df, id_col='id_responden'):
     )
     return df[valid_mask][id_col].unique().tolist()
 
+@loading_decorator()
 def calculate_fakultas_emissions(df_responden, df_transport, df_electronic, df_daily, fakultas_mapping):
     """Calculate comprehensive emissions per fakultas with proper user validation"""
     try:
@@ -592,31 +597,34 @@ def generate_overview_pdf_report(filtered_transport, filtered_electronic, filter
     return html_content
 
 def show():
-    st.markdown("""
-    <div class="wow-header">
-        <div class="header-bg-pattern"></div>
-        <div class="header-float-1"></div>
-        <div class="header-float-2"></div>
-        <div class="header-float-3"></div>
-        <div class="header-float-4"></div>  
-        <div class="header-float-5"></div>              
-        <div class="header-content">
-            <h1 class="header-title">Dashboard Emisi Karbon ITB</h1>
+    with loading():
+        st.markdown("""
+        <div class="wow-header">
+            <div class="header-bg-pattern"></div>
+            <div class="header-float-1"></div>
+            <div class="header-float-2"></div>
+            <div class="header-float-3"></div>
+            <div class="header-float-4"></div>  
+            <div class="header-float-5"></div>              
+            <div class="header-content">
+                <h1 class="header-title">Dashboard Emisi Karbon ITB</h1>
+            </div>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
+        time.sleep(0.5) 
 
     # Load data
-    data = load_overview_data()
+    data = load_data()
     if not data:
         st.error("Failed to load overview data.")
         return
 
     # Extract and process data
-    df_responden = data["responden"]
-    df_transport = data["transport"]
-    df_electronic = data["electronic"]
-    df_daily = data["daily"]
+    with loading(): 
+        df_responden = data["responden"]
+        df_transport = data["transport"]
+        df_electronic = data["electronic"]
+        df_daily = data["daily"]
 
     # Safe data processing
     try:
@@ -699,7 +707,7 @@ def show():
         })
         csv_data = combined_data.to_csv(index=False)
         st.download_button(
-            "Export Raw Data", 
+            "Raw Data", 
             data=csv_data, 
             file_name=f"overview_emisi_{total_emisi_kampus:.0f}kg.csv", 
             mime="text/csv", 
@@ -714,7 +722,7 @@ def show():
                 total_emisi_kampus, avg_emisi_per_mahasiswa, fakultas_emissions_df, df_responden
             )
             st.download_button(
-                "Export Laporan", 
+                "Laporan", 
                 data=pdf_content, 
                 file_name=f"overview_emisi_{total_emisi_kampus:.0f}kg.html", 
                 mime="text/html", 

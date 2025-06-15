@@ -3,6 +3,8 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
+from loading import loading, loading_decorator
+import time
 
 MAIN_PALETTE = ['#9e0142', '#d53e4f', '#f46d43', '#fdae61', '#fee08b', 
                 '#e6f598', '#abdda4', '#66c2a5', '#3288bd', '#5e4fa2']
@@ -15,20 +17,24 @@ PERIOD_COLORS = {
 }
 
 @st.cache_data(ttl=3600)
+@loading_decorator()
 def load_daily_activities_data():
     """Load daily activities data from Google Sheets"""
     url = "https://docs.google.com/spreadsheets/d/11Y7cx9SqtLeG5S09F34nDQSnwaZDfUkZKVnNwRLi8V4/export?format=csv&gid=1749257811"
     try:
+        time.sleep(0.35)  # Food data loading time
         return pd.read_csv(url)
     except Exception as e:
         st.error(f"Error loading daily activities data: {e}")
         return pd.DataFrame()
 
 @st.cache_data(ttl=3600)
+@loading_decorator()
 def load_responden_data():
     """Load responden data for fakultas information"""
     url = "https://docs.google.com/spreadsheets/d/11Y7cx9SqtLeG5S09F34nDQSnwaZDfUkZKVnNwRLi8V4/export?format=csv&gid=1606042726"
     try:
+        time.sleep(0.2)  # Responden data loading time
         return pd.read_csv(url)
     except Exception as e:
         return pd.DataFrame()
@@ -51,6 +57,7 @@ def get_fakultas_mapping():
         'Informatika': 'STEI', 'Teknik Telekomunikasi': 'STEI', 'Teknik Tenaga Listrik': 'STEI'
     }
 
+@loading_decorator()
 def parse_meal_activities(df):
     """Parse meal activities from daily activities data - filter kegiatan Makan/Minum"""
     meal_activities = []
@@ -110,8 +117,10 @@ def parse_meal_activities(df):
                         'is_weekend': day_name in ['Sabtu', 'Minggu']
                     })
     
+    time.sleep(0.12)  # Meal activity parsing time
     return pd.DataFrame(meal_activities)
 
+@loading_decorator()
 def apply_filters(df, selected_days, selected_periods, selected_fakultas, df_responden=None):
     """Apply filters to the meal dataframe - 3 filters only"""
     filtered_df = df.copy()
@@ -133,12 +142,17 @@ def apply_filters(df, selected_days, selected_periods, selected_fakultas, df_res
             if 'id_responden' in fakultas_students.columns and 'id_responden' in filtered_df.columns:
                 filtered_df = filtered_df[filtered_df['id_responden'].isin(fakultas_students['id_responden'])]
     
+    time.sleep(0.08)  # Filter processing time
     return filtered_df
 
+@loading_decorator()
 def generate_pdf_report(filtered_df, total_emisi, avg_emisi, df_responden=None):
     """Generate professional HTML report optimized for PDF printing"""
     from datetime import datetime
     import pandas as pd
+    
+    # Simulate complex report generation
+    time.sleep(0.55)
     
     def get_fakultas_mapping():
         return {
@@ -722,21 +736,24 @@ def generate_pdf_report(filtered_df, total_emisi, avg_emisi, df_responden=None):
     return html_content
 
 def show():
-    st.markdown("""
-    <div class="wow-header">
-        <div class="header-bg-pattern"></div>
-        <div class="header-float-1"></div>
-        <div class="header-float-2"></div>
-        <div class="header-float-3"></div>
-        <div class="header-float-4"></div>  
-        <div class="header-float-5"></div>              
-        <div class="header-content">
-            <h1 class="header-title">Emisi Sampah Makanan & Minuman</h1>
+    # Header with loading
+    with loading():
+        st.markdown("""
+        <div class="wow-header">
+            <div class="header-bg-pattern"></div>
+            <div class="header-float-1"></div>
+            <div class="header-float-2"></div>
+            <div class="header-float-3"></div>
+            <div class="header-float-4"></div>  
+            <div class="header-float-5"></div>              
+            <div class="header-content">
+                <h1 class="header-title">Emisi Sampah Makanan & Minuman</h1>
+            </div>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
+        time.sleep(0.25)  # Header animation time
 
-    # Load data
+    # Load data with loading decorators
     df_activities = load_daily_activities_data()
     df_responden = load_responden_data()
     
@@ -744,16 +761,18 @@ def show():
         st.error("Data aktivitas harian tidak tersedia")
         return
 
-    # Parse meal activities
+    # Parse meal activities with loading
     meal_data = parse_meal_activities(df_activities)
     
     if meal_data.empty:
         st.error("Data aktivitas makanan & minuman tidak ditemukan")
         return
     
-    # Clean data
-    meal_data = meal_data.dropna(subset=['emisi_makanminum'])
-    meal_data = meal_data[meal_data['emisi_makanminum'] > 0]  # Remove zero emissions
+    # Clean data with loading
+    with loading():
+        meal_data = meal_data.dropna(subset=['emisi_makanminum'])
+        meal_data = meal_data[meal_data['emisi_makanminum'] > 0]  # Remove zero emissions
+        time.sleep(0.1)  # Data cleaning time
 
     # Filters
     filter_col1, filter_col2, filter_col3, export_col1, export_col2 = st.columns([1.8, 1.8, 1.8, 1, 1])
@@ -790,7 +809,7 @@ def show():
         else:
             selected_fakultas = []
 
-    # Apply filters
+    # Apply filters with loading
     filtered_df = apply_filters(meal_data, selected_days, selected_periods, selected_fakultas, df_responden)
 
     # Calculate metrics for export
@@ -801,7 +820,7 @@ def show():
     with export_col1:
         csv_data = filtered_df.to_csv(index=False)
         st.download_button(
-            "Export Raw Data", 
+            "Raw Data", 
             data=csv_data, 
             file_name=f"food_drink_waste_{len(filtered_df)}.csv", 
             mime="text/csv", 
@@ -813,7 +832,7 @@ def show():
         try:
             pdf_content = generate_pdf_report(filtered_df, total_emisi, avg_emisi, df_responden)
             st.download_button(
-                "Export Laporan", 
+                "Laporan", 
                 data=pdf_content, 
                 file_name=f"food_drink_waste_{len(filtered_df)}.html", 
                 mime="text/html", 
@@ -828,370 +847,376 @@ def show():
         st.warning("Tidak ada data yang sesuai dengan filter yang dipilih. Silakan ubah atau kosongkan filter.")
         return
 
-    # Row 1
-    col1, col2, col3 = st.columns([1, 1, 1])
+    # Charts with loading animations - Row 1
+    with loading():
+        col1, col2, col3 = st.columns([1, 1, 1])
 
-    with col1:
-        # 1. Tren Emisi Harian - Grafik Garis
-        daily_trend = filtered_df.groupby('day')['emisi_makanminum'].sum().reset_index()
-        day_order = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
-        daily_trend['day_order'] = daily_trend['day'].map({day: i for i, day in enumerate(day_order)})
-        daily_trend = daily_trend.sort_values('day_order')
-        
-        fig_trend = go.Figure()
-        fig_trend.add_trace(go.Scatter(
-            x=daily_trend['day'], y=daily_trend['emisi_makanminum'],
-            fill='tonexty', mode='lines+markers',
-            line=dict(color='#3288bd', width=2, shape='spline'),
-            marker=dict(size=6, color='#3288bd', line=dict(color='white', width=1)),
-            fillcolor="rgba(102, 194, 165, 0.3)",
-            hovertemplate='<b>%{x}</b><br>%{y:.1f} kg CO₂<extra></extra>',
-            showlegend=False
-        ))
-        
-        fig_trend.update_layout(
-            height=235, margin=dict(t=25, b=0, l=0, r=20),
-            xaxis_title="", yaxis_title="Emisi (kg CO₂)",
-            paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-            title=dict(text="<b>Tren Emisi Harian</b>", x=0.38, y=0.95, 
-                      font=dict(size=11, color="#000000")),
-            xaxis=dict(showgrid=False, tickfont=dict(size=8), title=dict(text="Hari", font=dict(size=10))),
-            yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=8), title=dict(text="Emisi (Kg CO₂)", font=dict(size=10)))
-        )
-        
-        st.plotly_chart(fig_trend, use_container_width=True, config={'displayModeBar': False})
-
-    with col2:
-        # 2. Emisi per Fakultas
-        if df_responden is not None and not df_responden.empty and 'program_studi' in df_responden.columns:
-            fakultas_mapping = get_fakultas_mapping()
-            df_responden['fakultas'] = df_responden['program_studi'].map(fakultas_mapping).fillna('Lainnya')
-            df_with_fakultas = filtered_df.merge(df_responden[['id_responden', 'fakultas']], on='id_responden', how='left')
+        with col1:
+            # 1. Tren Emisi Harian - Grafik Garis
+            daily_trend = filtered_df.groupby('day')['emisi_makanminum'].sum().reset_index()
+            day_order = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
+            daily_trend['day_order'] = daily_trend['day'].map({day: i for i, day in enumerate(day_order)})
+            daily_trend = daily_trend.sort_values('day_order')
             
-            if not df_with_fakultas.empty:
-                fakultas_stats = df_with_fakultas.groupby('fakultas')['emisi_makanminum'].agg(['sum', 'count']).reset_index()
-                fakultas_stats.columns = ['fakultas', 'total_emisi', 'count']
-                fakultas_stats = fakultas_stats[fakultas_stats['count'] >= 1].sort_values('total_emisi', ascending=True).tail(13)
-                
-                if not fakultas_stats.empty:
-                    fig_fakultas = go.Figure()
-                    
-                    # Use color gradient based on emission level
-                    max_emisi = fakultas_stats['total_emisi'].max()
-                    min_emisi = fakultas_stats['total_emisi'].min()
-                    
-                    for i, (_, row) in enumerate(fakultas_stats.iterrows()):
-                        if max_emisi > min_emisi:
-                            ratio = (row['total_emisi'] - min_emisi) / (max_emisi - min_emisi)
-                            color_palette = ['#66c2a5', '#abdda4', '#fdae61', '#f46d43', '#d53e4f', '#9e0142']
-                            color_idx = int(ratio * (len(color_palette) - 1))
-                            color = color_palette[color_idx]
-                        else:
-                            color = MAIN_PALETTE[i % len(MAIN_PALETTE)]
-                        
-                        fig_fakultas.add_trace(go.Bar(
-                            x=[row['total_emisi']], 
-                            y=[row['fakultas']], 
-                            orientation='h',
-                            marker=dict(color=color), 
-                            showlegend=False,
-                            text=[f"{row['total_emisi']:.1f}"], 
-                            textposition='inside',
-                            textfont=dict(color='white', size=7, weight='bold'),
-                            hovertemplate=f'<b>{row["fakultas"]}</b><br>Total: {row["total_emisi"]:.1f} kg CO₂<br>Aktivitas: {row["count"]}<extra></extra>'
-                        ))
-                    
-                    fig_fakultas.update_layout(
-                        height=235, margin=dict(t=25, b=0, l=0, r=20),
-                        title=dict(text="<b>Emisi per Fakultas</b>", x=0.35, y=0.95,
-                                  font=dict(size=11, color="#000000")),
-                        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                        xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=8), title=dict(text="Rata-Rata Emisi (kg CO₂)", font=dict(size=10))),
-                        yaxis=dict(tickfont=dict(size=8), title=dict(text="Fakultas/Sekolah", font=dict(size=10)))
-                    )
-                    
-                    st.plotly_chart(fig_fakultas, use_container_width=True, config={'displayModeBar': False})
-                else:
-                    st.info("Data fakultas tidak cukup (min 3 aktivitas)")
-            else:
-                st.info("Data fakultas tidak dapat digabungkan")
-        else:
-            st.info("Data fakultas tidak tersedia")
-
-    with col3:
-        # 3. Distribusi Periode Waktu - Diagram Lingkaran
-        period_data = filtered_df['meal_period'].value_counts()
-        colors = [PERIOD_COLORS.get(period, MAIN_PALETTE[i % len(MAIN_PALETTE)]) 
-                 for i, period in enumerate(period_data.index)]
-        
-        fig_period = go.Figure(data=[go.Pie(
-            labels=period_data.index,
-            values=period_data.values,
-            hole=0.45,
-            marker=dict(colors=colors, line=dict(color='#FFFFFF', width=2)),
-            textposition='outside',
-            textinfo='label+percent',
-            textfont=dict(size=7, family="Poppins"),
-            hovertemplate='<b>%{label}</b><br>%{value} aktivitas (%{percent})<extra></extra>'
-        )])
-        
-        total_activities = period_data.sum()
-        center_text = f"<b style='font-size:14px'>{total_activities}</b><br><span style='font-size:8px'>Aktivitas</span>"
-        fig_period.add_annotation(text=center_text, x=0.5, y=0.5, font_size=10, showarrow=False)
-        
-        fig_period.update_layout(
-            height=235, margin=dict(t=25, b=5, l=5, r=5), showlegend=False,
-            paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-            title=dict(text="<b>Distribusi Periode Waktu</b>", x=0.27, y=0.95, 
-                      font=dict(size=11, color="#000000"))
-        )
-        
-        st.plotly_chart(fig_period, use_container_width=True, config={'displayModeBar': False})
-
-    # Row 2
-    col1, col2, col3 = st.columns([1, 1, 1])
-
-    with col1:
-        # 1. Heatmap Top Lokasi vs Waktu 
-        top_locations = filtered_df.groupby('lokasi')['emisi_makanminum'].sum().nlargest().index.tolist()
-        heatmap_filtered = filtered_df[filtered_df['lokasi'].isin(top_locations)]
-        
-        heatmap_data = heatmap_filtered.groupby(['lokasi', 'time_slot'])['emisi_makanminum'].sum().reset_index()
-        heatmap_pivot = heatmap_data.pivot(index='time_slot', columns='lokasi', values='emisi_makanminum').fillna(0)
-        
-        if not heatmap_pivot.empty:
-            truncated_columns = [col[:15] + '...' if len(col) > 15 else col for col in heatmap_pivot.columns]
-            
-            fig_heatmap = go.Figure(data=go.Heatmap(
-                z=heatmap_pivot.values,
-                x=truncated_columns,
-                y=heatmap_pivot.index,
-                colorscale=[[0, '#fee08b'], [0.25, '#fdae61'], [0.5, '#f46d43'], [0.75, '#d53e4f'], [1, '#9e0142']],
-                hoverongaps=False,
-                hovertemplate='<b>%{customdata}</b><br>Waktu: %{y}<br>Emisi: %{z:.2f} kg CO₂<extra></extra>',
-                customdata=np.array([list(heatmap_pivot.columns)] * len(heatmap_pivot.index)),
-                colorbar=dict(
-                    title=dict(text="Emisi", font=dict(size=9)),
-                    tickfont=dict(size=8),
-                    thickness=15,
-                    len=0.7
-                ),
-                xgap=1, ygap=1,
-                zmin=0
+            fig_trend = go.Figure()
+            fig_trend.add_trace(go.Scatter(
+                x=daily_trend['day'], y=daily_trend['emisi_makanminum'],
+                fill='tonexty', mode='lines+markers',
+                line=dict(color='#3288bd', width=2, shape='spline'),
+                marker=dict(size=6, color='#3288bd', line=dict(color='white', width=1)),
+                fillcolor="rgba(102, 194, 165, 0.3)",
+                hovertemplate='<b>%{x}</b><br>%{y:.1f} kg CO₂<extra></extra>',
+                showlegend=False
             ))
             
-            fig_heatmap.update_layout(
-                height=235, margin=dict(t=25, b=20, l=20, r=40),
-                title=dict(text="<b>Heatmap Top Lokasi vs Waktu</b>", x=0.15, y=0.95, 
-                        font=dict(size=11, color="#000000")),
-                xaxis=dict(tickfont=dict(size=7), tickangle=-45, title=dict(text="Lokasi", font=dict(size=10))),
-                yaxis=dict(tickfont=dict(size=7)),
-                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
+            fig_trend.update_layout(
+                height=235, margin=dict(t=25, b=0, l=0, r=20),
+                xaxis_title="", yaxis_title="Emisi (kg CO₂)",
+                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                title=dict(text="<b>Tren Emisi Harian</b>", x=0.38, y=0.95, 
+                          font=dict(size=11, color="#000000")),
+                xaxis=dict(showgrid=False, tickfont=dict(size=8), title=dict(text="Hari", font=dict(size=10))),
+                yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=8), title=dict(text="Emisi (Kg CO₂)", font=dict(size=10)))
             )
-            st.plotly_chart(fig_heatmap, use_container_width=True, config={'displayModeBar': False})
-        else:
-            st.info("Data heatmap tidak tersedia")
+            
+            st.plotly_chart(fig_trend, use_container_width=True, config={'displayModeBar': False})
 
-    with col2:
-        # 2. Lokasi Terpopuler
-        if not filtered_df.empty and 'lokasi' in filtered_df.columns:
-            location_stats = filtered_df.groupby('lokasi').agg({
-                'emisi_makanminum': ['sum', 'mean'],
-                'lokasi': 'count'
-            }).reset_index()
-            location_stats.columns = ['lokasi', 'total_emisi', 'avg_emisi', 'session_count']
-            location_stats['avg_emisi_per_session'] = location_stats['total_emisi'] / location_stats['session_count']
-            
-            # Filter dan sort berdasarkan jumlah sesi
-            location_stats = location_stats[location_stats['session_count'] >= 2].sort_values('session_count', ascending=False).head(6)
-            
-            if not location_stats.empty:
-                fig_location = go.Figure()
+        with col2:
+            # 2. Emisi per Fakultas
+            if df_responden is not None and not df_responden.empty and 'program_studi' in df_responden.columns:
+                fakultas_mapping = get_fakultas_mapping()
+                df_responden['fakultas'] = df_responden['program_studi'].map(fakultas_mapping).fillna('Lainnya')
+                df_with_fakultas = filtered_df.merge(df_responden[['id_responden', 'fakultas']], on='id_responden', how='left')
                 
-                max_sessions = location_stats['session_count'].max()
-                min_sessions = location_stats['session_count'].min()
-                
-                colors = []
-                for _, row in location_stats.iterrows():
-                    if max_sessions > min_sessions:
-                        ratio = (row['session_count'] - min_sessions) / (max_sessions - min_sessions)
-                        if ratio < 0.2:
-                            colors.append('#e6f598') 
-                        elif ratio < 0.4:
-                            colors.append('#abdda4') 
-                        elif ratio < 0.6:
-                            colors.append('#66c2a5')  
-                        elif ratio < 0.8:
-                            colors.append('#3288bd') 
-                        else:
-                            colors.append('#d53e4f') 
-                    else:
-                        colors.append('#3288bd')
-                
-                for i, (_, row) in enumerate(location_stats.iterrows()):
-                    display_name = row['lokasi'] if len(row['lokasi']) <= 10 else row['lokasi'][:8] + '..'
+                if not df_with_fakultas.empty:
+                    fakultas_stats = df_with_fakultas.groupby('fakultas')['emisi_makanminum'].agg(['sum', 'count']).reset_index()
+                    fakultas_stats.columns = ['fakultas', 'total_emisi', 'count']
+                    fakultas_stats = fakultas_stats[fakultas_stats['count'] >= 1].sort_values('total_emisi', ascending=True).tail(13)
                     
-                    fig_location.add_trace(go.Bar(
-                        x=[display_name],
-                        y=[row['session_count']],
-                        marker=dict(
-                            color=colors[i],
-                            line=dict(color='white', width=1.5),
-                            opacity=0.85
-                        ),
-                        showlegend=False,
-                        text=[f"{row['session_count']}"],
-                        textposition='outside',
-                        textfont=dict(size=9, color='#2d3748', weight='bold'),
-                        hovertemplate=f'<b>{row["lokasi"]}</b><br>Jumlah Sesi: {row["session_count"]}<br>Total Emisi: {row["total_emisi"]:.2f} kg CO₂<br>Emisi per Sesi: {row["avg_emisi_per_session"]:.2f} kg CO₂<br><i>Frekuensi aktivitas makan</i><extra></extra>',
-                        name=row['lokasi']
-                    ))
-                
-                # Garis rata-rata
-                avg_sessions = location_stats['session_count'].mean()
-                fig_location.add_hline(
-                    y=avg_sessions,
-                    line_dash="dash",
-                    line_color="#5e4fa2",
-                    line_width=2,
-                    annotation_text=f"Rata-rata: {avg_sessions:.1f}",
-                    annotation_position="top right",
-                    annotation=dict(
-                        bgcolor="white", 
-                        bordercolor="#5e4fa2", 
-                        borderwidth=1,
-                        font=dict(size=8)
-                    )
-                )
-                
-                fig_location.update_layout(
-                    height=235,
-                    margin=dict(t=50, b=10, l=5, r=5),
-                    title=dict(text="<b>Lokasi Makan Terpopuler</b>", x=0.30, y=0.95,
-                              font=dict(size=11, color="#000000")),
-                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                    xaxis=dict(
-                        showgrid=False, 
-                        tickfont=dict(size=7), 
-                        tickangle=-45,
-                        title=dict(text="Lokasi", font=dict(size=9))
-                    ),
-                    yaxis=dict(
-                        showgrid=True, 
-                        gridcolor='rgba(0,0,0,0.1)', 
-                        tickfont=dict(size=7),
-                        title=dict(text="Jumlah Sesi", font=dict(size=9))
-                    ),
-                    showlegend=False
-                )
-                
-                st.plotly_chart(fig_location, use_container_width=True, config={'displayModeBar': False})
-            else:
-                st.info("Data lokasi tidak cukup untuk analisis")
-        else:
-            st.info("Data lokasi tidak tersedia")
-
-    with col3:
-        # 3. Pola Emisi per Responden
-        if 'id_responden' in filtered_df.columns and not filtered_df.empty:
-            valid_df = filtered_df[filtered_df['id_responden'].notna() & 
-                                 (filtered_df['id_responden'] != '') & 
-                                 (filtered_df['emisi_makanminum'].notna()) &
-                                 (filtered_df['emisi_makanminum'] > 0)]
-            
-            if len(valid_df) > 0:
-                user_emissions_food = valid_df.groupby('id_responden')['emisi_makanminum'].sum().reset_index()
-                user_emissions_food.columns = ['id_responden', 'total_emisi']
-                
-                if len(user_emissions_food) >= 2: 
-                    median_val = user_emissions_food['total_emisi'].median()
-                    Q1 = user_emissions_food['total_emisi'].quantile(0.25)
-                    Q3 = user_emissions_food['total_emisi'].quantile(0.75)
-                    
-                    # Simple categorization that works with small datasets
-                    user_emissions_food['category'] = 'Normal'
-                    user_emissions_food.loc[user_emissions_food['total_emisi'] < median_val * 0.7, 'category'] = 'Eco User'
-                    user_emissions_food.loc[(user_emissions_food['total_emisi'] >= median_val * 0.7) & 
-                                          (user_emissions_food['total_emisi'] < median_val), 'category'] = 'Light User'
-                    user_emissions_food.loc[(user_emissions_food['total_emisi'] > median_val) & 
-                                          (user_emissions_food['total_emisi'] <= median_val * 1.3), 'category'] = 'High User'
-                    user_emissions_food.loc[user_emissions_food['total_emisi'] > median_val * 1.3, 'category'] = 'Heavy User'
-                    
-                    user_emissions_food['user_index'] = range(len(user_emissions_food))
-                    
-                    fig_users_food = go.Figure()
-                    
-                    # Color mapping
-                    color_map = {
-                        'Eco User': '#66c2a5',  
-                        'Light User': '#abdda4',  
-                        'Normal': '#3288bd',      
-                        'High User': '#fdae61',     
-                        'Heavy User': '#d53e4f'     
-                    }
-                    
-                    size_map = {
-                        'Eco User': 8, 
-                        'Light User': 7, 
-                        'Normal': 6, 
-                        'High User': 9, 
-                        'Heavy User': 12
-                    }
-                    
-                    for category in user_emissions_food['category'].unique():
-                        category_data = user_emissions_food[user_emissions_food['category'] == category]
+                    if not fakultas_stats.empty:
+                        fig_fakultas = go.Figure()
                         
-                        if len(category_data) > 0: 
-                            fig_users_food.add_trace(go.Scatter(
-                                x=category_data['user_index'],
-                                y=category_data['total_emisi'],
-                                mode='markers',
-                                name=category,
-                                marker=dict(
-                                    color=color_map.get(category, '#3288bd'),
-                                    size=size_map.get(category, 6),
-                                    line=dict(color='white', width=1.5),
-                                    opacity=0.85,
-                                    symbol='circle'
-                                ),
-                                hovertemplate=f'<b>User %{{text}}</b><br>Total Emisi: %{{y:.2f}} kg CO₂<br>Kategori: {category}<br><i>Total konsumsi individual</i><extra></extra>',
-                                text=[f"{str(row['id_responden'])[-3:]}" if len(str(row['id_responden'])) >= 3 else str(row['id_responden']) for _, row in category_data.iterrows()]
+                        # Use color gradient based on emission level
+                        max_emisi = fakultas_stats['total_emisi'].max()
+                        min_emisi = fakultas_stats['total_emisi'].min()
+                        
+                        for i, (_, row) in enumerate(fakultas_stats.iterrows()):
+                            if max_emisi > min_emisi:
+                                ratio = (row['total_emisi'] - min_emisi) / (max_emisi - min_emisi)
+                                color_palette = ['#66c2a5', '#abdda4', '#fdae61', '#f46d43', '#d53e4f', '#9e0142']
+                                color_idx = int(ratio * (len(color_palette) - 1))
+                                color = color_palette[color_idx]
+                            else:
+                                color = MAIN_PALETTE[i % len(MAIN_PALETTE)]
+                            
+                            fig_fakultas.add_trace(go.Bar(
+                                x=[row['total_emisi']], 
+                                y=[row['fakultas']], 
+                                orientation='h',
+                                marker=dict(color=color), 
+                                showlegend=False,
+                                text=[f"{row['total_emisi']:.1f}"], 
+                                textposition='inside',
+                                textfont=dict(color='white', size=7, weight='bold'),
+                                hovertemplate=f'<b>{row["fakultas"]}</b><br>Total: {row["total_emisi"]:.1f} kg CO₂<br>Aktivitas: {row["count"]}<extra></extra>'
                             ))
-                    
-                    # Garis median
-                    if median_val > 0:
-                        fig_users_food.add_hline(
-                            y=median_val,
-                            line_dash="dash",
-                            line_color="#5e4fa2",
-                            line_width=2,
-                            annotation_text=f"Rata-rata: {median_val:.2f} kg CO₂",
-                            annotation_position="top right",
-                            annotation=dict(bgcolor="white", bordercolor="#5e4fa2", borderwidth=1, font=dict(size=8))
+                        
+                        fig_fakultas.update_layout(
+                            height=235, margin=dict(t=25, b=0, l=0, r=20),
+                            title=dict(text="<b>Emisi per Fakultas</b>", x=0.35, y=0.95,
+                                      font=dict(size=11, color="#000000")),
+                            paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                            xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=8), title=dict(text="Rata-Rata Emisi (kg CO₂)", font=dict(size=10))),
+                            yaxis=dict(tickfont=dict(size=8), title=dict(text="Fakultas/Sekolah", font=dict(size=10)))
                         )
+                        
+                        st.plotly_chart(fig_fakultas, use_container_width=True, config={'displayModeBar': False})
+                    else:
+                        st.info("Data fakultas tidak cukup (min 3 aktivitas)")
+                else:
+                    st.info("Data fakultas tidak dapat digabungkan")
+            else:
+                st.info("Data fakultas tidak tersedia")
+
+        with col3:
+            # 3. Distribusi Periode Waktu - Diagram Lingkaran
+            period_data = filtered_df['meal_period'].value_counts()
+            colors = [PERIOD_COLORS.get(period, MAIN_PALETTE[i % len(MAIN_PALETTE)]) 
+                     for i, period in enumerate(period_data.index)]
+            
+            fig_period = go.Figure(data=[go.Pie(
+                labels=period_data.index,
+                values=period_data.values,
+                hole=0.45,
+                marker=dict(colors=colors, line=dict(color='#FFFFFF', width=2)),
+                textposition='outside',
+                textinfo='label+percent',
+                textfont=dict(size=7, family="Poppins"),
+                hovertemplate='<b>%{label}</b><br>%{value} aktivitas (%{percent})<extra></extra>'
+            )])
+            
+            total_activities = period_data.sum()
+            center_text = f"<b style='font-size:14px'>{total_activities}</b><br><span style='font-size:8px'>Aktivitas</span>"
+            fig_period.add_annotation(text=center_text, x=0.5, y=0.5, font_size=10, showarrow=False)
+            
+            fig_period.update_layout(
+                height=235, margin=dict(t=25, b=5, l=5, r=5), showlegend=False,
+                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                title=dict(text="<b>Distribusi Periode Waktu</b>", x=0.27, y=0.95, 
+                          font=dict(size=11, color="#000000"))
+            )
+            
+            st.plotly_chart(fig_period, use_container_width=True, config={'displayModeBar': False})
+
+        time.sleep(0.18)  # Row 1 charts loading time
+
+    # Row 2 with loading
+    with loading():
+        col1, col2, col3 = st.columns([1, 1, 1])
+
+        with col1:
+            # 1. Heatmap Top Lokasi vs Waktu 
+            top_locations = filtered_df.groupby('lokasi')['emisi_makanminum'].sum().nlargest().index.tolist()
+            heatmap_filtered = filtered_df[filtered_df['lokasi'].isin(top_locations)]
+            
+            heatmap_data = heatmap_filtered.groupby(['lokasi', 'time_slot'])['emisi_makanminum'].sum().reset_index()
+            heatmap_pivot = heatmap_data.pivot(index='time_slot', columns='lokasi', values='emisi_makanminum').fillna(0)
+            
+            if not heatmap_pivot.empty:
+                truncated_columns = [col[:15] + '...' if len(col) > 15 else col for col in heatmap_pivot.columns]
+                
+                fig_heatmap = go.Figure(data=go.Heatmap(
+                    z=heatmap_pivot.values,
+                    x=truncated_columns,
+                    y=heatmap_pivot.index,
+                    colorscale=[[0, '#fee08b'], [0.25, '#fdae61'], [0.5, '#f46d43'], [0.75, '#d53e4f'], [1, '#9e0142']],
+                    hoverongaps=False,
+                    hovertemplate='<b>%{customdata}</b><br>Waktu: %{y}<br>Emisi: %{z:.2f} kg CO₂<extra></extra>',
+                    customdata=np.array([list(heatmap_pivot.columns)] * len(heatmap_pivot.index)),
+                    colorbar=dict(
+                        title=dict(text="Emisi", font=dict(size=9)),
+                        tickfont=dict(size=8),
+                        thickness=15,
+                        len=0.7
+                    ),
+                    xgap=1, ygap=1,
+                    zmin=0
+                ))
+                
+                fig_heatmap.update_layout(
+                    height=235, margin=dict(t=25, b=20, l=20, r=40),
+                    title=dict(text="<b>Heatmap Top Lokasi vs Waktu</b>", x=0.15, y=0.95, 
+                            font=dict(size=11, color="#000000")),
+                    xaxis=dict(tickfont=dict(size=7), tickangle=-45, title=dict(text="Lokasi", font=dict(size=10))),
+                    yaxis=dict(tickfont=dict(size=7)),
+                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
+                )
+                st.plotly_chart(fig_heatmap, use_container_width=True, config={'displayModeBar': False})
+            else:
+                st.info("Data heatmap tidak tersedia")
+
+        with col2:
+            # 2. Lokasi Terpopuler
+            if not filtered_df.empty and 'lokasi' in filtered_df.columns:
+                location_stats = filtered_df.groupby('lokasi').agg({
+                    'emisi_makanminum': ['sum', 'mean'],
+                    'lokasi': 'count'
+                }).reset_index()
+                location_stats.columns = ['lokasi', 'total_emisi', 'avg_emisi', 'session_count']
+                location_stats['avg_emisi_per_session'] = location_stats['total_emisi'] / location_stats['session_count']
+                
+                # Filter dan sort berdasarkan jumlah sesi
+                location_stats = location_stats[location_stats['session_count'] >= 2].sort_values('session_count', ascending=False).head(6)
+                
+                if not location_stats.empty:
+                    fig_location = go.Figure()
                     
-                    fig_users_food.update_layout(
-                        height=235, margin=dict(t=25, b=5, l=5, r=5),
-                        title=dict(text="<b>Pola Emisi per Responden</b>", x=0.25, y=0.95, 
+                    max_sessions = location_stats['session_count'].max()
+                    min_sessions = location_stats['session_count'].min()
+                    
+                    colors = []
+                    for _, row in location_stats.iterrows():
+                        if max_sessions > min_sessions:
+                            ratio = (row['session_count'] - min_sessions) / (max_sessions - min_sessions)
+                            if ratio < 0.2:
+                                colors.append('#e6f598') 
+                            elif ratio < 0.4:
+                                colors.append('#abdda4') 
+                            elif ratio < 0.6:
+                                colors.append('#66c2a5')  
+                            elif ratio < 0.8:
+                                colors.append('#3288bd') 
+                            else:
+                                colors.append('#d53e4f') 
+                        else:
+                            colors.append('#3288bd')
+                    
+                    for i, (_, row) in enumerate(location_stats.iterrows()):
+                        display_name = row['lokasi'] if len(row['lokasi']) <= 10 else row['lokasi'][:8] + '..'
+                        
+                        fig_location.add_trace(go.Bar(
+                            x=[display_name],
+                            y=[row['session_count']],
+                            marker=dict(
+                                color=colors[i],
+                                line=dict(color='white', width=1.5),
+                                opacity=0.85
+                            ),
+                            showlegend=False,
+                            text=[f"{row['session_count']}"],
+                            textposition='outside',
+                            textfont=dict(size=9, color='#2d3748', weight='bold'),
+                            hovertemplate=f'<b>{row["lokasi"]}</b><br>Jumlah Sesi: {row["session_count"]}<br>Total Emisi: {row["total_emisi"]:.2f} kg CO₂<br>Emisi per Sesi: {row["avg_emisi_per_session"]:.2f} kg CO₂<br><i>Frekuensi aktivitas makan</i><extra></extra>',
+                            name=row['lokasi']
+                        ))
+                    
+                    # Garis rata-rata
+                    avg_sessions = location_stats['session_count'].mean()
+                    fig_location.add_hline(
+                        y=avg_sessions,
+                        line_dash="dash",
+                        line_color="#5e4fa2",
+                        line_width=2,
+                        annotation_text=f"Rata-rata: {avg_sessions:.1f}",
+                        annotation_position="top right",
+                        annotation=dict(
+                            bgcolor="white", 
+                            bordercolor="#5e4fa2", 
+                            borderwidth=1,
+                            font=dict(size=8)
+                        )
+                    )
+                    
+                    fig_location.update_layout(
+                        height=235,
+                        margin=dict(t=50, b=10, l=5, r=5),
+                        title=dict(text="<b>Lokasi Makan Terpopuler</b>", x=0.30, y=0.95,
                                   font=dict(size=11, color="#000000")),
                         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                        xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.05)', tickfont=dict(size=7), 
-                                  title=dict(text="Index Responden", font=dict(size=9))),
-                        yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=7), 
-                                  title=dict(text="Total Emisi (kg CO₂)", font=dict(size=9))),
-                        legend=dict(orientation="v", yanchor="top", y=0.98, xanchor="left", x=0.02, 
-                                   font=dict(size=7), bgcolor="rgba(255,255,255,0.9)", 
-                                   bordercolor="rgba(0,0,0,0.1)", borderwidth=1)
+                        xaxis=dict(
+                            showgrid=False, 
+                            tickfont=dict(size=7), 
+                            tickangle=-45,
+                            title=dict(text="Lokasi", font=dict(size=9))
+                        ),
+                        yaxis=dict(
+                            showgrid=True, 
+                            gridcolor='rgba(0,0,0,0.1)', 
+                            tickfont=dict(size=7),
+                            title=dict(text="Jumlah Sesi", font=dict(size=9))
+                        ),
+                        showlegend=False
                     )
                     
-                    st.plotly_chart(fig_users_food, use_container_width=True, config={'displayModeBar': False})
-                    
+                    st.plotly_chart(fig_location, use_container_width=True, config={'displayModeBar': False})
                 else:
-                    st.info("Data tidak cukup (min 2 responden)")
+                    st.info("Data lokasi tidak cukup untuk analisis")
             else:
-                st.info("Tidak ada data emisi yang valid")
-        else:
-            st.info("Data responden tidak tersedia")
+                st.info("Data lokasi tidak tersedia")
+
+        with col3:
+            # 3. Pola Emisi per Responden
+            if 'id_responden' in filtered_df.columns and not filtered_df.empty:
+                valid_df = filtered_df[filtered_df['id_responden'].notna() & 
+                                     (filtered_df['id_responden'] != '') & 
+                                     (filtered_df['emisi_makanminum'].notna()) &
+                                     (filtered_df['emisi_makanminum'] > 0)]
+                
+                if len(valid_df) > 0:
+                    user_emissions_food = valid_df.groupby('id_responden')['emisi_makanminum'].sum().reset_index()
+                    user_emissions_food.columns = ['id_responden', 'total_emisi']
+                    
+                    if len(user_emissions_food) >= 2: 
+                        median_val = user_emissions_food['total_emisi'].median()
+                        Q1 = user_emissions_food['total_emisi'].quantile(0.25)
+                        Q3 = user_emissions_food['total_emisi'].quantile(0.75)
+                        
+                        # Simple categorization that works with small datasets
+                        user_emissions_food['category'] = 'Normal'
+                        user_emissions_food.loc[user_emissions_food['total_emisi'] < median_val * 0.7, 'category'] = 'Eco User'
+                        user_emissions_food.loc[(user_emissions_food['total_emisi'] >= median_val * 0.7) & 
+                                              (user_emissions_food['total_emisi'] < median_val), 'category'] = 'Light User'
+                        user_emissions_food.loc[(user_emissions_food['total_emisi'] > median_val) & 
+                                              (user_emissions_food['total_emisi'] <= median_val * 1.3), 'category'] = 'High User'
+                        user_emissions_food.loc[user_emissions_food['total_emisi'] > median_val * 1.3, 'category'] = 'Heavy User'
+                        
+                        user_emissions_food['user_index'] = range(len(user_emissions_food))
+                        
+                        fig_users_food = go.Figure()
+                        
+                        # Color mapping
+                        color_map = {
+                            'Eco User': '#66c2a5',  
+                            'Light User': '#abdda4',  
+                            'Normal': '#3288bd',      
+                            'High User': '#fdae61',     
+                            'Heavy User': '#d53e4f'     
+                        }
+                        
+                        size_map = {
+                            'Eco User': 8, 
+                            'Light User': 7, 
+                            'Normal': 6, 
+                            'High User': 9, 
+                            'Heavy User': 12
+                        }
+                        
+                        for category in user_emissions_food['category'].unique():
+                            category_data = user_emissions_food[user_emissions_food['category'] == category]
+                            
+                            if len(category_data) > 0: 
+                                fig_users_food.add_trace(go.Scatter(
+                                    x=category_data['user_index'],
+                                    y=category_data['total_emisi'],
+                                    mode='markers',
+                                    name=category,
+                                    marker=dict(
+                                        color=color_map.get(category, '#3288bd'),
+                                        size=size_map.get(category, 6),
+                                        line=dict(color='white', width=1.5),
+                                        opacity=0.85,
+                                        symbol='circle'
+                                    ),
+                                    hovertemplate=f'<b>User %{{text}}</b><br>Total Emisi: %{{y:.2f}} kg CO₂<br>Kategori: {category}<br><i>Total konsumsi individual</i><extra></extra>',
+                                    text=[f"{str(row['id_responden'])[-3:]}" if len(str(row['id_responden'])) >= 3 else str(row['id_responden']) for _, row in category_data.iterrows()]
+                                ))
+                        
+                        # Garis median
+                        if median_val > 0:
+                            fig_users_food.add_hline(
+                                y=median_val,
+                                line_dash="dash",
+                                line_color="#5e4fa2",
+                                line_width=2,
+                                annotation_text=f"Rata-rata: {median_val:.2f} kg CO₂",
+                                annotation_position="top right",
+                                annotation=dict(bgcolor="white", bordercolor="#5e4fa2", borderwidth=1, font=dict(size=8))
+                            )
+                        
+                        fig_users_food.update_layout(
+                            height=235, margin=dict(t=25, b=5, l=5, r=5),
+                            title=dict(text="<b>Pola Emisi per Responden</b>", x=0.25, y=0.95, 
+                                      font=dict(size=11, color="#000000")),
+                            paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                            xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.05)', tickfont=dict(size=7), 
+                                      title=dict(text="Index Responden", font=dict(size=9))),
+                            yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=7), 
+                                      title=dict(text="Total Emisi (kg CO₂)", font=dict(size=9))),
+                            legend=dict(orientation="v", yanchor="top", y=0.98, xanchor="left", x=0.02, 
+                                       font=dict(size=7), bgcolor="rgba(255,255,255,0.9)", 
+                                       bordercolor="rgba(0,0,0,0.1)", borderwidth=1)
+                        )
+                        
+                        st.plotly_chart(fig_users_food, use_container_width=True, config={'displayModeBar': False})
+                        
+                    else:
+                        st.info("Data tidak cukup (min 2 responden)")
+                else:
+                    st.info("Tidak ada data emisi yang valid")
+            else:
+                st.info("Data responden tidak tersedia")
+
+        time.sleep(0.18)  # Row 2 charts loading time
 
 if __name__ == "__main__":
     show()

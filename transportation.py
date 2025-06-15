@@ -2,6 +2,9 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import numpy as np
+from loading import loading, loading_decorator
+import time
 
 # CONSISTENT COLOR PALETTE
 MAIN_PALETTE = ['#9e0142', '#d53e4f', '#f46d43', '#fdae61', '#fee08b', 
@@ -21,20 +24,24 @@ TRANSPORT_COLORS = {
 }
 
 @st.cache_data(ttl=3600)
+@loading_decorator()
 def load_data():
     """Load transportation data from Google Sheets"""
     url = "https://docs.google.com/spreadsheets/d/11Y7cx9SqtLeG5S09F34nDQSnwaZDfUkZKVnNwRLi8V4/export?format=csv&gid=155140281"
     try:
+        time.sleep(0.3)  # Simulate loading time for smooth UX
         return pd.read_csv(url)
     except Exception as e:
         st.error(f"Error loading transportation data: {e}")
         return pd.DataFrame()
 
 @st.cache_data(ttl=3600)
+@loading_decorator()
 def load_responden_data():
     """Load responden data for fakultas information"""
     url = "https://docs.google.com/spreadsheets/d/11Y7cx9SqtLeG5S09F34nDQSnwaZDfUkZKVnNwRLi8V4/export?format=csv&gid=1606042726"
     try:
+        time.sleep(0.2)  # Simulate loading time for smooth UX
         return pd.read_csv(url)
     except Exception as e:
         return pd.DataFrame()
@@ -75,8 +82,9 @@ def get_fakultas_mapping():
         'Informatika': 'STEI', 'Teknik Telekomunikasi': 'STEI', 'Teknik Tenaga Listrik': 'STEI'
     }
 
+@loading_decorator()
 def apply_filters(df, selected_days, selected_modes, selected_fakultas, df_responden=None):
-    """Apply filters to the dataframe"""
+    """Apply filters to the dataframe with loading"""
     filtered_df = df.copy()
     
     # Filter by day (using daily emission columns if available)
@@ -104,12 +112,17 @@ def apply_filters(df, selected_days, selected_modes, selected_fakultas, df_respo
             if 'id_responden' in fakultas_students.columns and 'id_responden' in filtered_df.columns:
                 filtered_df = filtered_df[filtered_df['id_responden'].isin(fakultas_students['id_responden'])]
     
+    time.sleep(0.1)  # Small delay for smooth filtering experience
     return filtered_df
 
+@loading_decorator()
 def generate_pdf_report(filtered_df, total_emisi, avg_emisi, eco_percentage, df_responden=None):
-    """Generate professional HTML report optimized for PDF printing"""
+    """Generate professional HTML report optimized for PDF printing with loading"""
     from datetime import datetime
     import pandas as pd
+    
+    # Simulate processing time for complex report generation
+    time.sleep(0.5)
     
     def get_fakultas_mapping():
         return {
@@ -178,57 +191,99 @@ def generate_pdf_report(filtered_df, total_emisi, avg_emisi, eco_percentage, df_
         lowest_day = daily_data.iloc[-1]
         daily_conclusion = f"Hari {highest_day['hari']} mencatat emisi tertinggi ({highest_day['total_emisi']:.1f} kg CO₂), hari {lowest_day['hari']} terendah ({lowest_day['total_emisi']:.1f} kg CO₂)."
     
-    # 4. Pattern data
-    pattern_data = pd.DataFrame()
-    pattern_conclusion = "Data pola penggunaan transportasi per hari tidak tersedia."
+    # 4. Heatmap pattern data (updated for hari vs moda)
+    heatmap_pattern_data = pd.DataFrame()
+    heatmap_pattern_conclusion = "Data heatmap penggunaan moda transportasi per hari tidak tersedia."
     if hari_cols and len(transport_stats) > 0:
-        pattern_rows = []
-        for _, transport_row in transport_stats.head(5).iterrows():
-            mode = transport_row['transportasi']
-            mode_data = filtered_df[filtered_df['transportasi'] == mode]
-            row_data = {'moda_transportasi': mode}
+        heatmap_rows = []
+        for col in hari_cols:
+            day = col.replace('emisi_transportasi_', '').capitalize()
+            row_data = {'hari': day}
             
-            for col in hari_cols:
-                day = col.replace('emisi_transportasi_', '').capitalize()
+            for _, transport_row in transport_stats.head(5).iterrows():
+                mode = transport_row['transportasi']
+                mode_data = filtered_df[filtered_df['transportasi'] == mode]
                 users_count = (mode_data[col] > 0).sum()
-                row_data[day] = users_count
+                row_data[mode] = users_count
             
-            if sum([v for k, v in row_data.items() if k != 'moda_transportasi']) > 0:
-                pattern_rows.append(row_data)
+            total_day_usage = sum([v for k, v in row_data.items() if k != 'hari'])
+            if total_day_usage > 0:
+                heatmap_rows.append(row_data)
         
-        pattern_data = pd.DataFrame(pattern_rows)
-        if not pattern_data.empty:
-            mode_peak_info = []
+        heatmap_pattern_data = pd.DataFrame(heatmap_rows)
+        if not heatmap_pattern_data.empty:
+            # Find peak day and mode combinations
+            day_totals = []
+            mode_cols = [col for col in heatmap_pattern_data.columns if col != 'hari']
             
-            for _, row in pattern_data.iterrows():
-                mode = row['moda_transportasi']
-                max_usage = 0
-                peak_day = ""
-                
-                for col in hari_cols:
-                    day = col.replace('emisi_transportasi_', '').capitalize()
-                    usage = row[day]
-                    if usage > max_usage:
-                        max_usage = usage
-                        peak_day = day
-                
-                if max_usage > 0:
-                    mode_peak_info.append(f"{mode}: penggunaan tertinggi pada {peak_day} ({max_usage} pengguna)")
+            for _, row in heatmap_pattern_data.iterrows():
+                day_total = sum([row[mode] for mode in mode_cols])
+                day_totals.append({'hari': row['hari'], 'total_usage': day_total})
             
-            if mode_peak_info:
-                pattern_conclusion = ". ".join(mode_peak_info) + "."
+            if day_totals:
+                peak_day_data = max(day_totals, key=lambda x: x['total_usage'])
+                peak_day = peak_day_data['hari']
+                
+                # Find which mode dominates which day
+                mode_peak_info = []
+                for mode in mode_cols:
+                    mode_peak_day = heatmap_pattern_data.loc[heatmap_pattern_data[mode].idxmax()]
+                    mode_peak_info.append(f"{mode}: puncak pada {mode_peak_day['hari']} ({mode_peak_day[mode]} pengguna)")
+                
+                if mode_peak_info:
+                    heatmap_pattern_conclusion = f"Pola penggunaan menunjukkan {peak_day} sebagai hari dengan aktivitas tertinggi. " + ". ".join(mode_peak_info[:3]) + "."
+                else:
+                    heatmap_pattern_conclusion = f"Pola penggunaan menunjukkan {peak_day} sebagai hari dengan aktivitas transportasi tertinggi."
             else:
-                pattern_conclusion = "Tidak ada data penggunaan yang tersedia untuk analisis pola harian."
+                heatmap_pattern_conclusion = "Tidak ada data penggunaan yang tersedia untuk analisis heatmap."
         else:
-            pattern_conclusion = "Tidak ada data penggunaan yang tersedia untuk analisis pola harian."
+            heatmap_pattern_conclusion = "Tidak ada data penggunaan yang tersedia untuk analisis heatmap moda transportasi per hari."
 
-    # 5. Kecamatan
+    # 5. Box Plot Distribution Analysis (yang tadi hilang!)
+    box_plot_data = pd.DataFrame()
+    box_plot_conclusion = "Data distribusi emisi tidak tersedia."
+    if not valid_df.empty and 'transportasi' in valid_df.columns:
+        box_stats = []
+        for mode in transport_stats.head(5)['transportasi'].tolist():
+            mode_data = valid_df[valid_df['transportasi'] == mode]['emisi_mingguan']
+            if len(mode_data) > 0:
+                q1 = mode_data.quantile(0.25)
+                q2 = mode_data.quantile(0.5)  # median
+                q3 = mode_data.quantile(0.75)
+                iqr = q3 - q1
+                upper_fence = q3 + 1.5 * iqr
+                lower_fence = q1 - 1.5 * iqr
+                
+                outliers = len(mode_data[(mode_data > upper_fence) | (mode_data < lower_fence)])
+                
+                box_stats.append({
+                    'moda': mode,
+                    'median': q2,
+                    'q1': q1,
+                    'q3': q3,
+                    'outliers': outliers,
+                    'variabilitas': iqr
+                })
+        
+        if box_stats:
+            box_plot_data = pd.DataFrame(box_stats)
+            
+            # Find insights
+            most_outliers = box_plot_data.loc[box_plot_data['outliers'].idxmax()]
+            most_variable = box_plot_data.loc[box_plot_data['variabilitas'].idxmax()]
+            highest_median = box_plot_data.loc[box_plot_data['median'].idxmax()]
+            
+            total_outliers = box_plot_data['outliers'].sum()
+            
+            box_plot_conclusion = f"Distribusi emisi menunjukkan {total_outliers} responden outlier total. {most_outliers['moda']} memiliki outlier terbanyak ({most_outliers['outliers']} responden), {most_variable['moda']} paling bervariasi (IQR: {most_variable['variabilitas']:.1f}), dan {highest_median['moda']} memiliki median tertinggi ({highest_median['median']:.1f} kg CO₂)."
+
+    # 6. Kecamatan
     kecamatan_data = pd.DataFrame()
     kecamatan_conclusion = "Data kecamatan tidak tersedia."
     if 'kecamatan' in filtered_df.columns:
         kecamatan_stats = filtered_df.groupby('kecamatan')['emisi_mingguan'].agg(['sum', 'count', 'mean']).round(1)
         kecamatan_stats.columns = ['total_emisi', 'jumlah_mahasiswa', 'rata_rata_emisi']
-        kecamatan_data = kecamatan_stats[kecamatan_stats['jumlah_mahasiswa'] >= 2].sort_values('total_emisi', ascending=False)
+        kecamatan_data = kecamatan_stats[kecamatan_stats['jumlah_mahasiswa'] >= 0].sort_values('total_emisi', ascending=False)
         
         if kecamatan_data.empty:
             kecamatan_data = kecamatan_stats[kecamatan_stats['jumlah_mahasiswa'] >= 1].sort_values('total_emisi', ascending=False)
@@ -239,32 +294,6 @@ def generate_pdf_report(filtered_df, total_emisi, avg_emisi, eco_percentage, df_
             lowest_kecamatan = kecamatan_data.index[-1]
             lowest_total = kecamatan_data.iloc[-1]['total_emisi']
             kecamatan_conclusion = f"Kecamatan {highest_kecamatan} menghasilkan total emisi tertinggi ({highest_total:.1f} kg CO₂), sedangkan {lowest_kecamatan} menghasilkan emisi terendah ({lowest_total:.1f} kg CO₂)."
-    
-    # 6. Mode contribution by day (stacked equivalent)
-    mode_daily_data = pd.DataFrame()
-    mode_daily_conclusion = "Data emisi harian per moda tidak tersedia."
-    if hari_cols:
-        top_modes = transport_stats.head(5)['transportasi'].tolist()
-        daily_mode_totals = []
-        
-        for mode in top_modes:
-            mode_data = filtered_df[filtered_df['transportasi'] == mode]
-            for col in hari_cols:
-                day = col.replace('emisi_transportasi_', '').capitalize()
-                emission = mode_data[col].sum()
-                daily_mode_totals.append({
-                    'moda': mode,
-                    'hari': day,
-                    'emisi': emission
-                })
-        
-        if daily_mode_totals:
-            mode_daily_df = pd.DataFrame(daily_mode_totals)
-            mode_daily_data = mode_daily_df.pivot(index='moda', columns='hari', values='emisi').fillna(0)
-            
-            if not mode_daily_data.empty:
-                top_mode = top_modes[0]
-                mode_daily_conclusion = f"Moda transportasi {top_mode} mendominasi emisi di sebagian besar hari dalam seminggu."
     
     most_used = transport_stats.iloc[0]
     transport_conclusion = f"Moda transportasi {most_used['transportasi']} mendominasi dengan {most_used['jumlah_pengguna']} pengguna ({most_used['persentase']:.1f}%)."
@@ -486,40 +515,38 @@ def generate_pdf_report(filtered_df, total_emisi, avg_emisi, eco_percentage, df_
                 </div>
             </div>
         </div>
-        
-        <!-- 1. Komposisi Moda Transportasi -->
+
+        <!-- 1. Tren Emisi Harian -->
         <div class="section avoid-break">
-            <h2 class="section-title">1. Komposisi Moda Transportasi</h2>
+            <h2 class="section-title">1. Tren Emisi Harian</h2>
             <div class="section-content">
+    """
+    
+    if not daily_data.empty:
+        html_content += """
                 <table>
                     <thead>
                         <tr>
-                            <th>Moda Transportasi</th>
-                            <th>Pengguna</th>
-                            <th>Persentase</th>
-                            <th>Rata-rata Emisi</th>
-                            <th>Total Emisi</th>
+                            <th>Hari</th>
+                            <th>Total Emisi (kg CO₂)</th>
                         </tr>
                     </thead>
                     <tbody>
-    """
-    
-    for _, row in transport_stats.iterrows():
-        html_content += f"""
+        """
+        for _, row in daily_data.iterrows():
+            html_content += f"""
                         <tr>
-                            <td style="text-align: left; font-weight: 500;">{row['transportasi']}</td>
-                            <td>{row['jumlah_pengguna']}</td>
-                            <td>{row['persentase']:.1f}%</td>
-                            <td>{row['rata_rata_emisi']:.2f}</td>
+                            <td style="text-align: left; font-weight: 500;">{row['hari']}</td>
                             <td>{row['total_emisi']:.1f}</td>
                         </tr>
-        """
+            """
+        html_content += "</tbody></table>"
+    else:
+        html_content += "<p>Data emisi harian tidak tersedia.</p>"
     
     html_content += f"""
-                    </tbody>
-                </table>
                 <div class="conclusion">
-                    <strong>Kesimpulan:</strong> {transport_conclusion}
+                    <strong>Kesimpulan:</strong> {daily_conclusion}
                 </div>
             </div>
         </div>
@@ -562,81 +589,126 @@ def generate_pdf_report(filtered_df, total_emisi, avg_emisi, eco_percentage, df_
                 </div>
             </div>
         </div>
-        
-        <!-- 3. Tren Emisi Harian -->
+
+        <!-- 3. Komposisi Moda Transportasi -->
         <div class="section avoid-break">
-            <h2 class="section-title">3. Tren Emisi Harian</h2>
+            <h2 class="section-title">3. Komposisi Moda Transportasi</h2>
             <div class="section-content">
-    """
-    
-    if not daily_data.empty:
-        html_content += """
                 <table>
                     <thead>
                         <tr>
-                            <th>Hari</th>
-                            <th>Total Emisi (kg CO₂)</th>
+                            <th>Moda Transportasi</th>
+                            <th>Pengguna</th>
+                            <th>Persentase</th>
+                            <th>Rata-rata Emisi</th>
+                            <th>Total Emisi</th>
                         </tr>
                     </thead>
                     <tbody>
-        """
-        for _, row in daily_data.iterrows():
-            html_content += f"""
+    """
+    
+    for _, row in transport_stats.iterrows():
+        html_content += f"""
                         <tr>
-                            <td style="text-align: left; font-weight: 500;">{row['hari']}</td>
+                            <td style="text-align: left; font-weight: 500;">{row['transportasi']}</td>
+                            <td>{row['jumlah_pengguna']}</td>
+                            <td>{row['persentase']:.1f}%</td>
+                            <td>{row['rata_rata_emisi']:.2f}</td>
                             <td>{row['total_emisi']:.1f}</td>
                         </tr>
-            """
-        html_content += "</tbody></table>"
-    else:
-        html_content += "<p>Data emisi harian tidak tersedia.</p>"
+        """
     
     html_content += f"""
+                    </tbody>
+                </table>
                 <div class="conclusion">
-                    <strong>Kesimpulan:</strong> {daily_conclusion}
+                    <strong>Kesimpulan:</strong> {transport_conclusion}
                 </div>
             </div>
         </div>
-        
+
         <!-- 4. Pola Penggunaan Transportasi per Hari -->
         <div class="section avoid-break">
             <h2 class="section-title">4. Pola Penggunaan Transportasi per Hari</h2>
             <div class="section-content">
     """
     
-    if not pattern_data.empty:
-        day_columns = [col for col in pattern_data.columns if col != 'moda_transportasi']
+    if not heatmap_pattern_data.empty:
+        mode_columns = [col for col in heatmap_pattern_data.columns if col != 'hari']
         
         html_content += """
                 <table>
                     <thead>
                         <tr>
-                            <th>Moda Transportasi</th>
+                            <th>Hari</th>
         """
-        for day in day_columns:
-            html_content += f"<th>{day}<br>(Pengguna)</th>"
+        for mode in mode_columns:
+            html_content += f"<th>{mode}<br>(Pengguna)</th>"
         html_content += "</tr></thead><tbody>"
         
-        for _, row in pattern_data.iterrows():
-            html_content += f"<tr><td style='text-align: left; font-weight: 500;'>{row['moda_transportasi']}</td>"
-            for day in day_columns:
-                html_content += f"<td>{int(row[day])}</td>"
+        for _, row in heatmap_pattern_data.iterrows():
+            html_content += f"<tr><td style='text-align: left; font-weight: 500;'>{row['hari']}</td>"
+            for mode in mode_columns:
+                html_content += f"<td>{int(row[mode])}</td>"
             html_content += "</tr>"
         
         html_content += "</tbody></table>"
     else:
-        html_content += "<p>Data pola penggunaan harian tidak tersedia.</p>"
+        html_content += "<p>Data heatmap penggunaan moda transportasi per hari tidak tersedia.</p>"
     
     html_content += f"""
                 <div class="conclusion">
-                    <strong>Kesimpulan:</strong> {pattern_conclusion}
+                    <strong>Kesimpulan:</strong> {heatmap_pattern_conclusion}
                 </div>
             </div>
         </div>
         
-        <!-- 5. EMISI PER KECAMATAN (REPLACE PARKING) -->
+        <!-- 5. Distribusi Emisi per Moda Transportasi -->
         <div class="section avoid-break">
-            <h2 class="section-title">5. Emisi per Kecamatan</h2>
+            <h2 class="section-title">5. Distribusi Emisi per Moda Transportasi</h2>
+            <div class="section-content">
+    """
+    
+    if not box_plot_data.empty:
+        html_content += """
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Moda Transportasi</th>
+                            <th>Median (kg CO₂)</th>
+                            <th>Q1 (kg CO₂)</th>
+                            <th>Q3 (kg CO₂)</th>
+                            <th>Outlier</th>
+                            <th>Variabilitas (IQR)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        """
+        for _, row in box_plot_data.iterrows():
+            html_content += f"""
+                        <tr>
+                            <td style="text-align: left; font-weight: 500;">{row['moda']}</td>
+                            <td>{row['median']:.2f}</td>
+                            <td>{row['q1']:.2f}</td>
+                            <td>{row['q3']:.2f}</td>
+                            <td>{row['outliers']} responden</td>
+                            <td>{row['variabilitas']:.2f}</td>
+                        </tr>
+            """
+        html_content += "</tbody></table>"
+    else:
+        html_content += "<p>Data distribusi emisi tidak tersedia.</p>"
+    
+    html_content += f"""
+                <div class="conclusion">
+                    <strong>Kesimpulan:</strong> {box_plot_conclusion}
+                </div>
+            </div>
+        </div>
+        
+        <!-- 6. Emisi per Kecamatan -->
+        <div class="section avoid-break">
+            <h2 class="section-title">6. Emisi per Kecamatan</h2>
             <div class="section-content">
     """
     
@@ -645,6 +717,7 @@ def generate_pdf_report(filtered_df, total_emisi, avg_emisi, eco_percentage, df_
                 <table>
                     <thead>
                         <tr>
+                            <th>Ranking</th>
                             <th>Kecamatan</th>
                             <th>Mahasiswa</th>
                             <th>Rata-rata Emisi</th>
@@ -653,9 +726,10 @@ def generate_pdf_report(filtered_df, total_emisi, avg_emisi, eco_percentage, df_
                     </thead>
                     <tbody>
         """
-        for kecamatan, row in kecamatan_data.head(10).iterrows():  
+        for idx, (kecamatan, row) in enumerate(kecamatan_data.head(10).iterrows(), 1):  
             html_content += f"""
                         <tr>
+                            <td><strong>#{idx}</strong></td>
                             <td style="text-align: left; font-weight: 500;">{kecamatan}</td>
                             <td>{row['jumlah_mahasiswa']}</td>
                             <td>{row['rata_rata_emisi']:.1f}</td>
@@ -673,42 +747,6 @@ def generate_pdf_report(filtered_df, total_emisi, avg_emisi, eco_percentage, df_
             </div>
         </div>
         
-        <!-- 6. Emisi Harian per Moda -->
-        <div class="section avoid-break">
-            <h2 class="section-title">6. Emisi Harian per Moda</h2>
-            <div class="section-content">
-    """
-    
-    if not mode_daily_data.empty:
-        day_columns = mode_daily_data.columns
-        
-        html_content += """
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Moda Transportasi</th>
-        """
-        for day in day_columns:
-            html_content += f"<th>{day}</th>"
-        html_content += "</tr></thead><tbody>"
-        
-        for mode, row in mode_daily_data.iterrows():
-            html_content += f"<tr><td style='text-align: left; font-weight: 500;'>{mode}</td>"
-            for day in day_columns:
-                html_content += f"<td>{row[day]:.1f}</td>"
-            html_content += "</tr>"
-        
-        html_content += "</tbody></table>"
-    else:
-        html_content += "<p>Data emisi harian per moda tidak tersedia.</p>"
-    
-    html_content += f"""
-                <div class="conclusion">
-                    <strong>Kesimpulan:</strong> {mode_daily_conclusion}
-                </div>
-            </div>
-        </div>
-        
         <div class="footer">
             <p><strong>Institut Teknologi Bandung</strong></p>
             <p>Carbon Emission Dashboard - Transportation Report</p>
@@ -720,20 +758,22 @@ def generate_pdf_report(filtered_df, total_emisi, avg_emisi, eco_percentage, df_
     return html_content
 
 def show():
-    
-    st.markdown("""
-    <div class="wow-header">
-        <div class="header-bg-pattern"></div>
-        <div class="header-float-1"></div>
-        <div class="header-float-2"></div>
-        <div class="header-float-3"></div>
-        <div class="header-content">
-            <h1 class="header-title">Emisi Transportasi</h1>
+    # Header with loading
+    with loading():
+        st.markdown("""
+        <div class="wow-header">
+            <div class="header-bg-pattern"></div>
+            <div class="header-float-1"></div>
+            <div class="header-float-2"></div>
+            <div class="header-float-3"></div>
+            <div class="header-content">
+                <h1 class="header-title">Emisi Transportasi</h1>
+            </div>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
+        time.sleep(0.2)  # Small delay for header animation
 
-    # Load data
+    # Load data with loading decorators
     df = load_data()
     df_responden = load_responden_data()
     
@@ -741,10 +781,12 @@ def show():
         st.error("Data transportasi tidak tersedia")
         return
 
-    # Data processing
-    df['emisi_mingguan'] = pd.to_numeric(df['emisi_mingguan'], errors='coerce')
-    df = df.dropna(subset=['transportasi'])
-    df['emission_category'] = df['transportasi'].apply(categorize_emission_level)
+    # Data processing with loading
+    with loading():
+        df['emisi_mingguan'] = pd.to_numeric(df['emisi_mingguan'], errors='coerce')
+        df = df.dropna(subset=['transportasi'])
+        df['emission_category'] = df['transportasi'].apply(categorize_emission_level)
+        time.sleep(0.1)
     
     # Filters
     filter_col1, filter_col2, filter_col3, export_col1, export_col2 = st.columns([1.8, 1.8, 1.8, 1, 1])
@@ -781,7 +823,7 @@ def show():
         else:
             selected_fakultas = []
 
-    # Apply filters 
+    # Apply filters with loading
     filtered_df = apply_filters(df, selected_days, selected_modes, selected_fakultas, df_responden)
     
     if filtered_df.empty:
@@ -799,7 +841,7 @@ def show():
     with export_col1:
         csv_data = filtered_df.to_csv(index=False)
         st.download_button(
-            "Export Raw Data",
+            "Raw Data",
             data=csv_data,
             file_name=f"transport_{len(filtered_df)}.csv",
             mime="text/csv",
@@ -811,7 +853,7 @@ def show():
         try:
             pdf_content = generate_pdf_report(filtered_df, total_emisi, avg_emisi, eco_percentage, df_responden)
             st.download_button(
-                "Export Laporan",
+                "Laporan",
                 data=pdf_content,
                 file_name=f"transport_{len(filtered_df)}.html",
                 mime="text/html",
@@ -821,294 +863,365 @@ def show():
         except Exception as e:
             st.error(f"Error generating PDF: {e}")
 
-    # Row 1: Main Charts
-    col1, col2, col3 = st.columns([1, 1, 1])
+    # Charts with loading animations
+    with loading():
+        # Row 1: Main Charts
+        col1, col2, col3 = st.columns([1, 1, 1])
 
-    with col1:
-        # Chart 1: Tren Emisi Harian
-        hari_cols = [c for c in filtered_df.columns if 'emisi_transportasi_' in c and c != 'emisi_transportasi_mingguan']
-        
-        if hari_cols:
-            daily_data = []
-            for col in hari_cols:
-                day = col.replace('emisi_transportasi_', '').capitalize()
-                total_emisi = filtered_df[col].sum()
-                daily_data.append({'hari': day, 'emisi': total_emisi})
+        with col1:
+            # Chart 1: Tren Emisi Harian
+            hari_cols = [c for c in filtered_df.columns if 'emisi_transportasi_' in c and c != 'emisi_transportasi_mingguan']
             
-            daily_df = pd.DataFrame(daily_data)
-            day_order = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
-            daily_df['order'] = daily_df['hari'].map({day: i for i, day in enumerate(day_order)})
-            daily_df = daily_df.sort_values('order')
-            
-            fig_trend = go.Figure()
-            fig_trend.add_trace(go.Scatter(
-                x=daily_df['hari'], y=daily_df['emisi'],
-                fill='tonexty', mode='lines+markers',
-                line=dict(color='#3288bd', width=2, shape='spline'), 
-                marker=dict(size=6, color='#3288bd', line=dict(color='white', width=1)),
-                fillcolor="rgba(102, 194, 165, 0.3)",
-                hovertemplate='<b>%{x}</b><br>%{y:.1f} kg CO₂<extra></extra>',
-                showlegend=False
-            ))
-            
-            fig_trend.update_layout(
-                height=235, margin=dict(t=25, b=0, l=0, r=10),
-                xaxis_title="", yaxis_title="Emisi (kg CO₂)",
-                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                title=dict(text="<b>Tren Emisi Harian</b>", x=0.38, y=0.95, 
-                          font=dict(size=11, color="#000000")),
-                xaxis=dict(showgrid=False, tickfont=dict(size=8), title=dict(text="Hari", font=dict(size=10))),
-                yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=8), title=dict(text="Total Emisi (Kg CO₂)", font=dict(size=10)))
-            )
-            st.plotly_chart(fig_trend, use_container_width=True, config={'displayModeBar': False})
-        else:
-            st.info("Data tren harian tidak tersedia")
-
-    with col2:
-        # Chart 2: Emisi per Fakultas
-        if df_responden is not None and not df_responden.empty and 'program_studi' in df_responden.columns:
-            fakultas_mapping = get_fakultas_mapping()
-            df_responden['fakultas'] = df_responden['program_studi'].map(fakultas_mapping).fillna('Lainnya')
-            
-            if 'id_responden' in df_responden.columns and 'id_responden' in filtered_df.columns:
-                df_with_fakultas = filtered_df.merge(df_responden[['id_responden', 'fakultas']], on='id_responden', how='left')
-                fakultas_stats = df_with_fakultas.groupby('fakultas')['emisi_mingguan'].agg(['sum', 'count']).reset_index()
-                fakultas_stats.columns = ['fakultas', 'total_emisi', 'count']
-                fakultas_stats = fakultas_stats[fakultas_stats['count'] >= 0].sort_values('total_emisi', ascending=True).tail(13)
+            if hari_cols:
+                daily_data = []
+                for col in hari_cols:
+                    day = col.replace('emisi_transportasi_', '').capitalize()
+                    total_emisi = filtered_df[col].sum()
+                    daily_data.append({'hari': day, 'emisi': total_emisi})
                 
-                if not fakultas_stats.empty:
-                    fig_fakultas = go.Figure()
+                daily_df = pd.DataFrame(daily_data)
+                day_order = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
+                daily_df['order'] = daily_df['hari'].map({day: i for i, day in enumerate(day_order)})
+                daily_df = daily_df.sort_values('order')
+                
+                fig_trend = go.Figure()
+                fig_trend.add_trace(go.Scatter(
+                    x=daily_df['hari'], y=daily_df['emisi'],
+                    fill='tonexty', mode='lines+markers',
+                    line=dict(color='#3288bd', width=2, shape='spline'), 
+                    marker=dict(size=6, color='#3288bd', line=dict(color='white', width=1)),
+                    fillcolor="rgba(102, 194, 165, 0.3)",
+                    hovertemplate='<b>%{x}</b><br>%{y:.1f} kg CO₂<extra></extra>',
+                    showlegend=False
+                ))
+                
+                fig_trend.update_layout(
+                    height=235, margin=dict(t=25, b=0, l=0, r=10),
+                    xaxis_title="", yaxis_title="Emisi (kg CO₂)",
+                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                    title=dict(text="<b>Tren Emisi Harian</b>", x=0.38, y=0.95, 
+                              font=dict(size=11, color="#000000")),
+                    xaxis=dict(showgrid=False, tickfont=dict(size=8), title=dict(text="Hari", font=dict(size=10))),
+                    yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=8), title=dict(text="Total Emisi (Kg CO₂)", font=dict(size=10)))
+                )
+                st.plotly_chart(fig_trend, use_container_width=True, config={'displayModeBar': False})
+            else:
+                st.info("Data tren harian tidak tersedia")
+
+        with col2:
+            # Chart 2: Emisi per Fakultas
+            if df_responden is not None and not df_responden.empty and 'program_studi' in df_responden.columns:
+                fakultas_mapping = get_fakultas_mapping()
+                df_responden['fakultas'] = df_responden['program_studi'].map(fakultas_mapping).fillna('Lainnya')
+                
+                if 'id_responden' in df_responden.columns and 'id_responden' in filtered_df.columns:
+                    df_with_fakultas = filtered_df.merge(df_responden[['id_responden', 'fakultas']], on='id_responden', how='left')
+                    fakultas_stats = df_with_fakultas.groupby('fakultas')['emisi_mingguan'].agg(['sum', 'count']).reset_index()
+                    fakultas_stats.columns = ['fakultas', 'total_emisi', 'count']
+                    fakultas_stats = fakultas_stats[fakultas_stats['count'] >= 0].sort_values('total_emisi', ascending=True).tail(13)
                     
-                    # Use color gradient based on emission level
-                    max_emisi = fakultas_stats['total_emisi'].max()
-                    min_emisi = fakultas_stats['total_emisi'].min()
+                    if not fakultas_stats.empty:
+                        fig_fakultas = go.Figure()
+                        
+                        # Use color gradient based on emission level
+                        max_emisi = fakultas_stats['total_emisi'].max()
+                        min_emisi = fakultas_stats['total_emisi'].min()
+                        
+                        for i, (_, row) in enumerate(fakultas_stats.iterrows()):
+                            if max_emisi > min_emisi:
+                                ratio = (row['total_emisi'] - min_emisi) / (max_emisi - min_emisi)
+                                color_palette = ['#66c2a5', '#abdda4', '#fdae61', '#f46d43', '#d53e4f', '#9e0142']
+                                color_idx = int(ratio * (len(color_palette) - 1))
+                                color = color_palette[color_idx]
+                            else:
+                                color = MAIN_PALETTE[i % len(MAIN_PALETTE)]
+                            
+                            fig_fakultas.add_trace(go.Bar(
+                                x=[row['total_emisi']], 
+                                y=[row['fakultas']], 
+                                orientation='h',
+                                marker=dict(color=color), 
+                                showlegend=False,
+                                text=[f"{row['total_emisi']:.1f}"], 
+                                textposition='inside',
+                                textfont=dict(color='white', size=7, weight='bold'),
+                                hovertemplate=f'<b>{row["fakultas"]}</b><br>Total: {row["total_emisi"]:.1f} kg CO₂<br>Mahasiswa: {row["count"]}<extra></extra>'
+                            ))
+                        
+                        fig_fakultas.update_layout(
+                            height=235, margin=dict(t=25, b=0, l=0, r=20),
+                            title=dict(text="<b>Emisi per Fakultas</b>", x=0.35, y=0.95,
+                                      font=dict(size=11, color="#000000")),
+                            paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                            xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=8), title=dict(text="Total Emisi (kg CO₂)", font=dict(size=10))),
+                            yaxis=dict(tickfont=dict(size=8), title=dict(text="Fakultas/Sekolah", font=dict(size=10)))
+                        )
+                        
+                        st.plotly_chart(fig_fakultas, use_container_width=True, config={'displayModeBar': False})
+                    else:
+                        st.info("Data fakultas tidak cukup (min 2 mahasiswa)")
+                else:
+                    st.info("Data fakultas tidak dapat digabungkan")
+
+        with col3:
+            # Chart 3: Komposisi Moda Transportasi - Donut Chart (SAME AS ELECTRONIC)
+            transport_counts = filtered_df['transportasi'].value_counts()
+            colors = [TRANSPORT_COLORS.get(mode, MAIN_PALETTE[i % len(MAIN_PALETTE)]) 
+                     for i, mode in enumerate(transport_counts.index)]
+            
+            fig_donut = go.Figure(data=[go.Pie(
+                labels=transport_counts.index,
+                values=transport_counts.values,
+                hole=0.45,
+                marker=dict(colors=colors, line=dict(color='#FFFFFF', width=2)),
+                textposition='outside',
+                textinfo='label+percent',
+                textfont=dict(size=8, family="Poppins"),
+                hovertemplate='<b>%{label}</b><br>%{value} pengguna (%{percent})<extra></extra>'
+            )])
+            
+            
+            fig_donut.update_layout(
+                height=235, margin=dict(t=25, b=5, l=5, r=5), showlegend=False,
+                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                title=dict(text="<b>Komposisi Moda Transportasi</b>", x=0.27, y=0.95, 
+                          font=dict(size=11, color="#000000"))
+            )
+            st.plotly_chart(fig_donut, use_container_width=True, config={'displayModeBar': False})
+
+        time.sleep(0.2)  # Small delay for charts rendering
+
+    # Row 2: Secondary Charts with loading - UPDATED LAYOUT
+    with loading():
+        col1, col2, col3 = st.columns([1, 1, 1])
+
+        with col1:
+            # Chart 4: Heatmap Hari vs Moda Transportasi (count users, not emission) - FIXED AXES
+            hari_cols = [c for c in filtered_df.columns if 'emisi_transportasi_' in c and c != 'emisi_transportasi_mingguan']
+            
+            if hari_cols:
+                transport_day_data = []
+                for mode in filtered_df['transportasi'].unique():
+                    mode_data = filtered_df[filtered_df['transportasi'] == mode]
+                    for col in hari_cols:
+                        day = col.replace('emisi_transportasi_', '').capitalize()
+                        users_count = (mode_data[col] > 0).sum()
+                        transport_day_data.append({
+                            'transportasi': mode,
+                            'hari': day, 
+                            'pengguna': users_count
+                        })
+                
+                heatmap_df = pd.DataFrame(transport_day_data)
+                day_order = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
+                
+                # FIXED: pivot dengan hari sebagai index, transportasi sebagai columns
+                pivot_df = heatmap_df.pivot(index='hari', columns='transportasi', values='pengguna').fillna(0)
+                pivot_df = pivot_df.reindex(index=day_order, fill_value=0)
+                
+                # Ambil top 6 transportasi berdasarkan total penggunaan
+                top_modes = pivot_df.sum(axis=0).nlargest(6).index
+                pivot_df_filtered = pivot_df[top_modes]
+                
+                fig_heatmap = go.Figure(data=go.Heatmap(
+                    z=pivot_df_filtered.values,
+                    x=pivot_df_filtered.columns,
+                    y=pivot_df_filtered.index,   
+                    colorscale=[[0, '#fee08b'], [0.25, '#fdae61'], [0.5, '#f46d43'], [0.75, '#d53e4f'], [1, '#9e0142']],
+                    hoverongaps=False,
+                    hovertemplate='<b>%{x}</b><br>%{y}: %{z} pengguna<extra></extra>',
+                    colorbar=dict(
+                        title=dict(text="Pengguna", font=dict(size=9)),
+                        tickfont=dict(size=8),
+                        thickness=15,
+                        len=0.7
+                    ),
+                    xgap=1, ygap=1,  
+                    zmin=0
+                ))
+                
+                fig_heatmap.update_layout(
+                    height=235, margin=dict(t=30, b=0, l=0, r=0),
+                    title=dict(text="<b>Heatmap Penggunaan Moda Transportasi per Hari</b>", x=0.15, y=0.95, 
+                            font=dict(size=11, color="#000000")),
+                    xaxis=dict(tickfont=dict(size=8), tickangle=0, title=dict(text="Moda Transportasi", font=dict(size=10))),
+                    yaxis=dict(tickfont=dict(size=8), title=dict(text="Hari", font=dict(size=10))),
+                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
+                )
+                st.plotly_chart(fig_heatmap, use_container_width=True, config={'displayModeBar': False})
+            else:
+                st.info("Data pola harian tidak tersedia")
+
+        with col2:
+            # Chart 5: Box Plot Distribusi Emisi per Responden - Untuk Identifikasi Outlier
+            if 'id_responden' in filtered_df.columns and not filtered_df.empty:
+                valid_df = filtered_df[filtered_df['id_responden'].notna() & 
+                                     (filtered_df['id_responden'] != '') & 
+                                     (filtered_df['emisi_mingguan'].notna()) &
+                                     (filtered_df['emisi_mingguan'] > 0)]
+                
+                if len(valid_df) > 0:
+                    fig_boxplot = go.Figure()
                     
-                    for i, (_, row) in enumerate(fakultas_stats.iterrows()):
+                    # Get top transport modes untuk perbandingan yang meaningful
+                    top_modes = valid_df['transportasi'].value_counts().head(5).index.tolist()
+                    
+                    colors_box = []
+                    for i, mode in enumerate(top_modes):
+                        color = TRANSPORT_COLORS.get(mode, MAIN_PALETTE[i % len(MAIN_PALETTE)])
+                        colors_box.append(color)
+                        
+                        mode_data = valid_df[valid_df['transportasi'] == mode]['emisi_mingguan']
+                        
+                        q1 = mode_data.quantile(0.25)
+                        q2 = mode_data.quantile(0.5)  
+                        q3 = mode_data.quantile(0.75)
+                        iqr = q3 - q1
+                        lower_fence = q1 - 1.5 * iqr
+                        upper_fence = q3 + 1.5 * iqr
+                        
+                        # Count outliers for this mode
+                        outliers_count = len(mode_data[(mode_data > upper_fence) | (mode_data < lower_fence)])
+                        
+                        fig_boxplot.add_trace(go.Box(
+                            y=mode_data,
+                            name=mode,
+                            marker_color=color,
+                            boxpoints='outliers',  
+                            pointpos=-1.8,
+                            marker=dict(
+                                size=6,
+                                line=dict(width=1, color='white'),
+                                opacity=0.9
+                            ),
+                            line=dict(width=2),
+                            fillcolor=f"rgba{tuple(list(int(color[1:][i:i+2], 16) for i in (0, 2, 4)) + [0.4])}",
+                            hovertemplate=f'<b>{mode}</b><br>' +
+                                        'Median: %{median:.1f} kg CO₂<br>' +
+                                        f'Outlier: {outliers_count} responden<br>' +
+                                        'Nilai: %{y:.1f} kg CO₂<extra></extra>'
+                        ))
+                    
+                    # Calculate overall statistics untuk insight
+                    all_emissions = valid_df['emisi_mingguan']
+                    Q1_all = all_emissions.quantile(0.25)
+                    Q3_all = all_emissions.quantile(0.75)
+                    IQR_all = Q3_all - Q1_all
+                    lower_fence_all = Q1_all - 1.5 * IQR_all
+                    upper_fence_all = Q3_all + 1.5 * IQR_all
+                    
+                    outliers_high = len(all_emissions[all_emissions > upper_fence_all])
+                    outliers_low = len(all_emissions[all_emissions < lower_fence_all])
+                    median_val = all_emissions.median()
+                    
+                    fig_boxplot.update_layout(
+                        height=235, margin=dict(t=25, b=5, l=5, r=5),
+                        title=dict(text="<b>Distribusi Emisi per Moda Transportasi</b>", x=0.20, y=0.95, 
+                                  font=dict(size=11, color="#000000")),
+                        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                        xaxis=dict(
+                            showgrid=False, 
+                            tickfont=dict(size=8), 
+                            title=dict(text="Moda Transportasi", font=dict(size=10))
+                        ),
+                        yaxis=dict(
+                            showgrid=True, 
+                            gridcolor='rgba(0,0,0,0.1)', 
+                            tickfont=dict(size=8), 
+                            title=dict(text="Emisi Mingguan (kg CO₂)", font=dict(size=10))
+                        ),
+                        showlegend=False
+                    )
+                    
+                    st.plotly_chart(fig_boxplot, use_container_width=True, config={'displayModeBar': False})
+                        
+                else:
+                    st.info("Tidak ada data emisi yang valid")
+            else:
+                st.info("Data responden tidak tersedia")
+
+        with col3:
+            # MOVED: Chart 6: Emisi per Kecamatan - Vertical Bar Chart
+            if 'kecamatan' in filtered_df.columns:
+                kecamatan_stats = filtered_df.groupby('kecamatan')['emisi_mingguan'].agg(['mean', 'count', 'sum']).reset_index()
+                kecamatan_stats.columns = ['kecamatan', 'rata_rata_emisi', 'jumlah_mahasiswa', 'total_emisi']
+                
+                kecamatan_filtered = kecamatan_stats[kecamatan_stats['jumlah_mahasiswa'] >= 0].sort_values('rata_rata_emisi', ascending=False)
+                
+                if not kecamatan_filtered.empty:
+                    kecamatan_display = kecamatan_filtered.nlargest(8, 'jumlah_mahasiswa').sort_values('rata_rata_emisi', ascending=False)
+                    
+                    fig_kecamatan = go.Figure()
+                    
+                    max_emisi = kecamatan_display['rata_rata_emisi'].max()
+                    min_emisi = kecamatan_display['rata_rata_emisi'].min()
+                    
+                    for i, (_, row) in enumerate(kecamatan_display.iterrows()):
                         if max_emisi > min_emisi:
-                            ratio = (row['total_emisi'] - min_emisi) / (max_emisi - min_emisi)
-                            color_palette = ['#66c2a5', '#abdda4', '#fdae61', '#f46d43', '#d53e4f', '#9e0142']
-                            color_idx = int(ratio * (len(color_palette) - 1))
-                            color = color_palette[color_idx]
+                            ratio = (row['rata_rata_emisi'] - min_emisi) / (max_emisi - min_emisi)
+                            sequential_warm = ['#fee08b', '#fdae61', '#f46d43', '#d53e4f', '#9e0142']
+                            color_idx = int(ratio * (len(sequential_warm) - 1))
+                            color = sequential_warm[color_idx]
                         else:
                             color = MAIN_PALETTE[i % len(MAIN_PALETTE)]
                         
-                        fig_fakultas.add_trace(go.Bar(
-                            x=[row['total_emisi']], 
-                            y=[row['fakultas']], 
-                            orientation='h',
-                            marker=dict(color=color), 
+                        # Shorten kecamatan names for display
+                        display_name = row['kecamatan'] if len(row['kecamatan']) <= 10 else row['kecamatan'][:8] + '..'
+                        
+                        fig_kecamatan.add_trace(go.Bar(
+                            x=[display_name], 
+                            y=[row['rata_rata_emisi']], 
+                            marker=dict(color=color, line=dict(color='white', width=1)), 
                             showlegend=False,
-                            text=[f"{row['total_emisi']:.1f}"], 
+                            text=[f"{row['rata_rata_emisi']:.1f}"], 
                             textposition='inside',
-                            textfont=dict(color='white', size=7, weight='bold'),
-                            hovertemplate=f'<b>{row["fakultas"]}</b><br>Total: {row["total_emisi"]:.1f} kg CO₂<br>Mahasiswa: {row["count"]}<extra></extra>'
+                            textfont=dict(color='#2d3748', size=8, weight='bold'),
+                            hovertemplate=f'<b>{row["kecamatan"]}</b><br>Rata-rata: {row["rata_rata_emisi"]:.1f} kg CO₂<br>Mahasiswa: {row["jumlah_mahasiswa"]}<br>Total: {row["total_emisi"]:.1f} kg CO₂<extra></extra>',
+                            name=row['kecamatan']
                         ))
                     
-                    fig_fakultas.update_layout(
-                        height=235, margin=dict(t=25, b=0, l=0, r=20),
-                        title=dict(text="<b>Emisi per Fakultas</b>", x=0.35, y=0.95,
-                                  font=dict(size=11, color="#000000")),
-                        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                        xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=8), title=dict(text="Total Emisi (kg CO₂)", font=dict(size=10))),
-                        yaxis=dict(tickfont=dict(size=8), title=dict(text="Fakultas/Sekolah", font=dict(size=10)))
+                    # Add average line for reference
+                    avg_emisi = kecamatan_display['rata_rata_emisi'].mean()
+                    fig_kecamatan.add_hline(
+                        y=avg_emisi,
+                        line_dash="dash",
+                        line_color="#5e4fa2",
+                        line_width=2,
+                        annotation_text=f"Rata-rata: {avg_emisi:.1f}",
+                        annotation_position="top right",
+                        annotation=dict(
+                            bgcolor="white", 
+                            bordercolor="#5e4fa2", 
+                            borderwidth=1,
+                            font=dict(size=8)
+                        )
                     )
                     
-                    st.plotly_chart(fig_fakultas, use_container_width=True, config={'displayModeBar': False})
+                    fig_kecamatan.update_layout(
+                        height=235, margin=dict(t=25, b=0, l=0, r=10),
+                        title=dict(text="<b>Emisi per Kecamatan</b>", x=0.35, y=0.95, 
+                                  font=dict(size=11, color="#000000")),
+                        xaxis=dict(
+                            title=dict(text="Kecamatan", font=dict(size=10)), 
+                            showgrid=False, 
+                            tickfont=dict(size=8),
+                        ),
+                        yaxis=dict(
+                            title=dict(text="Rata-Rata Emisi (kg CO₂)", font=dict(size=10)), 
+                            showgrid=True, 
+                            gridcolor='rgba(0,0,0,0.1)', 
+                            tickfont=dict(size=8)
+                        ),
+                        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                        showlegend=False
+                    )
+                    st.plotly_chart(fig_kecamatan, use_container_width=True, config={'displayModeBar': False})
                 else:
-                    st.info("Data fakultas tidak cukup (min 2 mahasiswa)")
+                    st.info("Data kecamatan tidak mencukupi untuk analisis")
             else:
-                st.info("Data fakultas tidak dapat digabungkan")
+                st.info("Data kecamatan tidak tersedia")
 
-    with col3:
-        # Chart 3: Komposisi Moda Transportasi - Donut Chart (SAME AS ELECTRONIC)
-        transport_counts = filtered_df['transportasi'].value_counts()
-        colors = [TRANSPORT_COLORS.get(mode, MAIN_PALETTE[i % len(MAIN_PALETTE)]) 
-                 for i, mode in enumerate(transport_counts.index)]
-        
-        fig_donut = go.Figure(data=[go.Pie(
-            labels=transport_counts.index,
-            values=transport_counts.values,
-            hole=0.45,
-            marker=dict(colors=colors, line=dict(color='#FFFFFF', width=2)),
-            textposition='outside',
-            textinfo='label+percent',
-            textfont=dict(size=8, family="Poppins"),
-            hovertemplate='<b>%{label}</b><br>%{value} pengguna (%{percent})<extra></extra>'
-        )])
-        
-        
-        fig_donut.update_layout(
-            height=235, margin=dict(t=25, b=5, l=5, r=5), showlegend=False,
-            paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-            title=dict(text="<b>Komposisi Moda Transportasi</b>", x=0.27, y=0.95, 
-                      font=dict(size=11, color="#000000"))
-        )
-        st.plotly_chart(fig_donut, use_container_width=True, config={'displayModeBar': False})
-
-    # Row 2: Secondary Charts
-    col1, col2, col3 = st.columns([1, 1, 1])
-
-    with col1:
-        # Chart 4: Heatmap Penggunaan Transportasi vs Hari (count users, not emission)
-        hari_cols = [c for c in filtered_df.columns if 'emisi_transportasi_' in c and c != 'emisi_transportasi_mingguan']
-        
-        if hari_cols:
-            transport_day_data = []
-            for mode in filtered_df['transportasi'].unique():
-                mode_data = filtered_df[filtered_df['transportasi'] == mode]
-                for col in hari_cols:
-                    day = col.replace('emisi_transportasi_', '').capitalize()
-                    users_count = (mode_data[col] > 0).sum()
-                    transport_day_data.append({
-                        'transportasi': mode,
-                        'hari': day, 
-                        'pengguna': users_count
-                    })
-            
-            heatmap_df = pd.DataFrame(transport_day_data)
-            day_order = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
-            
-            pivot_df = heatmap_df.pivot(index='transportasi', columns='hari', values='pengguna').fillna(0)
-            pivot_df = pivot_df.reindex(columns=day_order, fill_value=0)
-            
-            top_modes = pivot_df.sum(axis=1).nlargest(6).index
-            pivot_df_filtered = pivot_df.loc[top_modes]
-            
-            fig_heatmap = go.Figure(data=go.Heatmap(
-                z=pivot_df_filtered.values,
-                x=pivot_df_filtered.columns,
-                y=pivot_df_filtered.index,
-                colorscale=[[0, '#fee08b'], [0.25, '#fdae61'], [0.5, '#f46d43'], [0.75, '#d53e4f'], [1, '#9e0142']],
-                hoverongaps=False,
-                hovertemplate='<b>%{y}</b><br>%{x}: %{z} pengguna<extra></extra>',
-                colorbar=dict(
-                    title=dict(text="Pengguna", font=dict(size=9)),
-                    tickfont=dict(size=8),
-                    thickness=15,
-                    len=0.7
-                ),
-                xgap=1, ygap=1,  
-                zmin=0
-            ))
-            
-            fig_heatmap.update_layout(
-                height=235, margin=dict(t=30, b=0, l=0, r=0),
-                title=dict(text="<b>Pola Penggunaan Transportasi per Hari</b>", x=0.2, y=0.95, 
-                        font=dict(size=11, color="#000000")),
-                xaxis=dict(tickfont=dict(size=8), tickangle=-45, title=dict(text="Hari", font=dict(size=10))),
-                yaxis=dict(tickfont=dict(size=8), title=dict(text="Moda Transportasi", font=dict(size=10))),
-                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
-            )
-            st.plotly_chart(fig_heatmap, use_container_width=True, config={'displayModeBar': False})
-        else:
-            st.info("Data pola harian tidak tersedia")
-
-    with col2:
-        # Chart 5: Emisi per Kecamatan
-        if 'kecamatan' in filtered_df.columns:
-            kecamatan_stats = filtered_df.groupby('kecamatan')['emisi_mingguan'].agg(['mean', 'count', 'sum']).reset_index()
-            kecamatan_stats.columns = ['kecamatan', 'rata_rata_emisi', 'jumlah_mahasiswa', 'total_emisi']
-            
-            kecamatan_filtered = kecamatan_stats[kecamatan_stats['jumlah_mahasiswa'] >= 0].sort_values('rata_rata_emisi', ascending=True)
-            
-            if not kecamatan_filtered.empty:
-                kecamatan_display = kecamatan_filtered.nlargest(8, 'jumlah_mahasiswa').sort_values('rata_rata_emisi')
-                
-                fig_kecamatan = go.Figure()
-                
-                max_emisi = kecamatan_display['rata_rata_emisi'].max()
-                min_emisi = kecamatan_display['rata_rata_emisi'].min()
-                
-                for i, (_, row) in enumerate(kecamatan_display.iterrows()):
-                    if max_emisi > min_emisi:
-                        ratio = (row['rata_rata_emisi'] - min_emisi) / (max_emisi - min_emisi)
-                        sequential_warm = ['#fee08b', '#fdae61', '#f46d43', '#d53e4f', '#9e0142']
-                        color_idx = int(ratio * (len(sequential_warm) - 1))
-                        color = sequential_warm[color_idx]
-                    else:
-                        color = MAIN_PALETTE[i % len(MAIN_PALETTE)]
-                    
-                    fig_kecamatan.add_trace(go.Bar(
-                        x=[row['rata_rata_emisi']], 
-                        y=[row['kecamatan']], 
-                        orientation='h',
-                        marker=dict(color=color), 
-                        showlegend=False,
-                        text=[f"{row['rata_rata_emisi']:.1f}"], 
-                        textposition='inside',
-                        textfont=dict(color='white', size=7, weight='bold'),
-                        hovertemplate=f'<b>{row["kecamatan"]}</b><br>Rata-rata: {row["rata_rata_emisi"]:.1f} kg CO₂<br>Mahasiswa: {row["jumlah_mahasiswa"]}<br>Total: {row["total_emisi"]:.1f} kg CO₂<extra></extra>'
-                    ))
-                
-                fig_kecamatan.update_layout(
-                    height=235, margin=dict(t=25, b=5, l=0, r=0),
-                    title=dict(text="<b>Emisi per Kecamatan</b>", x=0.35, y=0.95, 
-                              font=dict(size=11, color="#000000")),
-                    xaxis=dict(title=dict(text="Rata-Rata Emisi (kg CO₂)", font=dict(size=10)), showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=7)),
-                    yaxis=dict(tickfont=dict(size=8), title=dict(text="Kecamatan", font=dict(size=10))),
-                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
-                )
-                st.plotly_chart(fig_kecamatan, use_container_width=True, config={'displayModeBar': False})
-            else:
-                st.info("Data kecamatan tidak mencukupi untuk analisis")
-        else:
-            st.info("Data kecamatan tidak tersedia")
-
-    with col3:
-        # Chart 6: Stacked Bar - Emisi Harian per Moda Transportasi
-        hari_cols = [c for c in filtered_df.columns if 'emisi_transportasi_' in c and c != 'emisi_transportasi_mingguan']
-        
-        if hari_cols:
-            top_modes = filtered_df.groupby('transportasi')['emisi_mingguan'].sum().nlargest(5).index
-            
-            stack_data = []
-            day_order = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
-            
-            for i, mode in enumerate(top_modes):
-                mode_data = filtered_df[filtered_df['transportasi'] == mode]
-                if not mode_data.empty:
-                    daily_emissions = []
-                    for col in hari_cols:
-                        day = col.replace('emisi_transportasi_', '').capitalize()
-                        total_emisi = mode_data[col].sum()
-                        daily_emissions.append(total_emisi)
-                    
-                    color = TRANSPORT_COLORS.get(mode, MAIN_PALETTE[i % len(MAIN_PALETTE)])
-                    
-                    stack_data.append({
-                        'mode': mode,
-                        'emissions': daily_emissions,
-                        'color': color
-                    })
-            
-            if stack_data:
-                fig_stack = go.Figure()
-                
-                for data in stack_data:
-                    fig_stack.add_trace(go.Bar(
-                        name=data['mode'],
-                        x=day_order,
-                        y=data['emissions'],
-                        marker=dict(color=data['color']),
-                        hovertemplate=f'<b>{data["mode"]}</b><br>%{{x}}: %{{y:.1f}} kg CO₂<extra></extra>'
-                    ))
-                
-                fig_stack.update_layout(
-                    height=235, margin=dict(t=25, b=5, l=5, r=5),
-                    title=dict(text="<b>Emisi Harian per Moda</b>", x=0.35, y=0.95, 
-                              font=dict(size=11, color="#000000")),
-                    xaxis=dict(title=dict(text="Hari", font=dict(size=10)), tickfont=dict(size=8)),
-                    yaxis=dict(title=dict(text="Total Emisi (kg CO₂)", font=dict(size=10)), tickfont=dict(size=8)),
-                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                    barmode='stack',
-                    showlegend=True,
-                    legend=dict(x=0.8, y=0.98, font=dict(size=8))
-                )
-                st.plotly_chart(fig_stack, use_container_width=True, config={'displayModeBar': False})
-            else:
-                st.info("Data moda transportasi tidak tersedia")
-        else:
-            st.info("Data harian tidak tersedia")
+        time.sleep(0.2)  # Small delay for final charts
 
 if __name__ == "__main__":
     show()
