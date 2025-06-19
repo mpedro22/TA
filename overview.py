@@ -901,7 +901,7 @@ def show():
             ))
             
             fig_heatmap.update_layout(
-                title=dict(text="<b>Heatmap Kategori vs Fakultas</b>", x=0.5, y=0.95,
+                title=dict(text="<b>Heatmap Kategori vs Fakultas</b>", x=0.35, y=0.95,
                           font=dict(size=12, color="#000000")),
                 height=200, margin=dict(t=25, b=5, l=5, r=35),
                 font=dict(size=7), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
