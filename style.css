@@ -44,9 +44,86 @@ div.block-container {
     display: none !important;
 }
 
-/* ===========================================
-   STREAMLIT SIDEBAR FIX - PERMANENT SIDEBAR
-   =========================================== */
+/* Card container kustom untuk setiap chart */
+.chart-card {
+    background: rgba(255, 255, 255, 0.95) !important;
+    backdrop-filter: blur(20px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06) !important;
+    padding: 0.75rem 1rem 0.5rem 1rem !important;
+    margin-bottom: 0.5rem !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.chart-card:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 12px 25px rgba(5, 150, 105, 0.15) !important;
+}
+
+/* Header di dalam card (judul + tombol) */
+.chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.25rem;
+}
+
+.chart-header .stMarkdown {
+    margin-bottom: 0 !important;
+}
+
+/* Judul chart kustom */
+.chart-title {
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    color: #1f2937 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    line-height: 1.2 !important;
+}
+
+/* Tombol "Lihat" */
+.chart-card .stButton button {
+    background: #e9ecef !important;
+    color: #495057 !important;
+    border: none !important;
+    border-radius: 20px !important;
+    padding: 4px 12px !important;
+    font-size: 10px !important;
+    font-weight: 600 !important;
+    height: 26px !important;
+    line-height: 1 !important;
+    transition: all 0.2s ease;
+}
+
+.chart-card .stButton button:hover {
+    background: #d1d5db !important;
+    color: #212529 !important;
+    transform: scale(1.05);
+}
+
+/* Membuat chart Plotly di dalam card menjadi seamless */
+.chart-card .stPlotlyChart {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin-top: -1rem; 
+    margin-bottom: 0 !important;
+}
+
+/* Styling untuk Dialog (Pop-up) */
+div[data-testid="stDialog"] .stHeadingContainer h1 {
+    font-size: 1.5rem !important;
+    font-weight: 600 !important;
+    color: #1e293b;
+    font-family: 'Poppins', sans-serif !important;
+}
+
+div[data-testid="stDialog"] .stPlotlyChart {
+    background: transparent !important;
+}
 
 /* Hide ALL sidebar controls: toggle buttons, close buttons, resize handles */
 button[data-testid="collapsedControl"],
@@ -484,6 +561,11 @@ section[data-testid="stSidebar"] * {
 }
 
 /* Sidebar styling */
+.stSidebar {
+    display: flex !important;
+    flex-direction: column !important;
+}
+
 .stSidebar .element-container {
     margin: 0 !important;
     padding: 0 !important;
@@ -501,6 +583,23 @@ section[data-testid="stSidebar"] * {
 
 .stSidebar > div:first-child {
     overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100vh !important;
+}
+
+/* Logout and Auth Buttons */
+.stSidebar .stButton > button[key="logout"], 
+.stSidebar .stButton > button[key="logout_user"] {
+    background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%) !important;
+    /* ... */
+    margin-bottom: 0 !important;
+}
+
+.stSidebar .stButton > button[key="add_account"] {
+    background: linear-gradient(135deg, #059669 0%, #10b981 100%) !important;
+    /* ... */
+    margin-bottom: 0 !important;
 }
 
 .nav-menu > div {
@@ -541,7 +640,7 @@ div[data-testid="stButton"] > button:hover {
     color: #374151 !important;
 }
 
-/* Active navigation item - LEFT ALIGNED */
+/* Active navigation item */
 .nav-item-active {
     padding: 0 16px !important;
     color: #059669 !important; 
@@ -701,6 +800,90 @@ div[data-testid="stButton"] > button:hover {
     box-shadow: 0 4px 8px rgba(5, 150, 105, 0.3) !important;
     transform: translateY(-1px) !important;
     color: white !important;
+}
+
+/* Logout and Auth Buttons */
+.stButton > button[key="logout"], 
+.stButton > button[key="logout_user"] {
+    background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-weight: 500 !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 2px 4px rgba(220, 38, 38, 0.2) !important;
+    font-family: 'Poppins', sans-serif !important;
+    height: 36px !important;
+    font-size: 0.875rem !important;
+}
+
+.stButton > button[key="logout"]:hover, 
+.stButton > button[key="logout_user"]:hover {
+    background: linear-gradient(135deg, #b91c1c 0%, #dc2626 100%) !important;
+    box-shadow: 0 4px 8px rgba(220, 38, 38, 0.3) !important;
+    transform: translateY(-1px) !important;
+    color: white !important;
+}
+
+.stButton > button[key="add_account"] {
+    background: linear-gradient(135deg, #059669 0%, #10b981 100%) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-weight: 500 !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 2px 4px rgba(5, 150, 105, 0.2) !important;
+    font-family: 'Poppins', sans-serif !important;
+    height: 36px !important;
+    font-size: 0.875rem !important;
+}
+
+.stButton > button[key="add_account"]:hover {
+    background: linear-gradient(135deg, #047857 0%, #059669 100%) !important;
+    box-shadow: 0 4px 8px rgba(5, 150, 105, 0.3) !important;
+    transform: translateY(-1px) !important;
+    color: white !important;
+}
+
+/* Form Submit Buttons */
+.stForm button[type="submit"][kind="primaryFormSubmit"],
+.stForm button[kind="primary"] {
+    /* styles */
+    height: 40px !important;
+}
+.stForm button[kind="primary"] {
+    background: linear-gradient(135deg, #059669 0%, #10b981 100%) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-weight: 500 !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 2px 4px rgba(5, 150, 105, 0.2) !important;
+    font-family: 'Poppins', sans-serif !important;
+}
+
+.stForm button[kind="primary"]:hover {
+    background: linear-gradient(135deg, #047857 0%, #059669 100%) !important;
+    box-shadow: 0 4px 8px rgba(5, 150, 105, 0.3) !important;
+    transform: translateY(-1px) !important;
+    color: white !important;
+}
+
+.stForm button:not([kind="primary"]) {
+    background: #f8f9fa !important;
+    color: #6c757d !important;
+    border: 1px solid #dee2e6 !important;
+    border-radius: 8px !important;
+    font-weight: 500 !important;
+    transition: all 0.2s ease !important;
+    font-family: 'Poppins', sans-serif !important;
+}
+
+.stForm button:not([kind="primary"]):hover {
+    background: #e9ecef !important;
+    color: #495057 !important;
+    border-color: #adb5bd !important;
+    transform: translateY(-1px) !important;
 }
 
 /* KPI Cards */

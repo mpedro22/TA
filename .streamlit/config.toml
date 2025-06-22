@@ -1,0 +1,27 @@
+﻿# .streamlit/config.toml
+[server]
+runOnSave = true
+port = 8501
+headless = false
+fileWatcherType = poll
+
+[logger]
+level = debug
+
+[browser]
+gatherUsageStats = false
+serverAddress = "localhost"
+
+[theme]
+base = "light"
+primaryColor = "#16a34a"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f0f2f6"
+
+[runner]
+magicEnabled = true
+installTracer = true
+
+# For faster development
+[global]
+developmentMode = true

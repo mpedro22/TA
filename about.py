@@ -27,197 +27,240 @@ def show():
         """, unsafe_allow_html=True)
         time.sleep(0.2)
 
-    # CSS untuk layout yang lebih compact dan static
+    # CSS untuk styling cards - compact
     st.markdown("""
     <style>
-    .compact-section {
-        background: linear-gradient(145deg, rgba(255,255,255,0.95), rgba(248,250,252,0.9));
+    /* Override streamlit default spacing */
+    .stColumns {
+        gap: 0.6rem !important;
+    }
+    
+    .about-card {
+        background: rgba(255, 255, 255, 0.95);
         backdrop-filter: blur(10px);
-        border-radius: 12px;
-        padding: 1rem;
-        box-shadow: 0 4px 15px rgba(5, 150, 105, 0.1);
-        border: 1px solid rgba(34, 197, 94, 0.2);
-        margin-bottom: 0.8rem;
-        border-left: 4px solid var(--border-color);
+        border-radius: 10px;
+        padding: 0.8rem;
+        box-shadow: 0 3px 12px rgba(5, 150, 105, 0.08);
+        border: 1px solid rgba(34, 197, 94, 0.15);
+        margin-bottom: 0.6rem;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
     }
-    .compact-section-desc {
-        background: linear-gradient(145deg, #059669, #16a34a);
+    
+    .hero-card {
+        background: linear-gradient(135deg, #059669, #16a34a);
         color: white;
-        --border-color: #059669;
+        text-align: center;
+        border: none;
+        margin-bottom: 0.6rem;
     }
-    .compact-section-cards {
-        --border-color: #16a34a;
+    
+    .content-card {
+        border-left: 4px solid #16a34a;
+        margin-bottom: 0;
     }
-    .compact-section-fitur {
-        --border-color: #22c55e;
+    
+    .pages-card {
+        border-left: 4px solid #22c55e;
+        margin-bottom: 0.6rem;
     }
-    .compact-title {
-        font-size: 1rem;
+    
+    .features-card {
+        border-left: 4px solid #34d399;
+        background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(240,253,244,0.9));
+        margin-bottom: 0;
+    }
+    
+    .card-title {
+        font-size: 0.95rem;
         font-weight: 700;
         color: #059669;
         margin-bottom: 0.6rem;
-        text-align: center;
         text-transform: uppercase;
         letter-spacing: 0.5px;
         font-family: 'Poppins', sans-serif;
+        text-align: center;
     }
-    .compact-title-white {
+    
+    .card-title-white {
         color: white !important;
     }
-    .compact-desc {
-        font-size: 0.85rem;
+    
+    .card-desc {
+        font-size: 0.8rem;
         line-height: 1.4;
         color: rgba(255,255,255,0.95);
         text-align: justify;
         font-family: 'Poppins', sans-serif;
+        margin-bottom: 0;
     }
-    .compact-card {
-        background: var(--card-bg);
-        border-radius: 8px;
-        padding: 0.8rem;
-        margin-bottom: 0.6rem;
-        border-left: 3px solid var(--card-border);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    
+    .card-desc-dark {
+        color: #374151;
     }
-    .compact-card-title {
-        font-size: 0.8rem;
+    
+    .item-box {
+        background: var(--box-bg);
+        border-radius: 6px;
+        padding: 0.6rem;
+        margin-bottom: 0.5rem;
+        border-left: 3px solid var(--box-border);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+        transition: transform 0.2s ease;
+    }
+    
+    .item-box:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    .item-box:last-child {
+        margin-bottom: 0;
+    }
+    
+    .item-title {
+        font-size: 0.75rem;
         font-weight: 600;
-        color: var(--title-color);
-        margin-bottom: 0.4rem;
+        color: var(--item-title-color);
+        margin-bottom: 0.3rem;
         font-family: 'Poppins', sans-serif;
     }
-    .compact-card-desc {
-        font-size: 0.7rem;
+    
+    .item-desc {
+        font-size: 0.68rem;
         line-height: 1.3;
-        color: var(--desc-color);
+        color: var(--item-desc-color);
         font-family: 'Poppins', sans-serif;
+        margin: 0;
     }
-    .tujuan-theme {
-        --card-bg: linear-gradient(135deg, #d1fae5, #a7f3d0);
-        --card-border: #059669;
-        --title-color: #059669;
-        --desc-color: #065f46;
+    
+    .theme-goals {
+        --box-bg: linear-gradient(135deg, #d1fae5, #a7f3d0);
+        --box-border: #059669;
+        --item-title-color: #059669;
+        --item-desc-color: #065f46;
     }
-    .halaman-theme {
-        --card-bg: linear-gradient(135deg, #bbf7d0, #86efac);
-        --card-border: #16a34a;
-        --title-color: #16a34a;
-        --desc-color: #14532d;
+    
+    .theme-pages {
+        --box-bg: linear-gradient(135deg, #bbf7d0, #86efac);
+        --box-border: #16a34a;
+        --item-title-color: #16a34a;
+        --item-desc-color: #14532d;
     }
-    .fitur-theme {
-        --card-bg: linear-gradient(135deg, #a7f3d0, #6ee7b7);
-        --card-border: #22c55e;
-        --title-color: #22c55e;
-        --desc-color: #064e3b;
+    
+    .theme-features {
+        --box-bg: linear-gradient(135deg, #a7f3d0, #6ee7b7);
+        --box-border: #22c55e;
+        --item-title-color: #22c55e;
+        --item-desc-color: #064e3b;
     }
     </style>
     """, unsafe_allow_html=True)
 
-    # Row 1: Deskripsi + Halaman (2 kolom)
+    # Row 1: Layout sejajar dengan gap sama
     with loading():
-        col_left, col_right = st.columns([1, 1])
+        col_left, col_right = st.columns([1, 1], gap="medium")
         
         with col_left:
             # Deskripsi
             st.markdown("""
-            <div class="compact-section compact-section-desc">
-                <div class="compact-title compact-title-white">Deskripsi</div>
-                <div class="compact-desc">
-                    Platform analisis jejak karbon komprehensif dari aktivitas mahasiswa Institut Teknologi Bandung dengan visualisasi data real-time untuk mendukung inisiatif kampus berkelanjutan.
+            <div class="about-card hero-card">
+                <div class="card-title card-title-white">Deskripsi Project</div>
+                <div class="card-desc">
+                    Platform analisis jejak karbon komprehensif dari aktivitas mahasiswa Institut Teknologi Bandung dengan visualisasi data real-time untuk mendukung inisiatif kampus berkelanjutan dan mencapai target net-zero carbon.
                 </div>
             </div>
             """, unsafe_allow_html=True)
             
             # Tujuan
             st.markdown("""
-            <div class="compact-section compact-section-cards">
-                <div class="compact-title">Tujuan</div>
-                <div class="compact-card tujuan-theme">
-                    <div class="compact-card-title">Analisis Berkala</div>
-                    <div class="compact-card-desc">Menganalisis emisi karbon aktivitas kampus secara terjadwal dan berkelanjutan</div>
+            <div class="about-card content-card">
+                <div class="card-title">Tujuan Utama</div>
+                <div class="item-box theme-goals">
+                    <div class="item-title">Monitoring Berkelanjutan</div>
+                    <div class="item-desc">Menganalisis emisi karbon aktivitas kampus secara terjadwal</div>
                 </div>
-                <div class="compact-card tujuan-theme">
-                    <div class="compact-card-title">Insight Mendalam</div>
-                    <div class="compact-card-desc">Data actionable untuk pengambilan keputusan berkelanjutan</div>
+                <div class="item-box theme-goals">
+                    <div class="item-title">Data-Driven Insights</div>
+                    <div class="item-desc">Menyediakan data actionable untuk keputusan berkelanjutan</div>
                 </div>
-                <div class="compact-card tujuan-theme">
-                    <div class="compact-card-title">Kampus Berkelanjutan</div>
-                    <div class="compact-card-desc">Mendukung target ITB menjadi institusi net-zero carbon</div>
+                <div class="item-box theme-goals">
+                    <div class="item-title">Green Campus Initiative</div>
+                    <div class="item-desc">Mendukung transformasi ITB menjadi institusi net-zero carbon</div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
         
         with col_right:
-            # Halaman
+            # Halaman Dashboard
             st.markdown("""
-            <div class="compact-section compact-section-cards">
-                <div class="compact-title">Halaman</div>
-                <div class="compact-card halaman-theme">
-                    <div class="compact-card-title">Overview</div>
-                    <div class="compact-card-desc">Ringkasan komprehensif emisi kampus, perbandingan fakultas, dan trend harian</div>
+            <div class="about-card pages-card">
+                <div class="card-title">Struktur Dashboard</div>
+                <div class="item-box theme-pages">
+                    <div class="item-title">Dashboard Utama</div>
+                    <div class="item-desc">Overview komprehensif emisi kampus dengan perbandingan fakultas</div>
                 </div>
-                <div class="compact-card halaman-theme">
-                    <div class="compact-card-title">Transportasi</div>
-                    <div class="compact-card-desc">Analisis detail emisi dari moda transportasi dan jarak tempuh</div>
+                <div class="item-box theme-pages">
+                    <div class="item-title">Modul Transportasi</div>
+                    <div class="item-desc">Analisis emisi dari berbagai moda transportasi dan mobilitas</div>
                 </div>
-                <div class="compact-card halaman-theme">
-                    <div class="compact-card-title">Elektronik</div>
-                    <div class="compact-card-desc">Konsumsi energi perangkat elektronik mahasiswa</div>
+                <div class="item-box theme-pages">
+                    <div class="item-title">Modul Elektronik</div>
+                    <div class="item-desc">Monitoring konsumsi energi perangkat dan infrastruktur kampus</div>
                 </div>
-                <div class="compact-card halaman-theme">
-                    <div class="compact-card-title">Sampah Makanan</div>
-                    <div class="compact-card-desc">Jejak karbon dari pola konsumsi dan waste management</div>
+                <div class="item-box theme-pages">
+                    <div class="item-title">Modul Sampah Makanan</div>
+                    <div class="item-desc">Tracking jejak karbon konsumsi makanan dan waste management</div>
                 </div>
-                <div class="compact-card halaman-theme">
-                    <div class="compact-card-title">Tentang Dashboard</div>
-                    <div class="compact-card-desc">Informasi lengkap dashboard, tujuan project, dan fitur</div>
+                <div class="item-box theme-pages">
+                    <div class="item-title">Informasi Project</div>
+                    <div class="item-desc">Dokumentasi lengkap tujuan, metodologi, dan panduan penggunaan</div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
         
         time.sleep(0.1)
 
-    # Row 2: Fitur (4 kolom)
+    # Row 2: Fitur dengan gap sama
     with loading():
-        # Fitur section header
         st.markdown("""
-        <div class="compact-section compact-section-fitur">
-            <div class="compact-title">Fitur</div>
+        <div class="about-card features-card">
+            <div class="card-title">Fitur & Kemampuan</div>
         </div>
         """, unsafe_allow_html=True)
         
-        # 4 kolom untuk fitur cards
-        fitur_col1, fitur_col2, fitur_col3, fitur_col4 = st.columns([1, 1, 1, 1])
+        feature_col1, feature_col2, feature_col3, feature_col4 = st.columns(4, gap="medium")
         
-        with fitur_col1:
+        with feature_col1:
             st.markdown("""
-            <div class="compact-card fitur-theme">
-                <div class="compact-card-title">Visualisasi Interaktif</div>
-                <div class="compact-card-desc">Charts dan grafik dinamis dengan kemampuan drill-down</div>
+            <div class="item-box theme-features">
+                <div class="item-title">Interactive Visualization</div>
+                <div class="item-desc">Charts dan grafik dinamis dengan drill-down capability untuk eksplorasi data</div>
             </div>
             """, unsafe_allow_html=True)
         
-        with fitur_col2:
+        with feature_col2:
             st.markdown("""
-            <div class="compact-card fitur-theme">
-                <div class="compact-card-title">Multi-Filter System</div>
-                <div class="compact-card-desc">Filter data berdasarkan waktu, fakultas, dan kategori emisi</div>
+            <div class="item-box theme-features">
+                <div class="item-title">Advanced Filtering</div>
+                <div class="item-desc">Multi-layer filter berdasarkan waktu, fakultas, kategori emisi, dan parameter custom</div>
             </div>
             """, unsafe_allow_html=True)
         
-        with fitur_col3:
+        with feature_col3:
             st.markdown("""
-            <div class="compact-card fitur-theme">
-                <div class="compact-card-title">Export & Reporting</div>
-                <div class="compact-card-desc">Ekspor data CSV dan generate laporan PDF komprehensif</div>
+            <div class="item-box theme-features">
+                <div class="item-title">Export & Reporting</div>
+                <div class="item-desc">Export raw data CSV dan auto-generate comprehensive PDF reports untuk stakeholders</div>
             </div>
             """, unsafe_allow_html=True)
         
-        with fitur_col4:
+        with feature_col4:
             st.markdown("""
-            <div class="compact-card fitur-theme">
-                <div class="compact-card-title">Update Berkala</div>
-                <div class="compact-card-desc">Data diperbarui berkala dengan sinkronisasi otomatis</div>
+            <div class="item-box theme-features">
+                <div class="item-title">Real-time Sync</div>
+                <div class="item-desc">Automatic data synchronization dengan update berkala dari integrated data sources</div>
             </div>
             """, unsafe_allow_html=True)
         
