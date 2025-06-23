@@ -92,7 +92,15 @@ def get_current_user() -> Optional[Dict]:
         return st.session_state.user
     return None
 
+# auth.py
+
 def logout():
-    """Logout current user"""
-    if "user" in st.session_state:
-        del st.session_state.user
+    """Logout current user and clear all related state."""
+    # Hapus semua kunci yang relevan dari session_state
+    keys_to_delete = ["user", "current_page"]
+    for key in keys_to_delete:
+        if key in st.session_state:
+            del st.session_state[key]
+    
+    # Hapus semua parameter dari URL
+    st.query_params.clear()

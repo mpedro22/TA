@@ -44,87 +44,6 @@ div.block-container {
     display: none !important;
 }
 
-/* Card container kustom untuk setiap chart */
-.chart-card {
-    background: rgba(255, 255, 255, 0.95) !important;
-    backdrop-filter: blur(20px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.3) !important;
-    border-radius: 16px !important;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06) !important;
-    padding: 0.75rem 1rem 0.5rem 1rem !important;
-    margin-bottom: 0.5rem !important;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-}
-
-.chart-card:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: 0 12px 25px rgba(5, 150, 105, 0.15) !important;
-}
-
-/* Header di dalam card (judul + tombol) */
-.chart-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.25rem;
-}
-
-.chart-header .stMarkdown {
-    margin-bottom: 0 !important;
-}
-
-/* Judul chart kustom */
-.chart-title {
-    font-size: 11px !important;
-    font-weight: 700 !important;
-    color: #1f2937 !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    line-height: 1.2 !important;
-}
-
-/* Tombol "Lihat" */
-.chart-card .stButton button {
-    background: #e9ecef !important;
-    color: #495057 !important;
-    border: none !important;
-    border-radius: 20px !important;
-    padding: 4px 12px !important;
-    font-size: 10px !important;
-    font-weight: 600 !important;
-    height: 26px !important;
-    line-height: 1 !important;
-    transition: all 0.2s ease;
-}
-
-.chart-card .stButton button:hover {
-    background: #d1d5db !important;
-    color: #212529 !important;
-    transform: scale(1.05);
-}
-
-/* Membuat chart Plotly di dalam card menjadi seamless */
-.chart-card .stPlotlyChart {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-    margin-top: -1rem; 
-    margin-bottom: 0 !important;
-}
-
-/* Styling untuk Dialog (Pop-up) */
-div[data-testid="stDialog"] .stHeadingContainer h1 {
-    font-size: 1.5rem !important;
-    font-weight: 600 !important;
-    color: #1e293b;
-    font-family: 'Poppins', sans-serif !important;
-}
-
-div[data-testid="stDialog"] .stPlotlyChart {
-    background: transparent !important;
-}
-
 /* Hide ALL sidebar controls: toggle buttons, close buttons, resize handles */
 button[data-testid="collapsedControl"],
 .st-emotion-cache-1jicfl2, 
@@ -602,6 +521,8 @@ section[data-testid="stSidebar"] * {
     margin-bottom: 0 !important;
 }
 
+
+
 .nav-menu > div {
     margin: 0 0 2px 0 !important;
     padding: 0 !important;
@@ -682,14 +603,21 @@ div[data-testid="stButton"] > button:hover {
     margin-bottom: -2rem;
 }
 
+.logo-wrapper {
+    position: relative;
+    margin: 0 auto;
+    width: 100px;
+    height: 100px;
+}
+
 .logo-container {
-    margin-bottom: 0rem;
-    margin-top: -2rem;
+    width: 100px;
+    height: 100px;
 }
 
 .logo-circle {
-    width: 80px;
-    height: 80px;
+    width: 100px;
+    height: 100px;
     background: linear-gradient(135deg, var(--primary-green) 0%, var(--secondary-green) 100%);
     border-radius: 50%;
     display: flex;
@@ -701,6 +629,7 @@ div[data-testid="stButton"] > button:hover {
     overflow: hidden;
 }
 
+/* Simple shimmer overlay */
 .logo-circle::before {
     content: '';
     position: absolute;
@@ -708,18 +637,84 @@ div[data-testid="stButton"] > button:hover {
     left: -50%;
     width: 200%;
     height: 200%;
-    background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-    animation: shimmer 3s infinite;
+    background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    transform: rotate(45deg);
 }
 
 .logo-text {
     color: white;
-    font-size: 1.8rem;
-    font-weight: 700;
-    letter-spacing: -0.02em;
     font-family: 'Poppins', sans-serif;
-    z-index: 1;
+    z-index: 2;
     position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 0.8;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.logo-text-main {
+    font-size: 1.8rem;
+    font-weight: 900;
+    margin-bottom: 3px;
+    letter-spacing: 0rem;
+}
+
+.logo-text-sub {
+    font-size: 0.5rem;
+    font-weight: 700;
+    opacity: 0.95;
+    letter-spacing: 0rem;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+/* Sidebar specific logo adjustments */
+.sidebar-header .logo-wrapper {
+    margin-bottom: 0.5rem;
+    margin-top: -1rem;
+}
+
+/* ===========================================
+   LOGIN & REGISTER LOGO - LARGER SIZE
+   =========================================== */
+
+.stColumn .logo-wrapper {
+    width: 120px !important;
+    height: 120px !important;
+    margin-bottom: 1.5rem !important;
+}
+
+.stColumn .logo-container {
+    width: 120px !important;
+    height: 120px !important;
+}
+
+.stColumn .logo-circle {
+    width: 120px !important;
+    height: 120px !important;
+    box-shadow: 0 12px 40px rgba(5, 150, 105, 0.35) !important;
+}
+
+.stColumn .logo-text-main {
+    font-size: 2rem !important;
+    margin-bottom: 5px !important;
+}
+
+.stColumn .logo-text-sub {
+    font-size: 0.6rem !important;
+    letter-spacing: 0rem !important;
+}
+
+.stColumn .sidebar-header {
+    text-align: center !important;
+    border-bottom: none !important;
+    padding: 0 !important;
+}
+
+.stColumn .sidebar-title,
+.stColumn .sidebar-subtitle {
+    text-align: center !important;
 }
 
 .sidebar-title {
@@ -729,7 +724,7 @@ div[data-testid="stButton"] > button:hover {
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    margin-bottom: 0.25rem;
+    margin-top: -4rem;
     font-family: 'Poppins', sans-serif;
 }
 
@@ -738,6 +733,7 @@ div[data-testid="stButton"] > button:hover {
     font-size: 0.875rem;
     font-weight: 500;
     font-family: 'Poppins', sans-serif;
+    margin-top: -4rem;
 }
 
 .nav-menu {
@@ -745,7 +741,7 @@ div[data-testid="stButton"] > button:hover {
 }
 
 .sidebar-footer {
-    margin-top: 2rem;
+    margin-top: 0rem;
     padding: 2rem;
 }
 

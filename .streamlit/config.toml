@@ -25,3 +25,10 @@ installTracer = true
 # For faster development
 [global]
 developmentMode = true
+
+[server]
+fileWatcherType = "auto"
+runOnSave = true
+
+[browser]
+gatherUsageStats = false

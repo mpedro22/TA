@@ -239,45 +239,7 @@ def generate_pdf_report(filtered_df, total_emisi, avg_emisi, eco_percentage, df_
         else:
             heatmap_pattern_conclusion = "Tidak ada data penggunaan yang tersedia untuk analisis heatmap moda transportasi per hari."
 
-    # 5. Box Plot Distribution Analysis (yang tadi hilang!)
-    box_plot_data = pd.DataFrame()
-    box_plot_conclusion = "Data distribusi emisi tidak tersedia."
-    if not valid_df.empty and 'transportasi' in valid_df.columns:
-        box_stats = []
-        for mode in transport_stats.head(5)['transportasi'].tolist():
-            mode_data = valid_df[valid_df['transportasi'] == mode]['emisi_mingguan']
-            if len(mode_data) > 0:
-                q1 = mode_data.quantile(0.25)
-                q2 = mode_data.quantile(0.5)  # median
-                q3 = mode_data.quantile(0.75)
-                iqr = q3 - q1
-                upper_fence = q3 + 1.5 * iqr
-                lower_fence = q1 - 1.5 * iqr
-                
-                outliers = len(mode_data[(mode_data > upper_fence) | (mode_data < lower_fence)])
-                
-                box_stats.append({
-                    'moda': mode,
-                    'median': q2,
-                    'q1': q1,
-                    'q3': q3,
-                    'outliers': outliers,
-                    'variabilitas': iqr
-                })
-        
-        if box_stats:
-            box_plot_data = pd.DataFrame(box_stats)
-            
-            # Find insights
-            most_outliers = box_plot_data.loc[box_plot_data['outliers'].idxmax()]
-            most_variable = box_plot_data.loc[box_plot_data['variabilitas'].idxmax()]
-            highest_median = box_plot_data.loc[box_plot_data['median'].idxmax()]
-            
-            total_outliers = box_plot_data['outliers'].sum()
-            
-            box_plot_conclusion = f"Distribusi emisi menunjukkan {total_outliers} responden outlier total. {most_outliers['moda']} memiliki outlier terbanyak ({most_outliers['outliers']} responden), {most_variable['moda']} paling bervariasi (IQR: {most_variable['variabilitas']:.1f}), dan {highest_median['moda']} memiliki median tertinggi ({highest_median['median']:.1f} kg CO₂)."
-
-    # 6. Kecamatan
+    # 5. Kecamatan
     kecamatan_data = pd.DataFrame()
     kecamatan_conclusion = "Data kecamatan tidak tersedia."
     if 'kecamatan' in filtered_df.columns:
@@ -663,52 +625,9 @@ def generate_pdf_report(filtered_df, total_emisi, avg_emisi, eco_percentage, df_
             </div>
         </div>
         
-        <!-- 5. Distribusi Emisi per Moda Transportasi -->
+        <!-- 5. Emisi per Kecamatan -->
         <div class="section avoid-break">
-            <h2 class="section-title">5. Distribusi Emisi per Moda Transportasi</h2>
-            <div class="section-content">
-    """
-    
-    if not box_plot_data.empty:
-        html_content += """
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Moda Transportasi</th>
-                            <th>Median (kg CO₂)</th>
-                            <th>Q1 (kg CO₂)</th>
-                            <th>Q3 (kg CO₂)</th>
-                            <th>Outlier</th>
-                            <th>Variabilitas (IQR)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        """
-        for _, row in box_plot_data.iterrows():
-            html_content += f"""
-                        <tr>
-                            <td style="text-align: left; font-weight: 500;">{row['moda']}</td>
-                            <td>{row['median']:.2f}</td>
-                            <td>{row['q1']:.2f}</td>
-                            <td>{row['q3']:.2f}</td>
-                            <td>{row['outliers']} responden</td>
-                            <td>{row['variabilitas']:.2f}</td>
-                        </tr>
-            """
-        html_content += "</tbody></table>"
-    else:
-        html_content += "<p>Data distribusi emisi tidak tersedia.</p>"
-    
-    html_content += f"""
-                <div class="conclusion">
-                    <strong>Kesimpulan:</strong> {box_plot_conclusion}
-                </div>
-            </div>
-        </div>
-        
-        <!-- 6. Emisi per Kecamatan -->
-        <div class="section avoid-break">
-            <h2 class="section-title">6. Emisi per Kecamatan</h2>
+            <h2 class="section-title">5. Emisi per Kecamatan</h2>
             <div class="section-content">
     """
     
@@ -896,13 +815,13 @@ def show():
                 ))
                 
                 fig_trend.update_layout(
-                    height=235, margin=dict(t=25, b=0, l=0, r=10),
+                    height=270, margin=dict(t=30, b=0, l=0, r=10),
                     xaxis_title="", yaxis_title="Emisi (kg CO₂)",
                     paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                     title=dict(text="<b>Tren Emisi Harian</b>", x=0.38, y=0.95, 
-                              font=dict(size=11, color="#000000")),
-                    xaxis=dict(showgrid=False, tickfont=dict(size=8), title=dict(text="Hari", font=dict(size=10))),
-                    yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=8), title=dict(text="Total Emisi (Kg CO₂)", font=dict(size=10)))
+                              font=dict(size=12, color="#000000")),
+                    xaxis=dict(showgrid=False, tickfont=dict(size=10), title=dict(text="Hari", font=dict(size=10))),
+                    yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=10), title=dict(text="Total Emisi (Kg CO₂)", font=dict(size=10)))
                 )
                 st.plotly_chart(fig_trend, use_container_width=True, config={'displayModeBar': False})
             else:
@@ -944,17 +863,17 @@ def show():
                                 showlegend=False,
                                 text=[f"{row['total_emisi']:.1f}"], 
                                 textposition='inside',
-                                textfont=dict(color='white', size=7, weight='bold'),
+                                textfont=dict(color='white', size=10, weight='bold'),
                                 hovertemplate=f'<b>{row["fakultas"]}</b><br>Total: {row["total_emisi"]:.1f} kg CO₂<br>Mahasiswa: {row["count"]}<extra></extra>'
                             ))
                         
                         fig_fakultas.update_layout(
-                            height=235, margin=dict(t=25, b=0, l=0, r=20),
-                            title=dict(text="<b>Emisi per Fakultas</b>", x=0.35, y=0.95,
-                                      font=dict(size=11, color="#000000")),
+                            height=270, margin=dict(t=30, b=0, l=0, r=20),
+                            title=dict(text="<b>Emisi per Fakultas</b>", x=0.4, y=0.95,
+                                      font=dict(size=12, color="#000000")),
                             paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                            xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=8), title=dict(text="Total Emisi (kg CO₂)", font=dict(size=10))),
-                            yaxis=dict(tickfont=dict(size=8), title=dict(text="Fakultas/Sekolah", font=dict(size=10)))
+                            xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=10), title=dict(text="Total Emisi (kg CO₂)", font=dict(size=10))),
+                            yaxis=dict(tickfont=dict(size=10), title=dict(text="Fakultas/Sekolah", font=dict(size=10)))
                         )
                         
                         st.plotly_chart(fig_fakultas, use_container_width=True, config={'displayModeBar': False})
@@ -976,7 +895,7 @@ def show():
                 marker=dict(colors=colors, line=dict(color='#FFFFFF', width=2)),
                 textposition='outside',
                 textinfo='label+percent',
-                textfont=dict(size=8, family="Poppins"),
+                textfont=dict(size=10, family="Poppins"),
                 hovertemplate='<b>%{label}</b><br>%{value:.2f} kg CO₂ (%{percent})<extra></extra>'
             )])
             
@@ -985,10 +904,10 @@ def show():
             fig_donut.add_annotation(text=center_text, x=0.5, y=0.5, font_size=10, showarrow=False)
 
             fig_donut.update_layout(
-                height=235, margin=dict(t=25, b=5, l=5, r=5), showlegend=False,
+                height=270, margin=dict(t=30, b=5, l=5, r=5), showlegend=False,
                 paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                title=dict(text="<b>Komposisi Moda Transportasi</b>", x=0.27, y=0.95, 
-                          font=dict(size=11, color="#000000"))
+                title=dict(text="<b>Komposisi Moda Transportasi</b>", x=0.3, y=0.95, 
+                          font=dict(size=12, color="#000000"))
             )
             st.plotly_chart(fig_donut, use_container_width=True, config={'displayModeBar': False})
 
@@ -996,7 +915,7 @@ def show():
 
     # Row 2: Secondary Charts with loading - UPDATED LAYOUT
     with loading():
-        col1, col2, col3 = st.columns([1, 1, 1])
+        col1, col2 = st.columns([1, 1])
 
         with col1:
             # Chart 4: Heatmap Hari vs Moda Transportasi (count users, not emission) - FIXED AXES
@@ -1035,7 +954,7 @@ def show():
                     hovertemplate='<b>%{x}</b><br>%{y}: %{z} pengguna<extra></extra>',
                     colorbar=dict(
                         title=dict(text="Pengguna", font=dict(size=9)),
-                        tickfont=dict(size=8),
+                        tickfont=dict(size=10),
                         thickness=15,
                         len=0.7
                     ),
@@ -1044,11 +963,11 @@ def show():
                 ))
                 
                 fig_heatmap.update_layout(
-                    height=235, margin=dict(t=30, b=0, l=0, r=0),
-                    title=dict(text="<b>Heatmap Penggunaan Moda Transportasi per Hari</b>", x=0.15, y=0.95, 
-                            font=dict(size=11, color="#000000")),
-                    xaxis=dict(tickfont=dict(size=8), tickangle=0, title=dict(text="Moda Transportasi", font=dict(size=10))),
-                    yaxis=dict(tickfont=dict(size=8), title=dict(text="Hari", font=dict(size=10))),
+                    height=270, margin=dict(t=30, b=0, l=0, r=0),
+                    title=dict(text="<b>Heatmap Penggunaan Moda Transportasi per Hari</b>", x=0.3, y=0.95, 
+                            font=dict(size=12, color="#000000")),
+                    xaxis=dict(tickfont=dict(size=10), tickangle=0, title=dict(text="Moda Transportasi", font=dict(size=10))),
+                    yaxis=dict(tickfont=dict(size=10), title=dict(text="Hari", font=dict(size=10))),
                     paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
                 )
                 st.plotly_chart(fig_heatmap, use_container_width=True, config={'displayModeBar': False})
@@ -1056,94 +975,6 @@ def show():
                 st.info("Data pola harian tidak tersedia")
 
         with col2:
-            # Chart 5: Box Plot Distribusi Emisi per Responden - Untuk Identifikasi Outlier
-            if 'id_responden' in filtered_df.columns and not filtered_df.empty:
-                valid_df = filtered_df[filtered_df['id_responden'].notna() & 
-                                     (filtered_df['id_responden'] != '') & 
-                                     (filtered_df['emisi_mingguan'].notna()) &
-                                     (filtered_df['emisi_mingguan'] > 0)]
-                
-                if len(valid_df) > 0:
-                    fig_boxplot = go.Figure()
-                    
-                    # Get top transport modes untuk perbandingan yang meaningful
-                    top_modes = valid_df['transportasi'].value_counts().head(6).index.tolist()
-                    
-                    colors_box = []
-                    for i, mode in enumerate(top_modes):
-                        color = TRANSPORT_COLORS.get(mode, MAIN_PALETTE[i % len(MAIN_PALETTE)])
-                        colors_box.append(color)
-                        
-                        mode_data = valid_df[valid_df['transportasi'] == mode]['emisi_mingguan']
-                        
-                        q1 = mode_data.quantile(0.25)
-                        q2 = mode_data.quantile(0.5)  
-                        q3 = mode_data.quantile(0.75)
-                        iqr = q3 - q1
-                        lower_fence = q1 - 1.5 * iqr
-                        upper_fence = q3 + 1.5 * iqr
-                        
-                        # Count outliers for this mode
-                        outliers_count = len(mode_data[(mode_data > upper_fence) | (mode_data < lower_fence)])
-                        
-                        fig_boxplot.add_trace(go.Box(
-                            y=mode_data,
-                            name=mode,
-                            marker_color=color,
-                            boxpoints='outliers',  
-                            pointpos=-1.8,
-                            marker=dict(
-                                size=6,
-                                line=dict(width=1, color='white'),
-                                opacity=0.9
-                            ),
-                            line=dict(width=2),
-                            fillcolor=f"rgba{tuple(list(int(color[1:][i:i+2], 16) for i in (0, 2, 4)) + [0.4])}",
-                            hovertemplate=f'<b>{mode}</b><br>' +
-                                        'Median: %{median:.1f} kg CO₂<br>' +
-                                        f'Outlier: {outliers_count} responden<br>' +
-                                        'Nilai: %{y:.1f} kg CO₂<extra></extra>'
-                        ))
-                    
-                    # Calculate overall statistics untuk insight
-                    all_emissions = valid_df['emisi_mingguan']
-                    Q1_all = all_emissions.quantile(0.25)
-                    Q3_all = all_emissions.quantile(0.75)
-                    IQR_all = Q3_all - Q1_all
-                    lower_fence_all = Q1_all - 1.5 * IQR_all
-                    upper_fence_all = Q3_all + 1.5 * IQR_all
-                    
-                    outliers_high = len(all_emissions[all_emissions > upper_fence_all])
-                    outliers_low = len(all_emissions[all_emissions < lower_fence_all])
-                    median_val = all_emissions.median()
-                    
-                    fig_boxplot.update_layout(
-                        height=235, margin=dict(t=25, b=5, l=5, r=5),
-                        title=dict(text="<b>Distribusi Emisi per Moda Transportasi</b>", x=0.20, y=0.95, 
-                                  font=dict(size=11, color="#000000")),
-                        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                        xaxis=dict(
-                            showgrid=False, 
-                            tickfont=dict(size=8), 
-                            title=dict(text="Moda Transportasi", font=dict(size=10))
-                        ),
-                        yaxis=dict(
-                            showgrid=True, 
-                            gridcolor='rgba(0,0,0,0.1)', 
-                            tickfont=dict(size=8), 
-                            title=dict(text="Emisi Mingguan (kg CO₂)", font=dict(size=10))
-                        ),
-                        showlegend=False
-                    )
-                    
-                    st.plotly_chart(fig_boxplot, use_container_width=True, config={'displayModeBar': False})
-                        
-                else:
-                    st.info("Tidak ada data emisi yang valid")
-            else:
-                st.info("Data responden tidak tersedia")
-
-        with col3:
             # MOVED: Chart 6: Emisi per Kecamatan - Vertical Bar Chart
             if 'kecamatan' in filtered_df.columns:
                 kecamatan_stats = filtered_df.groupby('kecamatan')['emisi_mingguan'].agg(['mean', 'count', 'sum']).reset_index()
@@ -1178,7 +1009,7 @@ def show():
                             showlegend=False,
                             text=[f"{row['rata_rata_emisi']:.1f}"], 
                             textposition='inside',
-                            textfont=dict(color='#2d3748', size=8, weight='bold'),
+                            textfont=dict(color='#2d3748', size=10, weight='bold'),
                             hovertemplate=f'<b>{row["kecamatan"]}</b><br>Rata-rata: {row["rata_rata_emisi"]:.1f} kg CO₂<br>Mahasiswa: {row["jumlah_mahasiswa"]}<br>Total: {row["total_emisi"]:.1f} kg CO₂<extra></extra>',
                             name=row['kecamatan']
                         ))
@@ -1196,24 +1027,24 @@ def show():
                             bgcolor="white", 
                             bordercolor="#5e4fa2", 
                             borderwidth=1,
-                            font=dict(size=8)
+                            font=dict(size=10)
                         )
                     )
                     
                     fig_kecamatan.update_layout(
-                        height=235, margin=dict(t=25, b=0, l=0, r=10),
-                        title=dict(text="<b>Emisi per Kecamatan</b>", x=0.35, y=0.95, 
-                                  font=dict(size=11, color="#000000")),
+                        height=270, margin=dict(t=30, b=0, l=0, r=10),
+                        title=dict(text="<b>Emisi per Kecamatan</b>", x=0.4, y=0.95, 
+                                  font=dict(size=12, color="#000000")),
                         xaxis=dict(
                             title=dict(text="Kecamatan", font=dict(size=10)), 
                             showgrid=False, 
-                            tickfont=dict(size=8),
+                            tickfont=dict(size=10),
                         ),
                         yaxis=dict(
                             title=dict(text="Rata-Rata Emisi (kg CO₂)", font=dict(size=10)), 
                             showgrid=True, 
                             gridcolor='rgba(0,0,0,0.1)', 
-                            tickfont=dict(size=8)
+                            tickfont=dict(size=10)
                         ),
                         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                         showlegend=False
