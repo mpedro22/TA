@@ -656,55 +656,9 @@ def generate_pdf_report(filtered_df, total_emisi, avg_emisi, df_responden=None):
             </div>
         </div>
         
-        <!-- 5. Distribusi Emisi per Lokasi Makan -->
+        <!-- 5. Lokasi Makan Terpopuler -->
         <div class="section avoid-break">
-            <h2 class="section-title">5. Distribusi Emisi per Lokasi Makan</h2>
-            <div class="section-content">
-    """
-    
-    if not box_plot_analysis.empty:
-        html_content += """
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Ranking</th>
-                            <th>Lokasi</th>
-                            <th>Responden</th>
-                            <th>Median (kg CO₂)</th>
-                            <th>IQR</th>
-                            <th>Outlier</th>
-                            <th>Variabilitas</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        """
-        
-        for idx, (_, row) in enumerate(box_plot_analysis.iterrows(), 1):
-            html_content += f"""
-                        <tr>
-                            <td><strong>#{idx}</strong></td>
-                            <td style="text-align: left; font-weight: 500;">{row['lokasi']}</td>
-                            <td>{row['responden']}</td>
-                            <td>{row['median']:.2f}</td>
-                            <td>{row['iqr']:.2f}</td>
-                            <td>{row['outliers']} responden</td>
-                            <td>{row['variabilitas']}</td>
-                        </tr>
-            """
-        
-        html_content += "</tbody></table>"
-    else:
-        html_content += "<p>Data distribusi emisi per lokasi tidak tersedia.</p>"
-    
-    html_content += f"""
-                <div class="conclusion">
-                    <strong>Kesimpulan:</strong> {box_plot_conclusion}
-                </div>
-            </div>
-
-        <!-- 6. Lokasi Makan Terpopuler -->
-        <div class="section avoid-break">
-            <h2 class="section-title">6. Lokasi Makan Terpopuler</h2>
+            <h2 class="section-title">5. Lokasi Makan Terpopuler</h2>
             <div class="section-content">
                 <table>
                     <thead>
@@ -889,13 +843,13 @@ def show():
             ))
             
             fig_trend.update_layout(
-                height=235, margin=dict(t=25, b=0, l=0, r=20),
+                height=270, margin=dict(t=30, b=0, l=0, r=20),
                 xaxis_title="", yaxis_title="Emisi (kg CO₂)",
                 paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                 title=dict(text="<b>Tren Emisi Harian</b>", x=0.38, y=0.95, 
-                          font=dict(size=11, color="#000000")),
-                xaxis=dict(showgrid=False, tickfont=dict(size=8), title=dict(text="Hari", font=dict(size=10))),
-                yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=8), title=dict(text="Emisi (Kg CO₂)", font=dict(size=10)))
+                          font=dict(size=12, color="#000000")),
+                xaxis=dict(showgrid=False, tickfont=dict(size=10), title=dict(text="Hari", font=dict(size=10))),
+                yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=10), title=dict(text="Emisi (Kg CO₂)", font=dict(size=10)))
             )
             
             st.plotly_chart(fig_trend, use_container_width=True, config={'displayModeBar': False})
@@ -936,17 +890,17 @@ def show():
                                 showlegend=False,
                                 text=[f"{row['total_emisi']:.1f}"], 
                                 textposition='inside',
-                                textfont=dict(color='white', size=7, weight='bold'),
+                                textfont=dict(color='white', size=10, weight='bold'),
                                 hovertemplate=f'<b>{row["fakultas"]}</b><br>Total: {row["total_emisi"]:.1f} kg CO₂<br>Aktivitas: {row["count"]}<extra></extra>'
                             ))
                         
                         fig_fakultas.update_layout(
-                            height=235, margin=dict(t=25, b=0, l=0, r=20),
+                            height=270, margin=dict(t=30, b=0, l=0, r=20),
                             title=dict(text="<b>Emisi per Fakultas</b>", x=0.35, y=0.95,
-                                      font=dict(size=11, color="#000000")),
+                                      font=dict(size=12, color="#000000")),
                             paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                            xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=8), title=dict(text="Rata-Rata Emisi (kg CO₂)", font=dict(size=10))),
-                            yaxis=dict(tickfont=dict(size=8), title=dict(text="Fakultas/Sekolah", font=dict(size=10)))
+                            xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=10), title=dict(text="Rata-Rata Emisi (kg CO₂)", font=dict(size=10))),
+                            yaxis=dict(tickfont=dict(size=10), title=dict(text="Fakultas/Sekolah", font=dict(size=10)))
                         )
                         
                         st.plotly_chart(fig_fakultas, use_container_width=True, config={'displayModeBar': False})
@@ -970,7 +924,7 @@ def show():
                 marker=dict(colors=colors, line=dict(color='#FFFFFF', width=2)),
                 textposition='outside',
                 textinfo='label+percent',
-                textfont=dict(size=7, family="Poppins"),
+                textfont=dict(size=10, family="Poppins"),
                 hovertemplate='<b>%{label}</b><br>%{value} aktivitas (%{percent})<extra></extra>'
             )])
             
@@ -980,10 +934,10 @@ def show():
             fig_period.add_annotation(text=center_text, x=0.5, y=0.5, font_size=10, showarrow=False)
             
             fig_period.update_layout(
-                height=235, margin=dict(t=25, b=5, l=5, r=5), showlegend=False,
+                height=270, margin=dict(t=30, b=5, l=5, r=5), showlegend=False,
                 paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                 title=dict(text="<b>Distribusi Periode Waktu</b>", x=0.27, y=0.95, 
-                          font=dict(size=11, color="#000000"))
+                          font=dict(size=12, color="#000000"))
             )
             
             st.plotly_chart(fig_period, use_container_width=True, config={'displayModeBar': False})
@@ -992,14 +946,11 @@ def show():
 
     # Row 2 with loading
     with loading():
-        col1, col2, col3 = st.columns([1, 1, 1])
+        col1, col2 = st.columns([1, 1])
 
         with col1:
-            # 1. Heatmap Top Lokasi vs Waktu 
-            top_locations = filtered_df.groupby('lokasi')['emisi_makanminum'].sum().nlargest().index.tolist()
-            heatmap_filtered = filtered_df[filtered_df['lokasi'].isin(top_locations)]
-            
-            heatmap_data = heatmap_filtered.groupby(['lokasi', 'time_slot'])['emisi_makanminum'].sum().reset_index()
+            # 1. Heatmap Lokasi vs Waktu 
+            heatmap_data = filtered_df.groupby(['lokasi', 'time_slot'])['emisi_makanminum'].sum().reset_index()
             heatmap_pivot = heatmap_data.pivot(index='time_slot', columns='lokasi', values='emisi_makanminum').fillna(0)
             
             if not heatmap_pivot.empty:
@@ -1015,7 +966,7 @@ def show():
                     customdata=np.array([list(heatmap_pivot.columns)] * len(heatmap_pivot.index)),
                     colorbar=dict(
                         title=dict(text="Emisi", font=dict(size=9)),
-                        tickfont=dict(size=8),
+                        tickfont=dict(size=10),
                         thickness=15,
                         len=0.7
                     ),
@@ -1024,11 +975,11 @@ def show():
                 ))
                 
                 fig_heatmap.update_layout(
-                    height=235, margin=dict(t=25, b=20, l=20, r=40),
-                    title=dict(text="<b>Heatmap Top Lokasi vs Waktu</b>", x=0.15, y=0.95, 
-                            font=dict(size=11, color="#000000")),
-                    xaxis=dict(tickfont=dict(size=7), tickangle=-45, title=dict(text="Lokasi", font=dict(size=10))),
-                    yaxis=dict(tickfont=dict(size=7)),
+                    height=270, margin=dict(t=30, b=20, l=20, r=40),
+                    title=dict(text="<b>Heatmap Lokasi vs Waktu</b>", x=0.15, y=0.95, 
+                            font=dict(size=12, color="#000000")),
+                    xaxis=dict(tickfont=dict(size=10), title=dict(text="Lokasi", font=dict(size=10))),
+                    yaxis=dict(tickfont=dict(size=10)),
                     paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
                 )
                 st.plotly_chart(fig_heatmap, use_container_width=True, config={'displayModeBar': False})
@@ -1036,138 +987,7 @@ def show():
                 st.info("Data heatmap tidak tersedia")
 
         with col2:
-            # 2. Box Plot Distribusi Emisi per Kantin - DIPERBAIKI DENGAN AGREGASI
-            if not filtered_df.empty and 'lokasi' in filtered_df.columns:
-                # Filter data valid
-                valid_data = filtered_df[
-                    (filtered_df['emisi_makanminum'].notna()) & 
-                    (filtered_df['emisi_makanminum'] > 0) &
-                    (filtered_df['lokasi'].notna()) &
-                    (filtered_df['lokasi'] != '') &
-                    (filtered_df['id_responden'].notna()) &
-                    (filtered_df['id_responden'] != '')
-                ]
-                
-                if len(valid_data) > 0:
-                    # KUNCI: Aggregate emisi per responden per lokasi (sum multiple visits)
-                    responden_lokasi_agg = valid_data.groupby(['id_responden', 'lokasi']).agg({
-                        'emisi_makanminum': 'sum'  # Sum all eating sessions per person per location
-                    }).reset_index()
-                    
-                    # Group by location untuk melihat distribusi
-                    location_stats = responden_lokasi_agg.groupby('lokasi').agg({
-                        'emisi_makanminum': ['count', 'mean', 'std', 'min', 'max']
-                    }).reset_index()
-                    location_stats.columns = ['lokasi', 'responden_count', 'mean_emisi', 'std_emisi', 'min_emisi', 'max_emisi']
-                    
-                    # Filter lokasi dengan minimal 3 responden untuk box plot yang meaningful
-                    valid_locations_data = location_stats[location_stats['responden_count'] >= 3]
-                    
-                    if len(valid_locations_data) >= 2:
-                        # Ambil top 6 lokasi berdasarkan jumlah responden
-                        top_locations = valid_locations_data.nlargest(6, 'responden_count')['lokasi'].tolist()
-                        
-                        # Filter aggregated data untuk lokasi-lokasi ini
-                        box_data = responden_lokasi_agg[responden_lokasi_agg['lokasi'].isin(top_locations)]
-                        
-                        if not box_data.empty:
-                            fig_canteen_boxplot = go.Figure()
-                            
-                            # Color palette
-                            colors = ['#66c2a5', '#fdae61', '#f46d43', '#d53e4f', '#5e4fa2', '#9e0142']
-                            
-                            for i, location in enumerate(top_locations):
-                                # Ambil total emisi per responden untuk lokasi ini
-                                location_emissions = box_data[box_data['lokasi'] == location]['emisi_makanminum']
-                                
-                                if len(location_emissions) >= 3:
-                                    color = colors[i % len(colors)]
-                                    
-                                    # Calculate statistics
-                                    q1 = location_emissions.quantile(0.25)
-                                    q3 = location_emissions.quantile(0.75)
-                                    iqr = q3 - q1
-                                    lower_fence = q1 - 1.5 * iqr
-                                    upper_fence = q3 + 1.5 * iqr
-                                    outliers_count = len(location_emissions[
-                                        (location_emissions > upper_fence) | 
-                                        (location_emissions < lower_fence)
-                                    ])
-                                    
-                                    # Convert hex to rgba
-                                    hex_color = color[1:]
-                                    rgb = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
-                                    rgba_fill = f"rgba({rgb[0]}, {rgb[1]}, {rgb[2]}, 0.4)"
-                                    
-                                    # Short name for display
-                                    display_name = location if len(location) <= 10 else location[:8] + '..'
-                                    
-                                    fig_canteen_boxplot.add_trace(go.Box(
-                                        y=location_emissions,
-                                        name=display_name,
-                                        marker_color=color,
-                                        boxpoints='outliers',
-                                        pointpos=-1.8,
-                                        marker=dict(
-                                            size=6,
-                                            line=dict(width=1, color='white'),
-                                            opacity=0.9
-                                        ),
-                                        line=dict(width=2),
-                                        fillcolor=rgba_fill,
-                                        hovertemplate=f'<b>{location}</b><br>' +
-                                                    'Median: %{median:.2f} kg CO₂<br>' +
-                                                    f'Outlier: {outliers_count}<br>' +
-                                                    'Total Emisi: %{y:.2f} kg CO₂<br>' +
-                                                    f'Responden: {len(location_emissions)}<extra></extra>'
-                                    ))
-                            
-                            fig_canteen_boxplot.update_layout(
-                                height=235, margin=dict(t=25, b=5, l=5, r=5),
-                                title=dict(text="<b>Distribusi Total Emisi per Responden</b>", x=0.20, y=0.95, 
-                                          font=dict(size=11, color="#000000")),
-                                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                                xaxis=dict(
-                                    showgrid=False, 
-                                    tickfont=dict(size=7), 
-                                    title=dict(text="Lokasi Makan", font=dict(size=9))
-                                ),
-                                yaxis=dict(
-                                    showgrid=True, 
-                                    gridcolor='rgba(0,0,0,0.1)', 
-                                    tickfont=dict(size=7), 
-                                    title=dict(text="Total Emisi per Responden (kg CO₂)", font=dict(size=9))
-                                ),
-                                showlegend=False
-                            )
-                            
-                            st.plotly_chart(fig_canteen_boxplot, use_container_width=True, config={'displayModeBar': False})
-                        else:
-                            st.info("Data lokasi makan kosong setelah agregasi")
-                    else:
-                        # Show debug info yang lebih detail
-                        st.info(f"Tidak cukup lokasi dengan responden memadai. Ditemukan {len(valid_locations_data)} lokasi.")
-                        
-                        # Tampilkan debug info untuk troubleshooting
-                        if not location_stats.empty:
-                            st.write("**Statistik per lokasi (setelah agregasi):**")
-                            st.dataframe(location_stats.head(10))
-                else:
-                    st.info("Tidak ada data aktivitas makan yang valid")
-                    
-                    # Debug info yang lebih detail
-                    st.write("**Debug Info:**")
-                    st.write(f"- Total data: {len(filtered_df)}")
-                    if len(filtered_df) > 0:
-                        st.write(f"- Data dengan emisi > 0: {len(filtered_df[filtered_df['emisi_makanminum'] > 0])}")
-                        st.write(f"- Data dengan lokasi valid: {len(filtered_df[filtered_df['lokasi'].notna()])}")
-                        st.write(f"- Lokasi unique: {filtered_df['lokasi'].nunique()}")
-                        st.write(f"- Sample lokasi: {filtered_df['lokasi'].value_counts().head()}")
-            else:
-                st.info("Data tidak tersedia")
-
-        with col3:
-            # 3. Emisi per Kantin
+            # 2. Emisi per Kantin
             if not filtered_df.empty and 'lokasi' in filtered_df.columns:
                 # Filter for canteen-like locations (containing 'kantin', 'cafeteria', 'cafe', etc.)
                 canteen_keywords = ['kantin', 'cafeteria', 'cafe', 'kafe', 'food', 'makan', 'warung', 'resto', 'restaurant']
@@ -1233,7 +1053,7 @@ def show():
                                 showlegend=False,
                                 text=[f"{row['total_emisi']:.1f}"],
                                 textposition='outside',
-                                textfont=dict(size=8, color='#2d3748', weight='bold'),
+                                textfont=dict(size=10, color='#2d3748', weight='bold'),
                                 hovertemplate=f'<b>{row["lokasi"]}</b><br>Total Emisi: {row["total_emisi"]:.2f} kg CO₂<br>Rata-rata: {row["avg_emisi"]:.2f} kg CO₂<br>Aktivitas: {row["activity_count"]}<br><i>Total emisi makanan & minuman</i><extra></extra>',
                                 name=row['lokasi']
                             ))
@@ -1251,26 +1071,25 @@ def show():
                                 bgcolor="white", 
                                 bordercolor="#5e4fa2", 
                                 borderwidth=1,
-                                font=dict(size=8)
+                                font=dict(size=10)
                             )
                         )
                         
                         fig_canteen.update_layout(
-                            height=235,
-                            margin=dict(t=25, b=0, l=0, r=0),
+                            height=270,
+                            margin=dict(t=30, b=0, l=0, r=0),
                             title=dict(text=f"<b>{canteen_title}</b>", x=0.35, y=0.95,
-                                      font=dict(size=11, color="#000000")),
+                                      font=dict(size=12, color="#000000")),
                             paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                             xaxis=dict(
                                 showgrid=False, 
-                                tickfont=dict(size=7), 
-                                tickangle=-45,
-                                title=dict(text="Lokasi", font=dict(size=9))
+                                tickfont=dict(size=10), 
+                                title=dict(text="Lokasi", font=dict(size=10))
                             ),
                             yaxis=dict(
                                 showgrid=True, 
                                 gridcolor='rgba(0,0,0,0.1)', 
-                                tickfont=dict(size=8),
+                                tickfont=dict(size=10),
                                 title=dict(text="Total Emisi (kg CO₂)", font=dict(size=9))
                             ),
                             showlegend=False

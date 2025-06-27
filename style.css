@@ -94,7 +94,13 @@ section[data-testid="stSidebar"] [role="separator"],
 section[data-testid="stSidebar"] .css-* button:not(.stButton > button),
 /* Force hide the resize handle div specifically */
 section[data-testid="stSidebar"] > div:last-child,
-section[data-testid="stSidebar"] > div > div[style*="position: absolute"][style*="cursor: col-resize"] {
+section[data-testid="stSidebar"] > div > div[style*="position: absolute"][style*="cursor: col-resize"],
+/* Hide copy icons and other potential interfering elements */
+.stMarkdown [data-testid="stCopyButton"],
+.stMarkdown button[aria-label*="Copy"],
+.stMarkdown .copy-button,
+[data-testid="copyButton"],
+button[title*="copy" i] {
     display: none !important;
     visibility: hidden !important;
     opacity: 0 !important;
@@ -163,6 +169,76 @@ section[data-testid="stSidebar"] * {
         inset 0 1px 0 rgba(255, 255, 255, 0.3);
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* UNIVERSAL INPUT STYLING - GREEN FOCUS EVERYWHERE */
+.stTextInput > div > div > input,
+.stTextArea > div > div > textarea,
+.stSelectbox > div > div > div,
+.stNumberInput > div > div > input,
+.stDateInput > div > div > input,
+.stTimeInput > div > div > input,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="date"],
+input[type="time"],
+textarea,
+select {
+    border: 2px solid #e5e7eb !important;
+    border-radius: 8px !important;
+    transition: all 0.3s ease !important;
+    font-family: 'Poppins', sans-serif !important;
+    background: white !important;
+}
+
+.stTextInput > div > div > input:focus,
+.stTextArea > div > div > textarea:focus,
+.stSelectbox > div > div > div:focus,
+.stNumberInput > div > div > input:focus,
+.stDateInput > div > div > input:focus,
+.stTimeInput > div > div > input:focus,
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="number"]:focus,
+input[type="date"]:focus,
+input[type="time"]:focus,
+textarea:focus,
+select:focus {
+    border-color: #059669 !important;
+    box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1) !important;
+    outline: none !important;
+}
+
+.stTextInput > div > div > input:hover,
+.stTextArea > div > div > textarea:hover,
+.stSelectbox > div > div > div:hover,
+.stNumberInput > div > div > input:hover,
+.stDateInput > div > div > input:hover,
+.stTimeInput > div > div > input:hover,
+input[type="text"]:hover,
+input[type="email"]:hover,
+input[type="password"]:hover,
+input[type="number"]:hover,
+input[type="date"]:hover,
+input[type="time"]:hover,
+textarea:hover,
+select:hover {
+    border-color: #059669 !important;
+}
+
+.stTextInput > label,
+.stTextArea > label,
+.stSelectbox > label,
+.stNumberInput > label,
+.stDateInput > label,
+.stTimeInput > label {
+    font-family: 'Poppins', sans-serif !important;
+    font-weight: 600 !important;
+    color: #374151 !important;
+    font-size: 14px !important;
 }
 
 .header-bg-pattern {
@@ -520,8 +596,6 @@ section[data-testid="stSidebar"] * {
     /* ... */
     margin-bottom: 0 !important;
 }
-
-
 
 .nav-menu > div {
     margin: 0 0 2px 0 !important;
