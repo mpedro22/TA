@@ -1,53 +1,42 @@
-# Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
-*.egg
-*.egg-info/
-dist/
-build/
+.Python
 env/
 venv/
+ENV/
+.env
 .venv
+
+# Data files
+data/users.json
+data/raw/*
+data/processed/*
+data/cache/*
 
 # Streamlit
 .streamlit/secrets.toml
-
-# SECURITY - User data
-users.json
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
-
-# OS
-.DS_Store
-Thumbs.db
-*.bak
 
 # Logs
 *.log
 logs/
 
-# Database
-*.db
-*.sqlite
-*.sqlite3
-
-# Environment
-.env
-.env.local
+# OS
+.DS_Store
+Thumbs.db
 
 # Testing
+.pytest_cache/
 .coverage
 htmlcov/
-*.cover
 
-# Temporary
-*.tmp
-temp/
-tmp/
+# Backup files
+*_backup/
+*.bak

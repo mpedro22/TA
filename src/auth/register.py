@@ -1,6 +1,6 @@
 # register.py
 import streamlit as st
-from auth import create_user, is_admin
+from src.auth.auth import create_user, is_admin
 import time
 
 def show():

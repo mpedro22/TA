@@ -5,7 +5,7 @@ import os
 from typing import Dict, Optional
 
 # File untuk menyimpan data user
-USERS_FILE = "users.json"
+USERS_FILE = "data/users.json"
 
 def hash_password(password: str) -> str:
     """Hash password using SHA256"""

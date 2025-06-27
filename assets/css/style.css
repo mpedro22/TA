@@ -1441,3 +1441,30 @@ section[data-testid="stSidebar"] > div:last-child {
     position: absolute !important;
     left: -9999px !important;
 }
+/* HIDE DEFAULT STREAMLIT SIDEBAR COMPLETELY */
+section[data-testid="stSidebar"] > div:first-child > div:first-child {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+/* Hide the file browser/page navigator in sidebar */
+div[data-testid="stSidebarNav"] {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+/* Hide any streamlit default navigation elements */
+.css-1d391kg, .css-1rs6os, .css-17eq0hr {
+    display: none !important;
+}
+
+/* Ensure our custom sidebar content is visible */
+section[data-testid="stSidebar"] .sidebar-header {
+    display: block !important;
+    visibility: visible !important;
+}
+
+section[data-testid="stSidebar"] .nav-menu {
+    display: block !important;
+    visibility: visible !important;
+}

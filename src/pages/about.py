@@ -1,5 +1,5 @@
 import streamlit as st
-from loading import loading
+from src.components.loading import loading, loading_decorator
 import time
 
 def show():

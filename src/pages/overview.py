@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
-from loading import loading, loading_decorator
+from src.components.loading import loading, loading_decorator
 import time
 from sklearn.cluster import KMeans, AgglomerativeClustering
 from sklearn.preprocessing import StandardScaler
