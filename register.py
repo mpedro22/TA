@@ -8,282 +8,176 @@ def show():
         st.error("Akses ditolak! Hanya admin yang dapat menambah akun baru.")
         return
 
-    # CSS untuk design register sesuai Figma
+    # CSS BARU UNTUK DESAIN REGISTER YANG KONSISTEN DENGAN LOGIN
     st.markdown("""
     <style>
-        /* CLEAN REGISTER BACKGROUND */
-        .register-container {
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100vw !important;
-            height: 100vh !important;
-            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%) !important;
-            z-index: -1 !important;
+        /* Mengatur background hijau untuk seluruh halaman */
+        [data-testid="stAppViewContainer"] > .main {
+            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+        }
+
+        /* Sembunyikan header bawaan Streamlit */
+        header {
+            visibility: hidden;
+            display: none;
+        }
+
+        /* Kontainer utama untuk kartu form putih */
+        .form-container {
+            background: white;
+            padding: 2.5rem;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.07);
+            border: 1px solid rgba(0,0,0,0.05);
+            max-width: 450px;
+            margin: 3rem auto;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         
-        /* Main content container override */
-        .main .block-container {
-            padding-top: 2rem !important;
-            padding-bottom: 1rem !important;
-            max-width: none !important;
-            min-height: 100vh !important;
+        /* Header di dalam form (Judul + Subjudul) */
+        .form-header {
+            text-align: center;
+            margin-bottom: 2rem;
         }
-        
-        /* Register Form - Integrated white container */
-        .register-form {
-            background: #ffffff !important;
-            border: 1px solid rgba(229, 231, 235, 0.6) !important;
-            border-radius: 20px !important;
-            padding: 2rem 2.5rem !important;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08) !important;
-            position: relative !important;
-            z-index: 10 !important;
-            margin: 2rem auto !important;
-            animation: slideInUp 0.6s ease-out !important;
-            max-width: 450px !important;
-        }
-        
+
         .form-title {
-            text-align: center !important;
-            font-size: 1.8rem !important;
-            font-weight: 700 !important;
-            color: #1e293b !important;
-            margin-bottom: 1.5rem !important;
-            margin-top: 0rem !important;
-            font-family: 'Poppins', sans-serif !important;
+            font-family: 'Poppins', sans-serif;
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 0.5rem;
         }
-        
-        .register-logo .logo-text {
-            color: white !important;
-            font-family: 'Poppins', sans-serif !important;
-            display: flex !important;
-            flex-direction: column !important;
-            align-items: center !important;
-            line-height: 0.8 !important;
-            text-shadow: 0 1px 3px rgba(0,0,0,0.2) !important;
+
+        .form-subtitle {
+            font-family: 'Poppins', sans-serif;
+            font-size: 1rem;
+            color: #64748b;
         }
-        
-        /* Form inputs styling - NO RED BORDER */
-        .stTextInput > div > div > input {
-            border: 1px solid #d1d5db !important;
-            border-radius: 8px !important;
-            padding: 12px 16px !important;
-            font-size: 14px !important;
-            font-family: 'Poppins', sans-serif !important;
-            transition: all 0.3s ease !important;
-            background: #ffffff !important;
-            height: 44px !important;
-            box-sizing: border-box !important;
-            width: 100% !important;
-        }
-        
-        .stTextInput > div > div > input:focus {
-            border-color: #059669 !important;
-            box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.1) !important;
-            outline: none !important;
-            background: #ffffff !important;
-        }
-        
-        .stTextInput > div > div > input:hover {
-            border-color: #9ca3af !important;
-            background: #ffffff !important;
-        }
-        
-        /* Fix input container */
-        .stTextInput > div {
-            width: 100% !important;
-        }
-        
-        .stTextInput > div > div {
-            width: 100% !important;
-        }
-        
+
+        /* Styling untuk Input Field */
         .stTextInput > label {
-            font-family: 'Poppins', sans-serif !important;
             font-weight: 600 !important;
             color: #374151 !important;
-            font-size: 14px !important;
-            margin-bottom: 8px !important;
-        }
-        
-        /* Button styling */
-        .button-row {
-            display: flex !important;
-            gap: 12px !important;
-            margin-top: 1.5rem !important;
-        }
-        
-        .stButton > button[key="back_btn"] {
-            background: #f8f9fa !important;
-            color: #6c757d !important;
-            border: 1px solid #dee2e6 !important;
-            border-radius: 8px !important;
-            font-weight: 600 !important;
-            font-size: 14px !important;
+            font-size: 0.9rem !important;
             font-family: 'Poppins', sans-serif !important;
-            transition: all 0.3s ease !important;
-            width: 100% !important;
-            height: 44px !important;
-            flex: 1 !important;
-            cursor: pointer !important;
         }
-        
-        .stButton > button[key="back_btn"]:hover {
-            background: #e9ecef !important;
-            color: #495057 !important;
-            border-color: #adb5bd !important;
-            transform: translateY(-1px) !important;
+
+        .stTextInput > div > div > input {
+            border-radius: 8px !important;
+            border: 1px solid #d1d5db !important;
+            background-color: #f9fafb !important;
+            transition: all 0.2s ease-in-out;
+            font-family: 'Poppins', sans-serif !important;
         }
-        
-        .stForm button[type="submit"] {
+
+        .stTextInput > div > div > input:focus {
+            border-color: #059669 !important;
+            background-color: white !important;
+            box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.15) !important;
+        }
+
+        /* Kontainer untuk dua tombol */
+        .button-container {
+            display: flex;
+            gap: 0.75rem; /* Jarak antar tombol */
+            margin-top: 1.5rem;
+        }
+
+        /* Styling Tombol Primary (Tambahkan) */
+        .stForm button[type="submit"][kind="primary"] {
             background: linear-gradient(135deg, #059669 0%, #10b981 100%) !important;
             color: white !important;
             border: none !important;
-            border-radius: 8px !important;
-            padding: 12px 24px !important;
-            font-weight: 600 !important;
-            font-size: 14px !important;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .stForm button[type="submit"][kind="primary"]:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+        }
+        
+        /* Styling Tombol Secondary (Kembali) */
+        .stForm button[type="submit"]:not([kind="primary"]) {
+            background-color: white !important;
+            color: #4b5563 !important;
+            border: 1px solid #d1d5db !important;
+        }
+
+        .stForm button[type="submit"]:not([kind="primary"]):hover {
+            background-color: #f3f4f6 !important;
+            border-color: #9ca3af !important;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        }
+        
+        /* Universal button styles */
+        .stForm button[type="submit"] {
+            border-radius: 8px;
+            padding: 0.75rem;
+            font-weight: 600;
+            font-size: 1rem;
             font-family: 'Poppins', sans-serif !important;
-            transition: all 0.3s ease !important;
-            width: 100% !important;
-            height: 44px !important;
-            flex: 1 !important;
-            cursor: pointer !important;
-        }
-        
-        .stForm button[type="submit"]:hover {
-            background: linear-gradient(135deg, #047857 0%, #059669 100%) !important;
-            transform: translateY(-1px) !important;
-            box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3) !important;
-        }
-        
-        /* Hide copy buttons */
-        .stMarkdown [data-testid="stCopyButton"],
-        .stMarkdown button[aria-label*="Copy"],
-        .stMarkdown .copy-button,
-        [data-testid="copyButton"],
-        button[title*="copy" i] {
-            display: none !important;
-            visibility: hidden !important;
-        }
-        
-        /* Custom button container */
-        .custom-button-container {
-            display: flex !important;
-            gap: 12px !important;
-            margin-top: 1.5rem !important;
-            width: 100% !important;
-        }
-        
-        .custom-button-container > div {
-            flex: 1 !important;
-        }
-        
-        /* Responsive */
-        @media (max-width: 768px) {
-            .register-form {
-                padding: 1.5rem !important;
-                margin: 1rem !important;
-                max-width: 95% !important;
-            }
-            
-            .form-title {
-                font-size: 1.5rem !important;
-            }
-            
-            .button-row, .custom-button-container {
-                flex-direction: column !important;
-                gap: 8px !important;
-            }
-            
-            .main .block-container {
-                padding-top: 1rem !important;
-            }
-        }
-        
-        /* Animation */
-        @keyframes slideInUp {
-            from {
-                transform: translateY(30px);
-                opacity: 0;
-            }
-            to {
-                transform: translateY(0);
-                opacity: 1;
-            }
+            width: 100%;
+            cursor: pointer;
         }
     </style>
     """, unsafe_allow_html=True)
 
-    # Background
-    st.markdown('<div class="register-container"></div>', unsafe_allow_html=True)
+    # Layout utama untuk memusatkan form
+    col1, col2, col3 = st.columns([1, 1.8, 1])
 
-    # Main container
-    col1, col2, col3 = st.columns([1, 2, 1])
-    
     with col2:
-        # Register form container
-        st.markdown('<div class="register-form">', unsafe_allow_html=True)
-        
-        # Form title
-        st.markdown('<h2 class="form-title">Tambah Akun</h2>', unsafe_allow_html=True)
-        
-        # Register form
-        with st.form("register_form"):
-            username = st.text_input("Username", placeholder="Masukkan username")
-            email = st.text_input("Email", placeholder="Masukkan email")
-            password = st.text_input("Password", type="password", placeholder="Masukkan password")
-            confirm_password = st.text_input("Konfirmasi Password", type="password", placeholder="Konfirmasi password")
-            
-            # Custom button layout
-            st.markdown('<div class="custom-button-container">', unsafe_allow_html=True)
-            
-            col_back, col_submit = st.columns(2)
-            
-            with col_back:
-                back_clicked = st.form_submit_button("Kembali", use_container_width=True)
-            
-            with col_submit:
-                submit_clicked = st.form_submit_button("Tambahkan", use_container_width=True, type="primary")
-            
-            st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('<div class="form-container">', unsafe_allow_html=True)
 
-        # Handle back button
+        st.markdown("""
+        <div class="form-header">
+            <h1 class="form-title">Tambah Akun Baru</h1>
+            <p class="form-subtitle">Isi detail di bawah untuk mendaftarkan pengguna.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        with st.form("register_form"):
+            username = st.text_input("Username", placeholder="Masukkan username baru")
+            email = st.text_input("Email", placeholder="Masukkan email pengguna")
+            password = st.text_input("Password", type="password", placeholder="Minimal 6 karakter")
+            confirm_password = st.text_input("Konfirmasi Password", type="password", placeholder="Ulangi password")
+
+            # Spasi sebelum tombol
+            st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
+
+            # Layout tombol
+            btn_col1, btn_col2 = st.columns(2)
+            with btn_col1:
+                back_clicked = st.form_submit_button("Kembali", use_container_width=True)
+            with btn_col2:
+                submit_clicked = st.form_submit_button("Tambahkan", use_container_width=True, type="primary")
+
         if back_clicked:
             st.query_params["page"] = "overview"
             st.rerun()
 
-        # Handle form submission
         if submit_clicked:
             if username and email and password and confirm_password:
                 if password == confirm_password:
                     if len(password) >= 6:
-                        try:
-                            success = create_user(email, username, password)
-                            if success:
-                                st.success(f"Akun '{username}' berhasil dibuat!")
-                                time.sleep(2)
-                                st.query_params["page"] = "overview"
-                                st.rerun()
-                            else:
-                                st.error("Gagal membuat akun. Username atau email mungkin sudah ada.")
-                        except Exception as e:
-                            st.error(f"Error: {str(e)}")
+                        success = create_user(email, username, password)
+                        if success:
+                            st.success(f"Akun '{username}' berhasil dibuat!")
+                            time.sleep(2)
+                            st.query_params["page"] = "overview"
+                            st.rerun()
+                        else:
+                            st.error("Gagal membuat akun. Username atau email mungkin sudah terdaftar.")
                     else:
-                        st.error("Password minimal 6 karakter!")
+                        st.error("Password minimal harus 6 karakter!")
                 else:
-                    st.error("Password dan konfirmasi password tidak sama!")
+                    st.error("Password dan konfirmasi password tidak cocok!")
             else:
-                st.error("Mohon isi semua field!")
-        
-        # Footer
-        st.markdown("""
-        <div style="text-align: center; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #e5e7eb;">
-            <p style="color: #6b7280; font-size: 0.9rem; font-family: 'Poppins', sans-serif;">
-                ITB Carbon Dashboard - Kampus Ganesha
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-        
+                st.error("Mohon isi semua field yang tersedia!")
+
         st.markdown('</div>', unsafe_allow_html=True)
