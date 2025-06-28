@@ -49,7 +49,7 @@ def show():
     
     /* Styling untuk Logo */
     .login-logo {
-        margin-top: 2rem; /* Jarak dari atas DIKURANGI */
+        margin-top: 1rem; /* Jarak dari atas DIKURANGI */
         margin-bottom: 1.5rem;
         animation: fadeIn 0.5s ease-out;
     }
@@ -74,28 +74,26 @@ def show():
     /* Styling Teks Sambutan (DIKECILKAN) */
     .welcome-text {
         text-align: center;
-        margin-bottom: 1rem; /* Jarak ke form DIKURANGI */
+        margin-bottom: 1.5rem; /* Jarak ke form DIKURANGI */
         animation: fadeIn 0.7s ease-out;
     }
     .welcome-title {
         font-family: 'Poppins', sans-serif;
-        font-size: 1.8rem; /* Ukuran font DIKECILKAN */
-        font-weight: 700;
+        font-size: 1.5rem;
+        font-weight: 650;
         color: #1e293b;
-        margin: 0;
     }
     .welcome-subtitle {
         font-family: 'Poppins', sans-serif;
-        font-size: 0.9rem; /* Ukuran font DIKECILKAN */
+        font-size: 0.5rem; /* Ukuran font DIKECILKAN */
         color: #64748b;
-        margin-top: 0.25rem;
+        margin-top: 0.5rem;
     }
 
     /* MENATA st.form MENJADI KARTU PUTIH */
     [data-testid="stForm"] {
         background: white;
         padding: 2.5rem;
-        border-radius: 20px;
         box-shadow: 0 15px 40px rgba(0, 0, 0, 0.08);
         border: 1px solid rgba(0,0,0,0.06);
         animation: fadeIn 0.9s ease-out;
@@ -107,44 +105,38 @@ def show():
         font-family: 'Poppins', sans-serif;
         font-weight: 600;
         color: #374151;
-        margin-top: -4;
-        margin-bottom: 0rem; /* Jarak ke input DIKURANGI */
+        margin-top: -1.5rem;
+        margin-bottom: 0.5rem; /* Jarak ke input DIKURANGI */
     }
     
     /* Styling Input Field */
     .stTextInput > label {
         font-weight: 600 !important;
         color: #374151 !important;
-        font-size: 0.5rem !important;
+        font-size: 1rem !important;
         font-family: 'Poppins', sans-serif !important;
         margin-bottom: 0.3rem !important;
     }
     .stTextInput > div > div > input {
-        border-radius: 8px !important;
-        border: 1px solid #d1d5db !important;
-        background-color: #f9fafb !important;
         transition: all 0.2s ease-in-out;
         font-family: 'Poppins', sans-serif !important;
         height: 40px;
     }
     /* SOLUSI FINAL UNTUK BORDER MERAH/BIRU */
     .stTextInput input:focus {
-        border-color: #059669 !important;
         background-color: white !important;
         box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.15) !important;
-        outline: none !important;
     }
 
     /* Styling Tombol Masuk (DI RAPATKAN) */
     .stForm button[type="submit"] {
-        background: linear-gradient(135deg, #059669 0%, #10b981 100%);
         color: white;
         border: none;
         border-radius: 8px;
         padding: 0.8rem;
         margin-top: 1rem; /* Jarak dari input password DIKURANGI */
         font-weight: 600;
-        font-size: 1rem;
+        font-size: 2rem;
         font-family: 'Poppins', sans-serif !important;
         width: 100%;
         cursor: pointer;
@@ -183,15 +175,16 @@ def show():
         # 2. Teks Sambutan
         st.markdown("""
         <div class="welcome-text">
-            <h1 class="welcome-title">Selamat Datang</h1>
+            <div class="welcome-title">Selamat Datang, Silahkan Isi Untuk Memasuki Dashboard</div>
         </div>
         """, unsafe_allow_html=True)
 
         # 3. Form Login
         with st.form("login_form"):
-            st.markdown("<h3>Masuk</h3>", unsafe_allow_html=True)
             username = st.text_input("Username atau Email", placeholder="Masukkan username atau email")
             password = st.text_input("Password", type="password", placeholder="Masukkan password")
+
+            st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
             submit = st.form_submit_button("Masuk", use_container_width=True)
 
         if submit:
