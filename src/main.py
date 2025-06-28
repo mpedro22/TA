@@ -31,7 +31,7 @@ def main():
             current_user = get_current_user()
             if current_user:
                 user_indicator = "Halo, Admin!" if is_admin() else f"Halo, {current_user['username']}!"
-                st.markdown(f"""<div style="font-size: 1rem; font-weight: 750; color: #059669; margin-top: -2.5rem; font-family: 'Poppins', sans-serif; padding-left: 0.5rem;">{user_indicator}</div>""", unsafe_allow_html=True)
+                st.markdown(f"""<div style="font-size: 1rem; font-weight: 750; color: #059669; margin-top: 0rem; font-family: 'Poppins', sans-serif; padding-left: 0.5rem;">{user_indicator}</div>""", unsafe_allow_html=True)
             
             st.markdown("""<div class="sidebar-header"><div class="logo-wrapper"><div class="logo-container"><div class="logo-circle"><span class="logo-text"><span class="logo-text-main">ITB</span><span class="logo-text-sub">CARBON DASHBOARD</span></span></div></div></div><h2 class="sidebar-title">Kampus Ganesha</h2></div>""", unsafe_allow_html=True)
             st.markdown('<div class="nav-menu">', unsafe_allow_html=True)
@@ -57,20 +57,15 @@ def main():
                 st.markdown('</div>', unsafe_allow_html=True)
             
             st.markdown('</div>', unsafe_allow_html=True)
-            st.markdown('<div style="flex-grow: 1; min-height: 2rem;"></div>', unsafe_allow_html=True)
 
-            if is_admin():
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.button("Tambah Akun", key="sidebar_add_account", use_container_width=True):
-                        st.query_params['page'] = 'register'
+            
+            with st.container():
+                if is_admin():
+                    if st.button("Tambah Akun", key="add_account", use_container_width=True):
+                        st.query_params["page"] = "register"
                         st.rerun()
-                with col2:
-                    if st.button("Keluar", key="sidebar_logout_admin", use_container_width=True):
-                        logout()
-                        st.rerun()
-            else:
-                if st.button("Keluar", key="sidebar_logout_user", use_container_width=True):
+                
+                if st.button("Keluar", key="logout_user", use_container_width=True):
                     logout()
                     st.rerun()
 
