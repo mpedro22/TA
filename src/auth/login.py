@@ -74,7 +74,7 @@ def show():
     /* Styling Teks Sambutan (DIKECILKAN) */
     .welcome-text {
         text-align: center;
-        margin-bottom: 1.5rem; /* Jarak ke form DIKURANGI */
+        margin-bottom: 1rem; /* Jarak ke form DIKURANGI */
         animation: fadeIn 0.7s ease-out;
     }
     .welcome-title {

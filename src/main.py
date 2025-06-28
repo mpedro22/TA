@@ -17,14 +17,16 @@ def main():
     )
 
     # Load CSS
-    with open("assets/css/style.css", encoding="utf-8") as f:
-        css_content = f.read()
-        st.markdown(f"""
-        <style>
-        /* Timestamp: {time.time()} */
-        {css_content}
-        </style>
-        """, unsafe_allow_html=True)
+    # Load CSS with cache-busting
+    # This ensures the browser always fetches the latest CSS file
+    css_file_path = "assets/css/style.css"
+    if os.path.exists(css_file_path):
+        with open(css_file_path, encoding="utf-8") as f:
+            css_content = f.read()
+            # Adding a unique timestamp to force browser to reload the CSS
+            st.markdown(f'<style>/* Cache Buster: {time.time()} */\n{css_content}</style>', unsafe_allow_html=True)
+    else:
+        st.error("Error: style.css not found!")
 
     def create_sidebar():
         with st.sidebar:
@@ -34,50 +36,61 @@ def main():
                 st.markdown(f"""<div style="font-size: 1rem; font-weight: 750; color: #059669; margin-top: 0rem; font-family: 'Poppins', sans-serif; padding-left: 0.5rem;">{user_indicator}</div>""", unsafe_allow_html=True)
             
             st.markdown("""<div class="sidebar-header"><div class="logo-wrapper"><div class="logo-container"><div class="logo-circle"><span class="logo-text"><span class="logo-text-main">ITB</span><span class="logo-text-sub">CARBON DASHBOARD</span></span></div></div></div><h2 class="sidebar-title">Kampus Ganesha</h2></div>""", unsafe_allow_html=True)
+            
             st.markdown('<div class="nav-menu">', unsafe_allow_html=True)
 
             menu_items = [
-                ("", "Dashboard Utama", "overview"),
-                ("", "Transportasi", "transportation"),
-                ("", "Elektronik", "electronic"),
-                ("", "Sampah", "sampah"),
-                ("", "Tentang Dashboard", "about")
+                ("Dashboard Utama", "overview"),
+                ("Transportasi", "transportation"),
+                ("Elektronik", "electronic"),
+                ("Sampah", "sampah"),
+                ("Tentang Dashboard", "about")
             ]
             
             current_page_from_url = st.query_params.get('page', 'overview')
 
-            for icon, label, page_id in menu_items:
+            # Render main menu items
+            for label, page_id in menu_items:
                 st.markdown('<div class="nav-item-wrapper">', unsafe_allow_html=True)
                 if current_page_from_url == page_id:
                     st.markdown(f'<div class="nav-item-active">{label}</div>', unsafe_allow_html=True)
                 else:
-                    if st.button(f"{label}", key=f"nav_{page_id}", use_container_width=True):
+                    if st.button(label, key=f"nav_{page_id}", use_container_width=True):
                         st.query_params["page"] = page_id
                         st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
+
+            # --- KEY CHANGE: REMOVED st.divider() TO MAKE SPACING CONSISTENT ---
+            # st.divider() # This line was removed
+
+            # Conditionally add "Tambah Akun" for admins
+            if is_admin():
+                st.markdown('<div class="nav-item-wrapper">', unsafe_allow_html=True)
+                if current_page_from_url == 'register':
+                    st.markdown('<div class="nav-item-active">Tambah Akun</div>', unsafe_allow_html=True)
+                else:
+                    if st.button("Tambah Akun", key="nav_register", use_container_width=True):
+                        st.query_params["page"] = "register"
+                        st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Add the "Keluar" button for everyone
+            st.markdown('<div class="nav-item-wrapper">', unsafe_allow_html=True)
+            if st.button("Keluar", key="nav_logout", use_container_width=True):
+                logout()
+                st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
             
             st.markdown('</div>', unsafe_allow_html=True)
 
-            
-            with st.container():
-                if is_admin():
-                    if st.button("Tambah Akun", key="add_account", use_container_width=True):
-                        st.query_params["page"] = "register"
-                        st.rerun()
-                
-                if st.button("Keluar", key="logout_user", use_container_width=True):
-                    logout()
-                    st.rerun()
 
-    # === AUTH LOGIC - FIX: Check login status FIRST ===
+    # === AUTH LOGIC - (No changes below this line) ===
     
-    # 1. Jika pengguna belum login, tampilkan halaman login TANPA SIDEBAR
     if st.query_params.get("logged_in") != "true":
         from src.auth.login import show
         show()
-        return  # STOP HERE - no sidebar, no other content
+        return
 
-    # 2. Jika flag login ada, tapi sesi di server kosong (terjadi saat refresh)
     if not is_logged_in():
         username_from_url = st.query_params.get("user")
         if username_from_url:
@@ -85,32 +98,24 @@ def main():
             user_data = all_users.get(username_from_url)
             
             if user_data:
-                # Berhasil menemukan data user, pulihkan sesi
                 st.session_state.user = user_data
-                # Paksa rerun agar seluruh UI digambar dengan sesi yang sudah pulih
                 st.rerun()
                 return 
             else:
-                # User di URL tidak valid, paksa logout
                 st.error("Sesi tidak valid. Harap login kembali.")
                 logout()
                 st.rerun()
                 return
         else:
-            # Flag login ada tapi username tidak, paksa logout
             st.error("Sesi tidak valid. Harap login kembali.")
             logout()
             st.rerun()
             return
             
-    # 3. ONLY AFTER LOGIN SUCCESS - Show sidebar and pages
     page = st.query_params.get("page", "overview")
 
-    # CREATE SIDEBAR ONLY AFTER LOGIN SUCCESS
-    if page != 'register':
-        create_sidebar()
+    create_sidebar()
 
-    # Routing Halaman
     if page == 'overview':
         from src.pages import overview
         overview.show()

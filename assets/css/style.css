@@ -863,89 +863,6 @@ div[data-testid="stButton"] > button:hover {
 
 /* Logout and Auth Buttons */
 
-/* REVISI: CSS tombol auth yang lebih kuat */
-
-section[data-testid="stSidebar"] > div > div > div.element-container:last-of-type > .st-emotion-cache-1jicfl2 {
-    padding: 10px;
-    margin: 0 1rem 1rem 1rem;
-    background-color: rgba(0, 0, 0, 0.03);
-    border-radius: 12px;
-    border: 1px solid rgba(0,0,0,0.05);
-}
-
-/* General style for buttons inside the auth container */
-section[data-testid="stSidebar"] .element-container:last-of-type .stButton > button {
-    text-align: center !important;
-    justify-content: center !important;
-    color: white !important;
-    font-weight: 600 !important;
-    border-radius: 8px !important;
-    height: 40px !important;
-    transition: all 0.2s ease;
-}
-
-/* Style for the "Tambah Akun" button (the first button in the container) */
-section[data-testid="stSidebar"] .element-container:last-of-type .stButton:first-child > button {
-    background: linear-gradient(135deg, #059669 0%, #10b981 100%) !important;
-    box-shadow: 0 2px 8px rgba(5, 150, 105, 0.2) !important;
-    margin-bottom: 8px !important;
-}
-section[data-testid="stSidebar"] .element-container:last-of-type .stButton:first-child > button:hover {
-    background: linear-gradient(135deg, #047857 0%, #059669 100%) !important;
-    box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3) !important;
-    transform: translateY(-2px) !important;
-}
-
-/* Style for the "Keluar" button (the last button in the container) */
-section[data-testid="stSidebar"] .element-container:last-of-type .stButton:last-child > button {
-    background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%) !important;
-    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.2) !important;
-}
-section[data-testid="stSidebar"] .element-container:last-of-type .stButton:last-child > button:hover {
-    background: linear-gradient(135deg, #b91c1c 0%, #dc2626 100%) !important;
-    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3) !important;
-    transform: translateY(-2px) !important;
-}
-
-/* Force override untuk memastikan warna tidak di-override */
-section[data-testid="stSidebar"] .auth-buttons-container .stButton > button[key="add_account"],
-section[data-testid="stSidebar"] .auth-buttons-container div[data-testid="stButton"] > button[key="add_account"] {
-    background: linear-gradient(135deg, #059669 0%, #10b981 100%) !important;
-    color: white !important;
-}
-
-section[data-testid="stSidebar"] .auth-buttons-container .stButton > button[key="logout_user"],
-section[data-testid="stSidebar"] .auth-buttons-container div[data-testid="stButton"] > button[key="logout_user"] {
-    background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%) !important;
-    color: white !important;
-}
-
-/* Pastikan tombol navigasi tidak mempengaruhi tombol auth */
-div[data-testid="stButton"] > button:not(.auth-buttons-container div[data-testid="stButton"] > button) {
-    background: transparent !important;
-    border: none !important;
-    color: #6B7280 !important;
-    font-weight: 500 !important;
-    font-family: 'Poppins', sans-serif !important;
-    padding: 0 16px !important;
-    border-radius: 8px !important;
-    width: 100% !important;
-    text-align: left !important;
-    transition: all 0.2s ease !important;
-    height: 36px !important;
-    margin: 0 !important;
-    box-sizing: border-box !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: flex-start !important;
-    line-height: 1 !important;
-    margin-bottom: -1.5rem !important;
-}
-
-div[data-testid="stButton"] > button:not(.auth-buttons-container div[data-testid="stButton"] > button):hover {
-    background: rgba(0,0,0,0.05) !important;
-    color: #374151 !important;
-}
 
 /* Form Submit Buttons */
 .stForm button[type="submit"][kind="primaryFormSubmit"],
@@ -1496,6 +1413,29 @@ section[data-testid="stSidebar"] .sidebar-header {
     visibility: visible !important;
 }
 
+section[data-testid="stSidebar"] .nav-menu {
+    display: block !important;
+    visibility: visible !important;
+}
+
+/* ========================================================= */
+/* FIX: MENCEGAH KEMUNCULAN SIDEBAR BAWAAN SAAT TRANSISI HALAMAN */
+/* ========================================================= */
+
+/* Hide the default Streamlit sidebar's internal content container */
+section[data-testid="stSidebar"] > div:first-child > div:first-child {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+/* Hide the file browser/page navigator specifically */
+div[data-testid="stSidebarNav"] {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+/* Ensure our custom sidebar content remains visible */
+section[data-testid="stSidebar"] .sidebar-header,
 section[data-testid="stSidebar"] .nav-menu {
     display: block !important;
     visibility: visible !important;
