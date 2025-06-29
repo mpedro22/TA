@@ -32,7 +32,6 @@ def show():
     /* Sembunyikan header bawaan Streamlit */
     header { visibility: hidden; display: none; }
     
-    /* HILANGKAN IKON COPY, LINK, DAN TOOLTIP "PRESS ENTER" */
     button[title*="Copy"], 
     [data-testid="stCopyButton"], 
     .stMarkdown a[href^="#"],
@@ -80,7 +79,7 @@ def show():
     .welcome-title {
         font-family: 'Poppins', sans-serif;
         font-size: 1.5rem;
-        font-weight: 650;
+        font-weight: 620;
         color: #1e293b;
     }
     .welcome-subtitle {
@@ -90,7 +89,6 @@ def show():
         margin-top: 0.5rem;
     }
 
-    /* MENATA st.form MENJADI KARTU PUTIH */
     [data-testid="stForm"] {
         background: white;
         padding: 2.5rem;
@@ -122,7 +120,6 @@ def show():
         font-family: 'Poppins', sans-serif !important;
         height: 40px;
     }
-    /* SOLUSI FINAL UNTUK BORDER MERAH/BIRU */
     .stTextInput input:focus {
         background-color: white !important;
         box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.15) !important;
