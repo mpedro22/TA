@@ -15,11 +15,10 @@ warnings.filterwarnings('ignore')
 MAIN_PALETTE = ['#9e0142', '#d53e4f', '#f46d43', '#fdae61', '#fee08b', 
                 '#e6f598', '#abdda4', '#66c2a5', '#3288bd', '#5e4fa2']
 
-CATEGORY_COLORS = {
-    'Transportasi': '#d53e4f',
-    'Elektronik': '#3288bd', 
-    'Sampah Makanan': '#66c2a5'
-}
+# Palet Warna
+CATEGORY_COLORS = {'Transportasi': '#d53e4f', 'Elektronik': '#3288bd', 'Sampah Makanan': '#66c2a5'}
+CLUSTER_COLORS = ['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00']
+FACULTY_PALETTE = ['#9e0142', '#d53e4f', '#f46d43', '#fdae61', '#fee08b', '#e6f598', '#abdda4', '#66c2a5']
 
 # K-MEANS CLUSTER COLORS
 CLUSTER_COLORS = ['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf']
@@ -985,328 +984,126 @@ def show():
         except Exception as e:
             st.error(f"Error generating PDF: {e}")
 
-    # Calculate metrics from FILTERED data
-    total_emisi = filtered_df['total_emisi'].sum()
-    avg_emisi = filtered_df['total_emisi'].mean()
-    gini_coeff = calculate_gini_coefficient(filtered_df['total_emisi'])
+    col1, col2, col3 = st.columns([1, 1, 1.5], gap="small")
 
-    # KPI Cards with loading - using FILTERED data
-    with loading():
-        kpi_col1, kpi_col2 = st.columns([1, 1])
+    with col1:
+        # --- KOLOM 1: KPI & FAKULTAS ---
+        total_emisi = filtered_df['total_emisi'].sum()
+        avg_emisi = filtered_df['total_emisi'].mean()
+        st.markdown(f'<div class="kpi-card primary" style="margin-bottom: 1rem;"><div class="kpi-value">{total_emisi:.1f}</div><div class="kpi-label">Total Emisi (kg CO₂)</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="kpi-card secondary" style="margin-bottom: 1.5rem;"><div class="kpi-value">{avg_emisi:.2f}</div><div class="kpi-label">Rata-rata/Mahasiswa</div></div>', unsafe_allow_html=True)
         
-        with kpi_col1:
-            st.markdown(f"""
-            <div class="kpi-card primary">
-                <div class="kpi-value">{total_emisi:.1f}</div>
-                <div class="kpi-label">Total Emisi Kampus (kg CO₂)</div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with kpi_col2:
-            st.markdown(f"""
-            <div class="kpi-card secondary">
-                <div class="kpi-value">{avg_emisi:.2f}</div>
-                <div class="kpi-label">Rata-rata Emisi per Mahasiswa</div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        time.sleep(0.15)
+        fakultas_stats = filtered_df.groupby('fakultas')['total_emisi'].sum().reset_index().sort_values('total_emisi', ascending=False)
+        color_palette = ['#9e0142', '#d53e4f', '#f46d43', '#fdae61', '#fee08b', '#e6f598', '#abdda4', '#66c2a5']
+        n_fakultas = len(fakultas_stats)
+        colors = [color_palette[int(i / (n_fakultas - 1) * (len(color_palette) - 1))] if n_fakultas > 1 else color_palette[0] for i in range(n_fakultas)]
+        fakultas_stats['color'] = colors
+        fakultas_stats = fakultas_stats.sort_values('total_emisi', ascending=True)
 
-    # Row 1: Main Charts with loading - ALL using FILTERED data
-    with loading():
-        col1, col2, col3 = st.columns([1, 1, 1])
+        fig_fakultas = go.Figure(go.Bar(
+            x=fakultas_stats['total_emisi'], y=fakultas_stats['fakultas'],
+            orientation='h', marker_color=fakultas_stats['color']
+        ))
+        fig_fakultas.update_layout(height=380, title_text="<b>Emisi per Fakultas</b>", title_x=0.5,
+            margin=dict(t=40, b=0, l=0, r=0), xaxis_title=None, yaxis_title=None, showlegend=False)
+        st.plotly_chart(fig_fakultas, use_container_width=True, config={'displayModeBar': False})
+        
 
-        with col1:
-            # 1. Tren Emisi Harian - using FILTERED data
-            daily_data = []
-            days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
-            
-            # If days filter is applied, only show selected days
-            if selected_days:
-                days_to_show = selected_days
-            else:
-                days_to_show = days
-            
-            # Calculate daily emissions from filtered transport data
-            filtered_transport_ids = set(filtered_df['id_responden'])
-            filtered_transport = df_transport[df_transport['id_responden'].isin(filtered_transport_ids)] if not df_transport.empty else pd.DataFrame()
-            filtered_food = df_food[df_food['id_responden'].isin(filtered_transport_ids)] if not df_food.empty else pd.DataFrame()
-            
-            for day in days_to_show:
-                day_transport = 0
-                day_col = f'emisi_transportasi_{day.lower()}'
-                if not filtered_transport.empty and day_col in filtered_transport.columns:
-                    day_transport = filtered_transport[day_col].sum()
-                
-                # Electronic - distribute weekly evenly for filtered responden
-                day_electronic = filtered_df['elektronik'].sum() / 7
-                
-                # Food for specific day
-                day_food = 0
-                if not filtered_food.empty:
-                    day_food_data = filtered_food[filtered_food['day'] == day]
-                    day_food = day_food_data['emisi_makanan'].sum()
-                
-                # Apply category filter
-                if selected_categories:
-                    if 'Transportasi' not in selected_categories:
-                        day_transport = 0
-                    if 'Elektronik' not in selected_categories:
-                        day_electronic = 0
-                    if 'Sampah Makanan' not in selected_categories:
-                        day_food = 0
-                
-                daily_data.append({
-                    'day': day,
-                    'transportasi': day_transport,
-                    'elektronik': day_electronic,
-                    'sampah_makanan': day_food,
-                    'total': day_transport + day_electronic + day_food
-                })
-            
-            daily_df = pd.DataFrame(daily_data)
-            
-            fig_trend = go.Figure()
-            
-            # Only add traces for selected categories (or all if none selected)
-            categories_to_show = selected_categories if selected_categories else ['Transportasi', 'Elektronik', 'Sampah Makanan']
-            
-            if 'Transportasi' in categories_to_show:
-                fig_trend.add_trace(go.Scatter(
-                    x=daily_df['day'], y=daily_df['transportasi'],
-                    mode='lines+markers', name='Transportasi',
-                    line=dict(color=CATEGORY_COLORS['Transportasi'], width=2),
-                    marker=dict(size=6)
-                ))
-            
-            if 'Elektronik' in categories_to_show:
-                fig_trend.add_trace(go.Scatter(
-                    x=daily_df['day'], y=daily_df['elektronik'],
-                    mode='lines+markers', name='Elektronik',
-                    line=dict(color=CATEGORY_COLORS['Elektronik'], width=2),
-                    marker=dict(size=6)
-                ))
-            
-            if 'Sampah Makanan' in categories_to_show:
-                fig_trend.add_trace(go.Scatter(
-                    x=daily_df['day'], y=daily_df['sampah_makanan'],
-                    mode='lines+markers', name='Sampah Makanan',
-                    line=dict(color=CATEGORY_COLORS['Sampah Makanan'], width=2),
-                    marker=dict(size=6)
-                ))
-            
-            fig_trend.update_layout(
-                height=235, margin=dict(t=25, b=0, l=0, r=20),
-                title=dict(text="<b>Tren Emisi Harian</b>", x=0.38, y=0.95, 
-                          font=dict(size=11, color="#000000")),
-                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                xaxis=dict(showgrid=False, tickfont=dict(size=8), title=dict(text="Hari", font=dict(size=10))),
-                yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=8), title=dict(text="Emisi (kg CO₂)", font=dict(size=10))),
-                legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5, font=dict(size=8)),
-                showlegend=True
+    with col2:
+        # --- KOLOM 2: TREN & KOMPOSISI ---
+        ids = filtered_df['id_responden']
+        daily_data = []
+        days_order = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
+        for day in days_order:
+            day_data_row = {'day': day, 'transportasi': 0, 'elektronik': 0, 'sampah_makanan': 0}
+            transport_col = f'emisi_transportasi_{day.lower()}'
+            day_data_row['transportasi'] = df_transport[df_transport['id_responden'].isin(ids)][transport_col].sum() if not df_transport.empty and transport_col in df_transport.columns else 0
+            electronic_col = f'emisi_elektronik_{day.lower()}'
+            day_data_row['elektronik'] = df_electronic[df_electronic['id_responden'].isin(ids)][electronic_col].sum() if not df_electronic.empty and electronic_col in df_electronic.columns else 0
+            day_data_row['sampah_makanan'] = df_food[(df_food['id_responden'].isin(ids)) & (df_food['day'] == day)]['emisi_makanan'].sum() if not df_food.empty else 0
+            daily_data.append(day_data_row)
+        daily_df = pd.DataFrame(daily_data)
+        
+        fig_trend = go.Figure()
+        for cat in (selected_categories or list(CATEGORY_COLORS.keys())):
+            col_name = cat.lower().replace(' ', '_')
+            if col_name in daily_df.columns:
+                fig_trend.add_trace(go.Scatter(x=daily_df['day'], y=daily_df[col_name], name=cat, mode='lines+markers', line=dict(color=CATEGORY_COLORS[cat])))
+        
+        fig_trend.update_layout(height=265, title_text="<b>Tren Emisi Harian</b>", title_x=0.5,
+            margin=dict(t=40, b=0, l=0, r=0), legend_title_text='', yaxis_title="Emisi (kg CO₂)", xaxis_title=None,
+            legend=dict(orientation="h", yanchor="bottom", y=-0.4, xanchor="center", x=0.5, font_size=9))
+        st.plotly_chart(fig_trend, use_container_width=True, config={'displayModeBar': False})
+
+        
+        categories_data = {'Transportasi': filtered_df['transportasi'].sum(), 'Elektronik': filtered_df['elektronik'].sum(), 'Sampah Makanan': filtered_df['sampah_makanan'].sum()}
+        data_pie = {k: v for k, v in categories_data.items() if v > 0}
+        
+        if data_pie:
+            fig_composition = go.Figure(go.Pie(
+                labels=list(data_pie.keys()), values=list(data_pie.values()), hole=0.5,
+                marker_colors=[CATEGORY_COLORS.get(cat) for cat in data_pie.keys()]
+            ))
+            fig_composition.update_layout(height=325, title_text="<b>Komposisi Emisi</b>", title_x=0.5,
+                margin=dict(t=40, b=0, l=0, r=0), showlegend=True,
+                legend=dict(orientation="h", yanchor="bottom", y=-0.1, xanchor="center", x=0.5, font=dict(size=9))
             )
+            st.plotly_chart(fig_composition, use_container_width=True, config={'displayModeBar': False})
+    
+    with col3:
+        # --- KOLOM 3: CLUSTERING 3D ---
+        if len(filtered_df) >= 4:
+            df_clustered, n_clusters, centers_df = perform_kmeans_clustering(filtered_df)
+            fig_3d = go.Figure()
             
-            st.plotly_chart(fig_trend, use_container_width=True, config={'displayModeBar': False})
-
-        with col2:
-            # 2. Emisi per Fakultas - using FILTERED data
-            fakultas_stats = filtered_df.groupby('fakultas')['total_emisi'].agg(['sum', 'count']).reset_index()
-            fakultas_stats.columns = ['fakultas', 'total_emisi', 'count']
-            fakultas_stats = fakultas_stats[fakultas_stats['count'] >= 1].sort_values('total_emisi', ascending=True).tail(13)
+            # PERBAIKAN: Menambahkan logika penamaan klaster
+            cluster_names = {}
+            # Urutkan pusat klaster berdasarkan total emisi untuk nama yang konsisten
+            centers_df['total'] = centers_df.sum(axis=1)
+            sorted_centers = centers_df.sort_values('total').index
             
-            if not fakultas_stats.empty:
-                fig_fakultas = go.Figure()
-                
-                # Use color gradient
-                max_emisi = fakultas_stats['total_emisi'].max()
-                min_emisi = fakultas_stats['total_emisi'].min()
-                
-                for i, (_, row) in enumerate(fakultas_stats.iterrows()):
-                    if max_emisi > min_emisi:
-                        ratio = (row['total_emisi'] - min_emisi) / (max_emisi - min_emisi)
-                        color_palette = ['#66c2a5', '#abdda4', '#fdae61', '#f46d43', '#d53e4f', '#9e0142']
-                        color_idx = int(ratio * (len(color_palette) - 1))
-                        color = color_palette[color_idx]
-                    else:
-                        color = MAIN_PALETTE[i % len(MAIN_PALETTE)]
-                    
-                    fig_fakultas.add_trace(go.Bar(
-                        x=[row['total_emisi']], 
-                        y=[row['fakultas']], 
-                        orientation='h',
-                        marker=dict(color=color), 
-                        showlegend=False,
-                        text=[f"{row['total_emisi']:.1f}"], 
-                        textposition='inside',
-                        textfont=dict(color='white', size=7, weight='bold'),
-                        hovertemplate=f'<b>{row["fakultas"]}</b><br>Total: {row["total_emisi"]:.1f} kg CO₂<br>Mahasiswa: {row["count"]}<extra></extra>'
-                    ))
-                
-                fig_fakultas.update_layout(
-                    height=235, margin=dict(t=25, b=0, l=0, r=20),
-                    title=dict(text="<b>Emisi per Fakultas</b>", x=0.35, y=0.95,
-                              font=dict(size=11, color="#000000")),
-                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                    xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=8), title=dict(text="Total Emisi (kg CO₂)", font=dict(size=10))),
-                    yaxis=dict(tickfont=dict(size=8), title=dict(text="Fakultas/Sekolah", font=dict(size=10)))
-                )
-                
-                st.plotly_chart(fig_fakultas, use_container_width=True, config={'displayModeBar': False})
-            else:
-                st.info("Data fakultas tidak tersedia dengan filter yang diterapkan")
-
-        with col3:
-            # 3. Komposisi Emisi per Kategori - using FILTERED data
-            categories = ['Transportasi', 'Elektronik', 'Sampah Makanan']
-            category_totals = [
-                filtered_df['transportasi'].sum(),
-                filtered_df['elektronik'].sum(),
-                filtered_df['sampah_makanan'].sum()
-            ]
+            # Beri nama berdasarkan profil
+            name_map = {}
+            low_emitter_threshold = df_unified['total_emisi'].quantile(0.25)
             
-            # Filter out categories with zero emission
-            filtered_categories = []
-            filtered_totals = []
-            filtered_colors = []
-            
-            for i, (cat, total) in enumerate(zip(categories, category_totals)):
-                if total > 0:
-                    filtered_categories.append(cat)
-                    filtered_totals.append(total)
-                    filtered_colors.append(CATEGORY_COLORS[cat])
-            
-            if filtered_totals:
-                fig_composition = go.Figure(data=[go.Pie(
-                    labels=filtered_categories,
-                    values=filtered_totals,
-                    hole=0.45,
-                    marker=dict(colors=filtered_colors, line=dict(color='#FFFFFF', width=2)),
-                    textposition='outside',
-                    textinfo='label+percent',
-                    textfont=dict(size=8, family="Poppins"),
-                    hovertemplate='<b>%{label}</b><br>%{value:.1f} kg CO₂ (%{percent})<extra></extra>'
-                )])
-                
-                total_emisi_chart = sum(filtered_totals)
-                center_text = f"<b style='font-size:14px'>{total_emisi_chart:.1f}</b><br><span style='font-size:8px'>kg CO₂</span>"
-                fig_composition.add_annotation(text=center_text, x=0.5, y=0.5, font_size=10, showarrow=False)
-                
-                fig_composition.update_layout(
-                    height=235, margin=dict(t=25, b=5, l=5, r=5), showlegend=False,
-                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                    title=dict(text="<b>Komposisi Emisi per Kategori</b>", x=0.27, y=0.95, 
-                              font=dict(size=11, color="#000000"))
-                )
-                
-                st.plotly_chart(fig_composition, use_container_width=True, config={'displayModeBar': False})
-            else:
-                st.info("Tidak ada data emisi dengan filter yang diterapkan")
-
-        time.sleep(0.2)
-
-    # Row 2: K-Means Clustering for Emission Category Pairs - IMPLEMENTATION AS REQUESTED
-    with loading():
-        cluster_pairs = [
-            ('transportasi', 'elektronik', 'Transportasi vs Elektronik'),
-            ('transportasi', 'sampah_makanan', 'Transportasi vs Sampah Makanan'),
-            ('elektronik', 'sampah_makanan', 'Elektronik vs Sampah Makanan')
-        ]
-        
-        col1, col2, col3 = st.columns([1, 1, 1])
-        columns = [col1, col2, col3]
-        
-        for idx, (feature1, feature2, title) in enumerate(cluster_pairs):
-            with columns[idx]:
-                # Perform K-means clustering for this pair
-                df_pairwise, n_clusters_pair, centers_pair = perform_pairwise_kmeans_clustering(filtered_df, feature1, feature2)
-                
-                if not df_pairwise.empty and n_clusters_pair > 1:
-                    fig_pair = go.Figure()
-                    
-                    # Get cluster colors
-                    pair_colors = CLUSTER_COLORS[:n_clusters_pair]
-                    
-                    # Add data points with cluster colors
-                    for i in range(n_clusters_pair):
-                        cluster_data = df_pairwise[df_pairwise['pairwise_cluster'] == i]
-                        
-                        if not cluster_data.empty:
-                            # Categorize emission levels for this cluster
-                            cluster_data_copy = cluster_data.copy()
-                            cluster_data_copy['emission_level'] = cluster_data_copy['total_emisi'].apply(categorize_emission_level)
-                            
-                            # Calculate average emission level for cluster
-                            avg_emission = cluster_data_copy['total_emisi'].mean()
-                            cluster_category = categorize_emission_level(avg_emission)
-                            
-                            fig_pair.add_trace(go.Scatter(
-                                x=cluster_data[feature1],
-                                y=cluster_data[feature2],
-                                mode='markers',
-                                marker=dict(
-                                    size=8,  # Same size for all markers
-                                    color=pair_colors[i],
-                                    opacity=0.7,
-                                    line=dict(color='white', width=1)
-                                ),
-                                name=f'Klaster {i+1} ({cluster_category})',
-                                hovertemplate=f'<b>Klaster {i+1}</b><br>' +
-                                            f'{feature1.replace("sampah_makanan", "Sampah Makanan").replace("transportasi", "Transportasi").replace("elektronik", "Elektronik")}: %{{x:.1f}} kg CO₂<br>' +
-                                            f'{feature2.replace("sampah_makanan", "Sampah Makanan").replace("transportasi", "Transportasi").replace("elektronik", "Elektronik")}: %{{y:.1f}} kg CO₂<br>' +
-                                            'Total Emisi: %{customdata:.1f} kg CO₂<br>' +
-                                            f'Kategori: {cluster_category}<br>' +
-                                            '<extra></extra>',
-                                customdata=cluster_data['total_emisi']
-                            ))
-                    
-                    # Add cluster centers
-                    if not centers_pair.empty:
-                        fig_pair.add_trace(go.Scatter(
-                            x=centers_pair[feature1],
-                            y=centers_pair[feature2],
-                            mode='markers',
-                            marker=dict(
-                                size=15,
-                                color='black',
-                                symbol='x',
-                                line=dict(color='white', width=2)
-                            ),
-                            name='Pusat Klaster',
-                            hovertemplate='<b>Pusat Klaster</b><br>' +
-                                        f'{feature1.replace("sampah_makanan", "Sampah Makanan").replace("transportasi", "Transportasi").replace("elektronik", "Elektronik")}: %{{x:.1f}}<br>' +
-                                        f'{feature2.replace("sampah_makanan", "Sampah Makanan").replace("transportasi", "Transportasi").replace("elektronik", "Elektronik")}: %{{y:.1f}}<br>' +
-                                        '<extra></extra>'
-                        ))
-                    
-                    # Calculate WCSS for this clustering
-                    if n_clusters_pair > 0:
-                        wcss_total = 0
-                        for i in range(n_clusters_pair):
-                            cluster_data = df_pairwise[df_pairwise['pairwise_cluster'] == i]
-                            if not cluster_data.empty and not centers_pair.empty:
-                                center = centers_pair.iloc[i]
-                                wcss_cluster = ((cluster_data[feature1] - center[feature1])**2 + 
-                                              (cluster_data[feature2] - center[feature2])**2).sum()
-                                wcss_total += wcss_cluster
-                    
-                    fig_pair.update_layout(
-                        height=240, margin=dict(t=40, b=0, l=0, r=0),
-                        title=dict(text=f"<b>{title}</b>", 
-                                  x=0.35, y=0.95, font=dict(size=10, color="#000000")),
-                        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                        xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=8), 
-                                  title=dict(text=f"{feature1.replace('sampah_makanan', 'Sampah Makanan').replace('transportasi', 'Transportasi').replace('elektronik', 'Elektronik')} (kg CO₂)", font=dict(size=8))),
-                        yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=8), 
-                                  title=dict(text=f"{feature2.replace('sampah_makanan', 'Sampah Makanan').replace('transportasi', 'Transportasi').replace('elektronik', 'Elektronik')} (kg CO₂)", font=dict(size=8))),
-                        legend=dict(orientation="v", yanchor="top", y=1, xanchor="left", x=1.02, font=dict(size=7)),
-                        showlegend=True
-                    )
-                    
-                    st.plotly_chart(fig_pair, use_container_width=True, config={'displayModeBar': False})
-                    
+            # Asignasi nama berdasarkan urutan
+            temp_names = []
+            for idx in sorted_centers:
+                center = centers_df.loc[idx]
+                if center['total'] < low_emitter_threshold:
+                    temp_names.append("Emitor Rendah")
                 else:
-                    st.info(f"Klasterisasi tidak dapat dilakukan untuk {title}")
-        
+                    dominant_feature = center.drop('total').idxmax()
+                    feature_map = {'transportasi': 'Fokus Transportasi', 'elektronik': 'Fokus Elektronik', 'sampah_makanan': 'Fokus Makanan'}
+                    temp_names.append(feature_map.get(dominant_feature, "Emitor Tinggi"))
+            
+            for i, original_idx in enumerate(sorted_centers):
+                name_map[original_idx] = f"Klaster {i+1}: {temp_names[i]}"
+
+
+            for i in range(n_clusters):
+                cluster_data = df_clustered[df_clustered['kmeans_cluster'] == i]
+                
+                fig_3d.add_trace(go.Scatter3d(
+                    x=cluster_data['transportasi'], y=cluster_data['elektronik'], z=cluster_data['sampah_makanan'],
+                    mode='markers', 
+                    name=name_map[i], # Menggunakan nama yang sudah dibuat
+                    marker=dict(size=5, color=CLUSTER_COLORS[i])
+                ))
+            
+            fig_3d.update_layout(
+                height=600, title_text="<b>Segmentasi Perilaku Emisi</b>", title_x=0.5,
+                margin=dict(l=0, r=0, b=0, t=40),
+                scene=dict(
+                    xaxis_title='Transportasi', yaxis_title='Elektronik', zaxis_title='Sampah',
+                    xaxis_title_font=dict(size=9), yaxis_title_font=dict(size=9), zaxis_title_font=dict(size=9),
+                    aspectratio=dict(x=1, y=1, z=0.8)),
+                legend=dict(orientation="h", yanchor="bottom", y=-0.1, xanchor="center", x=0.5, font_size=9)
+            )
+            st.plotly_chart(fig_3d, use_container_width=True, config={'displayModeBar': False})
+        else:
+            st.info("Data tidak cukup untuk clustering.")
+            
         time.sleep(0.15)
 
 if __name__ == "__main__":
