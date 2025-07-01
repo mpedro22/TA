@@ -18,7 +18,7 @@ PERIOD_COLORS = {
 
 MODEBAR_CONFIG = {
     'displayModeBar': True,
-    'displaylogo': False,  # Remove Plotly logo
+    'displaylogo': False,  
     'modeBarButtonsToRemove': [
         'pan2d', 'pan3d',
         'select2d', 'lasso2d', 
@@ -44,7 +44,7 @@ def load_daily_activities_data():
     """Load daily activities data from Google Sheets"""
     url = "https://docs.google.com/spreadsheets/d/11Y7cx9SqtLeG5S09F34nDQSnwaZDfUkZKVnNwRLi8V4/export?format=csv&gid=1749257811"
     try:
-        time.sleep(0.35)  # Food data loading time
+        time.sleep(0.35)  
         return pd.read_csv(url)
     except Exception as e:
         st.error(f"Error loading daily activities data: {e}")
@@ -56,7 +56,7 @@ def load_responden_data():
     """Load responden data for fakultas information"""
     url = "https://docs.google.com/spreadsheets/d/11Y7cx9SqtLeG5S09F34nDQSnwaZDfUkZKVnNwRLi8V4/export?format=csv&gid=1606042726"
     try:
-        time.sleep(0.2)  # Responden data loading time
+        time.sleep(0.2)  
         return pd.read_csv(url)
     except Exception as e:
         return pd.DataFrame()
@@ -139,7 +139,7 @@ def parse_meal_activities(df):
                         'is_weekend': day_name in ['Sabtu', 'Minggu']
                     })
     
-    time.sleep(0.12)  # Meal activity parsing time
+    time.sleep(0.12)  
     return pd.DataFrame(meal_activities)
 
 @loading_decorator()
@@ -164,574 +164,122 @@ def apply_filters(df, selected_days, selected_periods, selected_fakultas, df_res
             if 'id_responden' in fakultas_students.columns and 'id_responden' in filtered_df.columns:
                 filtered_df = filtered_df[filtered_df['id_responden'].isin(fakultas_students['id_responden'])]
     
-    time.sleep(0.08)  # Filter processing time
+    time.sleep(0.08)  
     return filtered_df
 
+
 @loading_decorator()
-def generate_pdf_report(filtered_df, total_emisi, avg_emisi, df_responden=None):
-    """Generate professional HTML report optimized for PDF printing - Updated to match 6 visualizations"""
+def generate_pdf_report(filtered_df, df_responden=None):
+    """
+    REVISED to generate a professional HTML report with tables, insights, and recommendations,
+    matching the latest design.
+    """
     from datetime import datetime
     import pandas as pd
+    time.sleep(0.6)
+
+    if filtered_df.empty:
+        return "<html><body><h1>Tidak ada data untuk dilaporkan</h1><p>Silakan ubah filter Anda.</p></body></html>"
+
+    total_emisi = filtered_df['emisi_makanminum'].sum()
+    avg_emisi = filtered_df['emisi_makanminum'].mean()
     
-    # Simulate complex report generation
-    time.sleep(0.55)
-    
-    def get_fakultas_mapping():
-        return {
-            'Meteorologi': 'FITB', 'Oseanografi': 'FITB', 'Teknik Geodesi dan Geomatika': 'FITB', 'Teknik Geologi': 'FITB',
-            'Aktuaria': 'FMIPA', 'Astronomi': 'FMIPA', 'Fisika': 'FMIPA', 'Kimia': 'FMIPA', 'Matematika': 'FMIPA',
-            'Desain Interior': 'FSRD', 'Desain Komunikasi Visual': 'FSRD', 'Desain Produk': 'FSRD', 'Kriya': 'FSRD', 'Seni Rupa': 'FSRD',
-            'Manajemen Rekayasa Industri': 'FTI', 'Teknik Fisika': 'FTI', 'Teknik Industri': 'FTI', 'Teknik Kimia': 'FTI',
-            'Teknik Geofisika': 'FTTM', 'Teknik Metalurgi': 'FTTM', 'Teknik Perminyakan': 'FTTM', 'Teknik Pertambangan': 'FTTM',
-            'Teknik Dirgantara': 'FTMD', 'Teknik Material': 'FTMD', 'Teknik Mesin': 'FTMD',
-            'Teknik Kelautan': 'FTSL', 'Teknik Lingkungan': 'FTSL', 'Teknik Sipil': 'FTSL',
-            'Arsitektur': 'SAPPK', 'Perencanaan Wilayah dan Kota': 'SAPPK',
-            'Kewirausahaan': 'SBM', 'Manajemen': 'SBM',
-            'Farmasi Klinik dan Komunitas': 'SF', 'Sains dan Teknologi Farmasi': 'SF',
-            'Biologi': 'SITH', 'Mikrobiologi': 'SITH',
-            'Sistem dan Teknologi Informasi': 'STEI', 'Teknik Biomedis': 'STEI', 'Teknik Elektro': 'STEI', 
-            'Informatika': 'STEI', 'Teknik Telekomunikasi': 'STEI', 'Teknik Tenaga Listrik': 'STEI'
-        }
-    
-    # Data calculations
-    valid_df = filtered_df[filtered_df['id_responden'].notna() & (filtered_df['id_responden'] != '') & (filtered_df['id_responden'] != 0)]
-    total_responden = len(valid_df['id_responden'].unique()) if not valid_df.empty else 0
-    
-    # 1. Daily trend analysis
-    daily_stats = valid_df.groupby('day')['emisi_makanminum'].sum().reset_index()
+    # Insight 1: Daily Trend
+    daily_stats = filtered_df.groupby('day')['emisi_makanminum'].sum().reset_index()
     day_order = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
     daily_stats['day_order'] = daily_stats['day'].map({day: i for i, day in enumerate(day_order)})
-    daily_stats = daily_stats.sort_values('day_order')
-    highest_day = daily_stats.loc[daily_stats['emisi_makanminum'].idxmax()] if not daily_stats.empty else None
-    lowest_day = daily_stats.loc[daily_stats['emisi_makanminum'].idxmin()] if not daily_stats.empty else None
-    
-    # 2. Faculty analysis
-    fakultas_data = pd.DataFrame()
-    fakultas_conclusion = "Data fakultas tidak tersedia."
-    if df_responden is not None and not df_responden.empty and 'program_studi' in df_responden.columns:
+    daily_stats = daily_stats.sort_values('day_order').drop(columns=['day_order'])
+    daily_trend_table_html = "".join([f"<tr><td>{row['day']}</td><td style='text-align:right;'>{row['emisi_makanminum']:.1f}</td></tr>" for _, row in daily_stats.iterrows()])
+    peak_day = daily_stats.sort_values('emisi_makanminum', ascending=False).iloc[0]['day']
+    trend_conclusion = f"Puncak emisi dari sampah makanan & minuman terjadi pada hari <strong>{peak_day}</strong>."
+    trend_recommendation = f"Fokuskan kampanye 'zero food waste' atau 'habiskan makananmu' pada hari <strong>{peak_day}</strong>, terutama di kantin-kantin populer."
+
+    # Insight 2: Faculty Analysis
+    fakultas_table_html = "<tr><td colspan='3'>Data fakultas tidak tersedia.</td></tr>"
+    fakultas_conclusion = "Tidak dapat melakukan analisis per fakultas."
+    fakultas_recommendation = "Integrasikan data responden untuk mendapatkan wawasan per fakultas."
+    if df_responden is not None and not df_responden.empty:
         fakultas_mapping = get_fakultas_mapping()
         df_responden['fakultas'] = df_responden['program_studi'].map(fakultas_mapping).fillna('Lainnya')
-        df_with_fakultas = valid_df.merge(df_responden[['id_responden', 'fakultas']], on='id_responden', how='left')
-        
-        if not df_with_fakultas.empty:
+        df_with_fakultas = filtered_df.merge(df_responden[['id_responden', 'fakultas']], on='id_responden', how='left')
+        if not df_with_fakultas.empty and 'fakultas' in df_with_fakultas.columns:
             fakultas_stats = df_with_fakultas.groupby('fakultas')['emisi_makanminum'].agg(['sum', 'count']).round(2)
-            fakultas_stats.columns = ['total_emisi', 'jumlah_aktivitas']
-            fakultas_data = fakultas_stats[fakultas_stats['jumlah_aktivitas'] >= 3].sort_values('total_emisi', ascending=False).head(6)
-            
-            if not fakultas_data.empty:
-                highest = fakultas_data.index[0]
-                highest_emisi = fakultas_data.iloc[0]['total_emisi']
-                fakultas_conclusion = f"Fakultas {highest} memiliki total emisi makanan tertinggi sebesar {highest_emisi:.2f} kg CO₂."
+            fakultas_stats = fakultas_stats[fakultas_stats['count'] >= 1].sort_values('sum', ascending=False)
+            if not fakultas_stats.empty:
+                fakultas_table_html = "".join([f"<tr><td>{fakultas}</td><td style='text-align:right;'>{row['sum']:.2f}</td><td style='text-align:center;'>{int(row['count'])}</td></tr>" for fakultas, row in fakultas_stats.head(10).iterrows()])
+                highest_fakultas = fakultas_stats.index[0]
+                fakultas_conclusion = f"Total emisi sampah makanan tertinggi berasal dari fakultas <strong>{highest_fakultas}</strong>."
+                fakultas_recommendation = f"Lakukan program edukasi limbah makanan yang ditargetkan untuk fakultas <strong>{highest_fakultas}</strong>, possibly di kantin terdekat mereka."
 
-    # 3. Period analysis  
-    period_stats = valid_df.groupby('meal_period')['emisi_makanminum'].agg(['count', 'mean', 'sum']).round(2)
-    period_stats.columns = ['jumlah_aktivitas', 'rata_rata_emisi', 'total_emisi']
-    period_stats = period_stats.reset_index().sort_values('total_emisi', ascending=False)
-    peak_period = period_stats.iloc[0] if not period_stats.empty else None
+    # Insight 3: Meal Period Distribution
+    period_stats = filtered_df.groupby('meal_period')['emisi_makanminum'].agg(['count', 'sum']).round(2).sort_values('count', ascending=False)
+    period_table_html = "".join([f"<tr><td>{period}</td><td style='text-align:center;'>{int(row['count'])}</td><td style='text-align:right;'>{row['sum']:.1f}</td></tr>" for period, row in period_stats.iterrows()])
+    peak_period = period_stats.index[0]
+    period_conclusion = f"Aktivitas makan & minum paling banyak terjadi pada periode <strong>{peak_period}</strong>."
+    period_recommendation = f"Pastikan ketersediaan pilihan makanan porsi kecil/sedang selama periode <strong>{peak_period}</strong> untuk mengurangi potensi sisa makanan."
 
-    # 4. Heatmap analysis (Time-Location patterns)
-    heatmap_conclusion = "Data pola waktu-lokasi tidak tersedia."
-    peak_time_location = "N/A"
-    if not valid_df.empty and 'time_slot' in valid_df.columns and 'lokasi' in valid_df.columns:
-        top_locations = valid_df.groupby('lokasi')['emisi_makanminum'].sum().nlargest(6).index.tolist()
-        heatmap_filtered = valid_df[valid_df['lokasi'].isin(top_locations)]
-        
-        if not heatmap_filtered.empty:
-            heatmap_data = heatmap_filtered.groupby(['lokasi', 'time_slot'])['emisi_makanminum'].sum().reset_index()
-            if not heatmap_data.empty:
-                peak_combo = heatmap_data.loc[heatmap_data['emisi_makanminum'].idxmax()]
-                peak_time_location = f"{peak_combo['lokasi']} pada jam {peak_combo['time_slot']}"
-                heatmap_conclusion = f"Kombinasi lokasi-waktu dengan emisi tertinggi adalah {peak_time_location} dengan {peak_combo['emisi_makanminum']:.2f} kg CO₂."
+    # Insight 4: Location vs. Time Heatmap
+    heatmap_conclusion = "Pola emisi menunjukkan adanya kombinasi waktu dan lokasi tertentu dengan emisi sangat tinggi."
+    heatmap_recommendation = "Gunakan data heatmap untuk mengidentifikasi 'hotspot' (misal: kantin tertentu di jam makan siang) dan tempatkan intervensi (seperti poster atau petugas) di sana."
 
-    # 5. Location popularity analysis
-    location_stats = valid_df.groupby('lokasi').agg({
-        'emisi_makanminum': ['sum', 'mean'],
-        'lokasi': 'count'
-    }).reset_index()
-    location_stats.columns = ['lokasi', 'total_emisi', 'avg_emisi', 'session_count']
-    location_stats = location_stats[location_stats['session_count'] >= 2].sort_values('session_count', ascending=False).head(10)
-    most_popular_location = location_stats.iloc[0] if not location_stats.empty else None
+    # Insight 5: Canteen/Location Emissions
+    canteen_stats = filtered_df.groupby('lokasi')['emisi_makanminum'].agg(['sum', 'count']).sort_values('sum', ascending=False)
+    canteen_table_html = "".join([f"<tr><td>{loc}</td><td style='text-align:right;'>{row['sum']:.1f}</td><td style='text-align:center;'>{int(row['count'])}</td></tr>" for loc, row in canteen_stats.head(10).iterrows()])
+    hottest_canteen = canteen_stats.index[0]
+    canteen_conclusion = f"Lokasi/kantin <strong>{hottest_canteen}</strong> menjadi sumber emisi sampah makanan terbesar."
+    canteen_recommendation = f"Prioritaskan program intervensi di <strong>{hottest_canteen}</strong>. Opsi: perkenalkan sistem penimbangan sisa makanan, tawarkan diskon untuk yang menghabiskan makanan, atau perbaiki manajemen porsi."
 
-    # 6. Box plot distribution analysis (sesuai visualisasi)
-    box_plot_analysis = pd.DataFrame()
-    box_plot_conclusion = "Data distribusi emisi per lokasi tidak tersedia."
-    
-    if not valid_df.empty and 'id_responden' in valid_df.columns and 'lokasi' in valid_df.columns:
-        # Aggregate per responden per lokasi (sama seperti di visualisasi)
-        responden_lokasi_agg = valid_df.groupby(['id_responden', 'lokasi']).agg({
-            'emisi_makanminum': 'sum'
-        }).reset_index()
-        
-        # Group by location untuk analisis distribusi
-        location_distribution = responden_lokasi_agg.groupby('lokasi').agg({
-            'emisi_makanminum': ['count', 'mean', 'median', 'std', 'min', 'max']
-        }).reset_index()
-        location_distribution.columns = ['lokasi', 'responden_count', 'mean_emisi', 'median_emisi', 'std_emisi', 'min_emisi', 'max_emisi']
-        
-        # Filter lokasi dengan minimal 3 responden
-        significant_locations = location_distribution[location_distribution['responden_count'] >= 3]
-        
-        if not significant_locations.empty:
-            # Analisis outliers per lokasi
-            outlier_analysis = []
-            for _, loc_row in significant_locations.iterrows():
-                lokasi = loc_row['lokasi']
-                location_emissions = responden_lokasi_agg[responden_lokasi_agg['lokasi'] == lokasi]['emisi_makanminum']
-                
-                q1 = location_emissions.quantile(0.25)
-                q3 = location_emissions.quantile(0.75)
-                iqr = q3 - q1
-                lower_fence = q1 - 1.5 * iqr
-                upper_fence = q3 + 1.5 * iqr
-                
-                outliers = len(location_emissions[(location_emissions > upper_fence) | (location_emissions < lower_fence)])
-                
-                outlier_analysis.append({
-                    'lokasi': lokasi,
-                    'responden': int(loc_row['responden_count']),
-                    'median': loc_row['median_emisi'],
-                    'iqr': q3 - q1,
-                    'outliers': outliers,
-                    'variabilitas': 'Tinggi' if loc_row['std_emisi'] > loc_row['mean_emisi'] * 0.5 else 'Rendah'
-                })
-            
-            box_plot_analysis = pd.DataFrame(outlier_analysis).sort_values('median', ascending=False)
-            
-            if not box_plot_analysis.empty:
-                highest_median = box_plot_analysis.iloc[0]
-                most_outliers = box_plot_analysis.loc[box_plot_analysis['outliers'].idxmax()]
-                most_variable = box_plot_analysis.loc[box_plot_analysis['iqr'].idxmax()]
-                total_outliers = box_plot_analysis['outliers'].sum()
-                
-                box_plot_conclusion = f"Distribusi emisi menunjukkan {total_outliers} responden outlier total. {highest_median['lokasi']} memiliki median tertinggi ({highest_median['median']:.2f} kg CO₂), {most_outliers['lokasi']} memiliki outlier terbanyak ({most_outliers['outliers']} responden), dan {most_variable['lokasi']} paling bervariasi (IQR: {most_variable['iqr']:.2f})."
-
+    # --- HTML Generation ---
     html_content = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <title>Laporan Emisi Sampah Makanan ITB</title>
-        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-        <style>
-            @page {{
-                size: A4;
-                margin: 15mm;
-            }}
-            
-            @media print {{
-                body {{
-                    -webkit-print-color-adjust: exact !important;
-                    color-adjust: exact !important;
-                    print-color-adjust: exact !important;
-                }}
-                
-                .no-print {{
-                    display: none !important;
-                }}
-                
-                .page-break {{
-                    page-break-before: always;
-                }}
-                
-                .avoid-break {{
-                    page-break-inside: avoid;
-                }}
-            }}
-            
-            body {{
-                font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
-                line-height: 1.4;
-                color: #1f2937;
-                margin: 0;
-                padding: 0;
-                font-size: 11px;
-                background: white;
-            }}
-            
-            .header {{
-                text-align: center;
-                margin-bottom: 25px;
-                padding: 20px 0;
-                border-bottom: 2px solid #16a34a;
-            }}
-            
-            .header h1 {{
-                font-size: 20px;
-                font-weight: 600;
-                color: #16a34a;
-                margin: 0 0 8px 0;
-            }}
-            
-            .header .subtitle {{
-                font-size: 12px;
-                color: #6b7280;
-                margin-bottom: 5px;
-                font-weight: 400;
-            }}
-            
-            .header .timestamp {{
-                font-size: 9px;
-                color: #9ca3af;
-                font-weight: 300;
-            }}
-            
-            .print-instruction {{
-                background: #f0fdf4;
-                border: 1px solid #bbf7d0;
-                border-radius: 4px;
-                padding: 10px;
-                margin-bottom: 20px;
-                text-align: center;
-                font-weight: 500;
-                color: #16a34a;
-                font-size: 10px;
-            }}
-            
-            .executive-summary {{
-                background: #fafafa;
-                border: 1px solid #e5e7eb;
-                border-radius: 6px;
-                padding: 20px;
-                margin-bottom: 25px;
-            }}
-            
-            .metrics-grid {{
-                display: grid;
-                grid-template-columns: repeat(2, 1fr);
-                gap: 15px;
-                margin-bottom: 10px;
-            }}
-            
-            .metric-card {{
-                background: white;
-                border: 1px solid #16a34a;
-                border-radius: 6px;
-                padding: 15px;
-                text-align: center;
-            }}
-            
-            .metric-value {{
-                font-size: 20px;
-                font-weight: 600;
-                color: #16a34a;
-                margin-bottom: 4px;
-                display: block;
-            }}
-            
-            .metric-label {{
-                font-size: 9px;
-                color: #6b7280;
-                font-weight: 400;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-            }}
-            
-            .section {{
-                margin-bottom: 20px;
-                page-break-inside: avoid;
-            }}
-            
-            .section-title {{
-                font-size: 13px;
-                font-weight: 600;
-                color: #16a34a;
-                margin-bottom: 10px;
-                padding-bottom: 5px;
-                border-bottom: 1px solid #16a34a;
-            }}
-            
-            .section-content {{
-                background: #fafafa;
-                border: 1px solid #e5e7eb;
-                border-radius: 4px;
-                padding: 15px;
-            }}
-            
-            .conclusion {{
-                background: #f0fdf4;
-                border-left: 3px solid #16a34a;
-                padding: 10px;
-                margin-top: 10px;
-                font-style: italic;
-                color: #374151;
-                font-size: 10px;
-            }}
-            
-            table {{
-                width: 100%;
-                border-collapse: collapse;
-                margin-bottom: 10px;
-                background: white;
-                font-size: 9px;
-            }}
-            
-            th {{
-                background: #16a34a !important;
-                color: white !important;
-                padding: 8px 5px;
-                text-align: center;
-                font-weight: 500;
-                border: 1px solid #16a34a;
-                font-size: 8px;
-            }}
-            
-            td {{
-                padding: 6px 5px;
-                text-align: center;
-                border: 1px solid #e5e7eb;
-                font-size: 8px;
-            }}
-            
-            tr:nth-child(even) {{
-                background: #f9fafb !important;
-            }}
-            
-            .footer {{
-                margin-top: 25px;
-                padding-top: 15px;
-                border-top: 1px solid #16a34a;
-                text-align: center;
-                font-size: 9px;
-                color: #6b7280;
-                page-break-inside: avoid;
-            }}
-        </style>
-    </head>
-    <body>
-        <div class="print-instruction no-print">
-            <strong>Export PDF:</strong> Tekan Ctrl+P (Windows) atau Cmd+P (Mac), pilih "Save as PDF", lalu klik Save
+    <!DOCTYPE html><html><head><title>Laporan Emisi Sampah Makanan</title><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body {{ font-family: 'Poppins', sans-serif; color: #333; line-height: 1.6; font-size: 11px; }}
+        .page {{ padding: 25px; max-width: 800px; margin: auto; }}
+        .header {{ text-align: center; border-bottom: 2px solid #059669; padding-bottom: 15px; margin-bottom: 25px; }}
+        h1 {{ color: #059669; margin: 0; }} h2 {{ color: #065f46; border-bottom: 1px solid #d1fae5; padding-bottom: 8px; margin-top: 30px; margin-bottom: 15px;}}
+        .grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 25px; }}
+        .card {{ background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; }}
+        .card.primary {{ border-left: 4px solid #10b981; }} .card.primary strong {{ color: #059669; }}
+        .card.secondary {{ border-left: 4px solid #34d399; }} .card.secondary strong {{ color: #10b981; }}
+        .card strong {{ font-size: 1.5em; display: block; }}
+        .conclusion, .recommendation {{ padding: 12px 15px; margin-top: 10px; border-radius: 6px; }}
+        .conclusion {{ background: #f0fdf4; border-left: 4px solid #10b981; }}
+        .recommendation {{ background: #fffbeb; border-left: 4px solid #f59e0b; }}
+        table {{ width: 100%; border-collapse: collapse; margin-top: 15px; }} th, td {{ padding: 8px; text-align: left; border: 1px solid #e5e7eb; }}
+        th {{ background-color: #d1fae5; font-weight: 600; text-align: center; }}
+        td:first-child {{ font-weight: 500; }}
+    </style></head>
+    <body><div class="page">
+        <div class="header"><h1>Laporan Emisi Sampah Makanan</h1><p>Institut Teknologi Bandung | Dibuat pada: {datetime.now().strftime('%d %B %Y')}</p></div>
+        <div class="grid">
+            <div class="card primary"><strong>{total_emisi:.1f} kg CO₂</strong>Total Emisi</div>
+            <div class="card secondary"><strong>{avg_emisi:.2f} kg CO₂</strong>Rata-rata/Aktivitas</div>
         </div>
-        
-        <div class="header">
-            <h1>LAPORAN EMISI SAMPAH MAKANAN ITB</h1>
-            <div class="subtitle">Institut Teknologi Bandung</div>
-            <div class="timestamp">Dibuat pada {datetime.now().strftime('%d %B %Y, %H:%M WIB')}</div>
-        </div>
-        
-        <div class="executive-summary avoid-break">
-            <h2 style="margin-top: 0; color: #16a34a; font-size: 14px; font-weight: 600;">Ringkasan Eksekutif</h2>
-            <div class="metrics-grid">
-                <div class="metric-card">
-                    <span class="metric-value">{total_emisi:.1f}</span>
-                    <div class="metric-label">Total Emisi (kg CO₂)</div>
-                </div>
-                <div class="metric-card">
-                    <span class="metric-value">{avg_emisi:.2f}</span>
-                    <div class="metric-label">Rata-rata per Aktivitas</div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- 1. Tren Emisi Harian -->
-        <div class="section avoid-break">
-            <h2 class="section-title">1. Tren Emisi Harian</h2>
-            <div class="section-content">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Hari</th>
-                            <th>Total Emisi (kg CO₂)</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-    """
-    
-    for _, row in daily_stats.iterrows():
-        # Determine status based on comparison to mean
-        avg_daily = daily_stats['emisi_makanminum'].mean()
-        if row['emisi_makanminum'] > avg_daily * 1.2:
-            status = 'Tinggi'
-        elif row['emisi_makanminum'] < avg_daily * 0.8:
-            status = 'Rendah'
-        else:
-            status = 'Normal'
-            
-        html_content += f"""
-                        <tr>
-                            <td style="text-align: left; font-weight: 500;">{row['day']}</td>
-                            <td>{row['emisi_makanminum']:.2f}</td>
-                            <td>{status}</td>
-                        </tr>
-        """
-    
-    daily_conclusion = f"Hari {highest_day['day']} mencatat emisi tertinggi ({highest_day['emisi_makanminum']:.1f} kg CO₂), sedangkan {lowest_day['day']} terendah ({lowest_day['emisi_makanminum']:.1f} kg CO₂)." if highest_day is not None and lowest_day is not None else "Data tren harian tidak tersedia."
-    
-    html_content += f"""
-                    </tbody>
-                </table>
-                <div class="conclusion">
-                    <strong>Kesimpulan:</strong> {daily_conclusion}
-                </div>
-            </div>
-        </div>
-        
-        <!-- 2. Emisi per Fakultas -->
-        <div class="section avoid-break">
-            <h2 class="section-title">2. Emisi per Fakultas</h2>
-            <div class="section-content">
-    """
-    
-    if not fakultas_data.empty:
-        html_content += """
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Ranking</th>
-                            <th>Fakultas</th>
-                            <th>Total Emisi (kg CO₂)</th>
-                            <th>Jumlah Aktivitas</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        """
-        for idx, (fakultas, row) in enumerate(fakultas_data.iterrows(), 1):
-            html_content += f"""
-                        <tr>
-                            <td><strong>#{idx}</strong></td>
-                            <td style="text-align: left; font-weight: 500;">{fakultas}</td>
-                            <td>{row['total_emisi']:.2f}</td>
-                            <td>{row['jumlah_aktivitas']}</td>
-                        </tr>
-            """
-        html_content += "</tbody></table>"
-    else:
-        html_content += "<p>Data fakultas tidak tersedia.</p>"
-    
-    html_content += f"""
-                <div class="conclusion">
-                    <strong>Kesimpulan:</strong> {fakultas_conclusion}
-                </div>
-            </div>
-        </div>
-        
-        <!-- 3. Distribusi Emisi per Periode Waktu -->
-        <div class="section avoid-break">
-            <h2 class="section-title">3. Distribusi Emisi per Periode Waktu</h2>
-            <div class="section-content">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Periode</th>
-                            <th>Aktivitas</th>
-                            <th>Rata-rata Emisi</th>
-                            <th>Total Emisi</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-    """
-    
-    for _, row in period_stats.iterrows():
-        html_content += f"""
-                        <tr>
-                            <td style="text-align: left; font-weight: 500;">{row['meal_period']}</td>
-                            <td>{row['jumlah_aktivitas']}</td>
-                            <td>{row['rata_rata_emisi']:.2f}</td>
-                            <td>{row['total_emisi']:.1f}</td>
-                        </tr>
-        """
-    
-    period_conclusion = f"Periode {peak_period['meal_period']} menghasilkan emisi tertinggi sebesar {peak_period['total_emisi']:.1f} kg CO₂." if peak_period is not None else "Data periode tidak tersedia."
-    
-    html_content += f"""
-                    </tbody>
-                </table>
-                <div class="conclusion">
-                    <strong>Kesimpulan:</strong> {period_conclusion}
-                </div>
-            </div>
-        </div>
-        
-        <!-- 4. Analisis Pola Waktu dan Lokasi -->
-        <div class="section avoid-break">
-            <h2 class="section-title">4. Analisis Pola Waktu dan Lokasi</h2>
-            <div class="section-content">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Metrik</th>
-                            <th>Nilai</th>
-                            <th>Keterangan</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td style="text-align: left; font-weight: 500;">Kombinasi Puncak</td>
-                            <td>{peak_time_location}</td>
-                            <td>Lokasi-waktu dengan emisi tertinggi</td>
-                        </tr>
-                        <tr>
-                            <td style="text-align: left; font-weight: 500;">Top Lokasi Analisis</td>
-                            <td>{len(top_locations) if 'top_locations' in locals() else 0}</td>
-                            <td>Lokasi yang dianalisis dalam heatmap</td>
-                        </tr>
-                        <tr>
-                            <td style="text-align: left; font-weight: 500;">Total Slot Waktu</td>
-                            <td>{len(valid_df['time_slot'].unique()) if 'time_slot' in valid_df.columns else 0}</td>
-                            <td>Variasi waktu aktivitas makan</td>
-                        </tr>
-                    </tbody>
-                </table>
-                <div class="conclusion">
-                    <strong>Kesimpulan:</strong> {heatmap_conclusion}
-                </div>
-            </div>
-        </div>
-        
-        <!-- 5. Lokasi Makan Terpopuler -->
-        <div class="section avoid-break">
-            <h2 class="section-title">5. Lokasi Makan Terpopuler</h2>
-            <div class="section-content">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Ranking</th>
-                            <th>Lokasi</th>
-                            <th>Jumlah Sesi</th>
-                            <th>Total Emisi (kg CO₂)</th>
-                            <th>Emisi per Sesi</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-    """
-    
-    for idx, (_, row) in enumerate(location_stats.iterrows(), 1):
-        emisi_per_sesi = row['total_emisi'] / row['session_count']
-        html_content += f"""
-                        <tr>
-                            <td><strong>#{idx}</strong></td>
-                            <td style="text-align: left; font-weight: 500;">{row['lokasi']}</td>
-                            <td>{row['session_count']}</td>
-                            <td>{row['total_emisi']:.2f}</td>
-                            <td>{emisi_per_sesi:.2f}</td>
-                        </tr>
-        """
-    
-    location_conclusion = f"Lokasi {most_popular_location['lokasi']} merupakan yang terpopuler dengan {most_popular_location['session_count']} sesi dan total emisi {most_popular_location['total_emisi']:.2f} kg CO₂." if most_popular_location is not None else "Data lokasi tidak tersedia."
-    
-    html_content += f"""
-                    </tbody>
-                </table>
-                <div class="conclusion">
-                    <strong>Kesimpulan:</strong> {location_conclusion}
-                </div>
-            </div>
-        </div>
-        </div>
-        
-        <div class="footer">
-            <p><strong>Institut Teknologi Bandung</strong></p>
-            <p>Carbon Emission Dashboard - Food Waste Report</p>
-        </div>
-    </body>
-    </html>
-    """
 
-    
+        <h2>1. Tren Emisi Harian</h2>
+        <table><thead><tr><th>Hari</th><th>Total Emisi (kg CO₂)</th></tr></thead><tbody>{daily_trend_table_html}</tbody></table>
+        <div class="conclusion"><strong>Insight:</strong> {trend_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {trend_recommendation}</div>
+
+        <h2>2. Emisi per Fakultas</h2>
+        <table><thead><tr><th>Fakultas</th><th>Total Emisi (kg CO₂)</th><th>Jumlah Aktivitas</th></tr></thead><tbody>{fakultas_table_html}</tbody></table>
+        <div class="conclusion"><strong>Insight:</strong> {fakultas_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {fakultas_recommendation}</div>
+
+        <h2>3. Distribusi per Periode Waktu</h2>
+        <table><thead><tr><th>Periode</th><th>Jumlah Aktivitas</th><th>Total Emisi (kg CO₂)</th></tr></thead><tbody>{period_table_html}</tbody></table>
+        <div class="conclusion"><strong>Insight:</strong> {period_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {period_recommendation}</div>
+
+        <h2>4. Pola Emisi (Lokasi & Waktu)</h2>
+        <div class="conclusion"><strong>Insight:</strong> {heatmap_conclusion}</div>
+        <div class="recommendation"><strong>Rekomendasi:</strong> {heatmap_recommendation}</div>
+
+        <h2>5. Hotspot Emisi per Lokasi/Kantin</h2>
+        <table><thead><tr><th>Lokasi/Kantin</th><th>Total Emisi (kg CO₂)</th><th>Jumlah Aktivitas</th></tr></thead><tbody>{canteen_table_html}</tbody></table>
+        <div class="conclusion"><strong>Insight:</strong> {canteen_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {canteen_recommendation}</div>
+    </div></body></html>
+    """
     return html_content
 
 def show():
-    # Header with loading
     with loading():
         st.markdown("""
         <div class="wow-header">
@@ -746,9 +294,8 @@ def show():
             </div>
         </div>
         """, unsafe_allow_html=True)
-        time.sleep(0.25)  # Header animation time
+        time.sleep(0.25)  
 
-    # Load data with loading decorators
     df_activities = load_daily_activities_data()
     df_responden = load_responden_data()
     
@@ -756,18 +303,16 @@ def show():
         st.error("Data aktivitas harian tidak tersedia")
         return
 
-    # Parse meal activities with loading
     meal_data = parse_meal_activities(df_activities)
     
     if meal_data.empty:
         st.error("Data aktivitas makanan & minuman tidak ditemukan")
         return
     
-    # Clean data with loading
     with loading():
         meal_data = meal_data.dropna(subset=['emisi_makanminum'])
-        meal_data = meal_data[meal_data['emisi_makanminum'] > 0]  # Remove zero emissions
-        time.sleep(0.1)  # Data cleaning time
+        meal_data = meal_data[meal_data['emisi_makanminum'] > 0] 
+        time.sleep(0.1)  
 
     # Filters
     filter_col1, filter_col2, filter_col3, export_col1, export_col2 = st.columns([1.8, 1.8, 1.8, 1, 1])
@@ -825,11 +370,12 @@ def show():
     
     with export_col2:
         try:
-            pdf_content = generate_pdf_report(filtered_df, total_emisi, avg_emisi, df_responden)
+            pdf_content = generate_pdf_report(filtered_df, df_responden)
+            
             st.download_button(
                 "Laporan", 
                 data=pdf_content, 
-                file_name=f"food_drink_waste_{len(filtered_df)}.html", 
+                file_name=f"food_waste_report_{len(filtered_df)}.html", 
                 mime="text/html", 
                 use_container_width=True, 
                 key="food_export_pdf"
@@ -934,7 +480,7 @@ def show():
                 st.info("Data fakultas tidak tersedia")
 
         with col3:
-            # 3. Distribusi Periode Waktu - Diagram Lingkaran - DIPERBAIKI CENTER TEXT
+            # 3. Distribusi Periode Waktu - Diagram Lingkaran
             period_data = filtered_df['meal_period'].value_counts()
             colors = [PERIOD_COLORS.get(period, MAIN_PALETTE[i % len(MAIN_PALETTE)]) 
                      for i, period in enumerate(period_data.index)]
@@ -950,7 +496,6 @@ def show():
                 hovertemplate='<b>%{label}</b><br>%{value} aktivitas (%{percent})<extra></extra>'
             )])
             
-            # DIPERBAIKI: Center text menampilkan total emisi, bukan total aktivitas
             total_emisi_chart = filtered_df['emisi_makanminum'].sum()
             center_text = f"<b style='font-size:14px'>{total_emisi_chart:.1f}</b><br><span style='font-size:8px'>kg CO₂</span>"
             fig_period.add_annotation(text=center_text, x=0.5, y=0.5, font_size=10, showarrow=False)
@@ -964,7 +509,7 @@ def show():
             
             st.plotly_chart(fig_period, config=MODEBAR_CONFIG, use_container_width=True)
 
-        time.sleep(0.18)  # Row 1 charts loading time
+        time.sleep(0.18)  
 
     # Row 2 with loading
     with loading():
@@ -1048,17 +593,17 @@ def show():
                             if max_emisi > min_emisi:
                                 ratio = (row['total_emisi'] - min_emisi) / (max_emisi - min_emisi)
                                 if ratio < 0.2:
-                                    colors.append('#66c2a5')  # Low emission - green
+                                    colors.append('#66c2a5')  
                                 elif ratio < 0.4:
                                     colors.append('#abdda4')  
                                 elif ratio < 0.6:
-                                    colors.append('#fdae61')  # Medium emission - orange
+                                    colors.append('#fdae61')  
                                 elif ratio < 0.8:
                                     colors.append('#f46d43')  
                                 else:
-                                    colors.append('#d53e4f')  # High emission - red
+                                    colors.append('#d53e4f') 
                             else:
-                                colors.append('#3288bd')  # Default blue
+                                colors.append('#3288bd')  
                         
                         for i, (_, row) in enumerate(canteen_stats.iterrows()):
                             # Shorten location names for display
@@ -1080,7 +625,6 @@ def show():
                                 name=row['lokasi']
                             ))
                         
-                        # Add average line for reference
                         avg_emisi = canteen_stats['total_emisi'].mean()
                         fig_canteen.add_hline(
                             y=avg_emisi,
@@ -1125,7 +669,7 @@ def show():
             else:
                 st.info("Data lokasi tidak tersedia")
 
-        time.sleep(0.18)  # Row 2 charts loading time
+        time.sleep(0.18)  
 
 if __name__ == "__main__":
     show()

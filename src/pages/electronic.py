@@ -19,7 +19,7 @@ DEVICE_COLORS = {
 
 MODEBAR_CONFIG = {
     'displayModeBar': True,
-    'displaylogo': False,  # Remove Plotly logo
+    'displaylogo': False,  
     'modeBarButtonsToRemove': [
         'pan2d', 'pan3d',
         'select2d', 'lasso2d', 
@@ -45,7 +45,7 @@ def load_electronic_data():
     """Load electronic data from Google Sheets"""
     url = "https://docs.google.com/spreadsheets/d/11Y7cx9SqtLeG5S09F34nDQSnwaZDfUkZKVnNwRLi8V4/export?format=csv&gid=622151341"
     try:
-        time.sleep(0.3)  # Simulate data loading time
+        time.sleep(0.3)  
         return pd.read_csv(url)
     except Exception as e:
         st.error(f"Error loading electronic data: {e}")
@@ -57,7 +57,7 @@ def load_daily_activities():
     """Load daily activities data from Google Sheets"""
     url = "https://docs.google.com/spreadsheets/d/11Y7cx9SqtLeG5S09F34nDQSnwaZDfUkZKVnNwRLi8V4/export?format=csv&gid=1749257811"
     try:
-        time.sleep(0.25)  # Simulate data loading time
+        time.sleep(0.25) 
         return pd.read_csv(url)
     except Exception as e:
         st.error(f"Error loading daily activities data: {e}")
@@ -69,7 +69,7 @@ def load_responden_data():
     """Load responden data for fakultas information"""
     url = "https://docs.google.com/spreadsheets/d/11Y7cx9SqtLeG5S09F34nDQSnwaZDfUkZKVnNwRLi8V4/export?format=csv&gid=1606042726"
     try:
-        time.sleep(0.2)  # Simulate data loading time
+        time.sleep(0.2) 
         return pd.read_csv(url)
     except Exception as e:
         return pd.DataFrame()
@@ -154,10 +154,8 @@ def apply_electronic_filters(df, selected_days, selected_devices, selected_fakul
             elif device == 'Tablet' and 'penggunaan_tab' in filtered_df.columns:
                 device_mask |= (filtered_df['penggunaan_tab'].str.contains('Ya', case=False, na=False))
             elif device == 'AC':
-                # For AC, we include all users since AC usage comes from activities data
                 device_mask |= pd.Series(True, index=filtered_df.index)
             elif device == 'Lampu':
-                # For Lampu, we include all users since lamp usage comes from activities data  
                 device_mask |= pd.Series(True, index=filtered_df.index)
         
         if device_mask.any():
@@ -172,7 +170,7 @@ def apply_electronic_filters(df, selected_days, selected_devices, selected_fakul
             if 'id_responden' in fakultas_students.columns and 'id_responden' in filtered_df.columns:
                 filtered_df = filtered_df[filtered_df['id_responden'].isin(fakultas_students['id_responden'])]
     
-    time.sleep(0.1)  # Small delay for smooth filtering experience
+    time.sleep(0.1) 
     return filtered_df
 
 @loading_decorator()
@@ -193,618 +191,129 @@ def calculate_device_emissions(df, activities_df):
         device_emissions['AC'] = activities_df['emisi_ac'].sum()
         device_emissions['Lampu'] = activities_df['emisi_lampu'].sum()
     
-    time.sleep(0.15)  # Calculation processing time
+    time.sleep(0.15)  
     return device_emissions
 
 @loading_decorator()
 def generate_electronic_pdf_report(filtered_df, activities_df, device_emissions, df_responden=None):
-    """Generate professional HTML report optimized for PDF printing with loading"""
+    """
+    REVISED to generate a professional HTML report with tables, insights, and recommendations,
+    matching the latest design.
+    """
     from datetime import datetime
     import pandas as pd
-    
-    # Simulate complex report generation time
     time.sleep(0.6)
-    
-    def get_fakultas_mapping():
-        return {
-            'Meteorologi': 'FITB', 'Oseanografi': 'FITB', 'Teknik Geodesi dan Geomatika': 'FITB', 'Teknik Geologi': 'FITB',
-            'Aktuaria': 'FMIPA', 'Astronomi': 'FMIPA', 'Fisika': 'FMIPA', 'Kimia': 'FMIPA', 'Matematika': 'FMIPA',
-            'Desain Interior': 'FSRD', 'Desain Komunikasi Visual': 'FSRD', 'Desain Produk': 'FSRD', 'Kriya': 'FSRD', 'Seni Rupa': 'FSRD',
-            'Manajemen Rekayasa Industri': 'FTI', 'Teknik Fisika': 'FTI', 'Teknik Industri': 'FTI', 'Teknik Kimia': 'FTI',
-            'Teknik Geofisika': 'FTTM', 'Teknik Metalurgi': 'FTTM', 'Teknik Perminyakan': 'FTTM', 'Teknik Pertambangan': 'FTTM',
-            'Teknik Dirgantara': 'FTMD', 'Teknik Material': 'FTMD', 'Teknik Mesin': 'FTMD',
-            'Teknik Kelautan': 'FTSL', 'Teknik Lingkungan': 'FTSL', 'Teknik Sipil': 'FTSL',
-            'Arsitektur': 'SAPPK', 'Perencanaan Wilayah dan Kota': 'SAPPK',
-            'Kewirausahaan': 'SBM', 'Manajemen': 'SBM',
-            'Farmasi Klinik dan Komunitas': 'SF', 'Sains dan Teknologi Farmasi': 'SF',
-            'Biologi': 'SITH', 'Mikrobiologi': 'SITH',
-            'Sistem dan Teknologi Informasi': 'STEI', 'Teknik Biomedis': 'STEI', 'Teknik Elektro': 'STEI', 
-            'Informatika': 'STEI', 'Teknik Telekomunikasi': 'STEI', 'Teknik Tenaga Listrik': 'STEI'
-        }
-    
-    total_emisi = sum(device_emissions.values()) if device_emissions else 0
-    
-    valid_responden = filtered_df[filtered_df['id_responden'].notna() & (filtered_df['id_responden'] != '') & (filtered_df['id_responden'] != 0)]
-    total_responden = len(valid_responden)
-    
-    avg_emisi_per_person = total_emisi / total_responden if total_responden > 0 else 0
-    
-    smartphone_users = len(valid_responden[valid_responden['penggunaan_hp'].str.contains('Ya', case=False, na=False)]) if 'penggunaan_hp' in valid_responden.columns else 0
-    laptop_users = len(valid_responden[valid_responden['penggunaan_laptop'].str.contains('Ya', case=False, na=False)]) if 'penggunaan_laptop' in valid_responden.columns else 0
-    tablet_users = len(valid_responden[valid_responden['penggunaan_tab'].str.contains('Ya', case=False, na=False)]) if 'penggunaan_tab' in valid_responden.columns else 0
-    
-    expected_daily_cols = [
-        'emisi_elektronik_senin', 'emisi_elektronik_selasa', 'emisi_elektronik_rabu',
-        'emisi_elektronik_kamis', 'emisi_elektronik_jumat', 'emisi_elektronik_sabtu', 
-        'emisi_elektronik_minggu'
-    ]
-    daily_cols = [col for col in expected_daily_cols if col in valid_responden.columns]
-    daily_analysis = []
-    
-    for col in daily_cols:
-        day = col.replace('emisi_elektronik_', '').capitalize()
-        total_day_emisi = valid_responden[col].sum()
-        daily_analysis.append({'day': day, 'emission': total_day_emisi})
-    
-    day_order = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
-    daily_analysis = sorted(daily_analysis, key=lambda x: day_order.index(x['day']) if x['day'] in day_order else 999)
-    
-    if daily_analysis:
-        highest_day = max(daily_analysis, key=lambda x: x['emission'])
-        lowest_day = min(daily_analysis, key=lambda x: x['emission'])
-        weekday_emissions = [d['emission'] for d in daily_analysis[:5]]  
-        weekend_emissions = [d['emission'] for d in daily_analysis[5:]]  
-        avg_weekday = sum(weekday_emissions) / len(weekday_emissions) if weekday_emissions else 0
-        avg_weekend = sum(weekend_emissions) / len(weekend_emissions) if weekend_emissions else 0
-    else:
-        highest_day = {'day': 'N/A', 'emission': 0}
-        lowest_day = {'day': 'N/A', 'emission': 0}
-        avg_weekday = 0
-        avg_weekend = 0
-    
-    # Top 3 fakultas with highest average emissions
-    if df_responden is not None and not df_responden.empty and 'program_studi' in df_responden.columns:
+
+    if filtered_df.empty:
+        return "<html><body><h1>Tidak ada data untuk dilaporkan</h1><p>Silakan ubah filter Anda.</p></body></html>"
+
+    # --- 1. DATA PREPARATION & INSIGHT GENERATION ---
+    total_emisi = sum(device_emissions.values()) if device_emissions else filtered_df['emisi_elektronik_mingguan'].sum()
+    avg_emisi = total_emisi / len(filtered_df) if not filtered_df.empty else 0
+
+    # Insight 1: Daily Trend
+    daily_cols = [c for c in filtered_df.columns if 'emisi_elektronik_' in c and c != 'emisi_elektronik_mingguan']
+    daily_trend_table_html = "<tr><td colspan='2'>Data emisi harian tidak tersedia.</td></tr>"
+    trend_conclusion = "Data tren harian tidak lengkap."
+    trend_recommendation = "Lengkapi data emisi harian untuk analisis tren mingguan."
+    if daily_cols:
+        daily_totals = {col.replace('emisi_elektronik_', '').capitalize(): filtered_df[col].sum() for col in daily_cols}
+        if daily_totals:
+            daily_df = pd.DataFrame(list(daily_totals.items()), columns=['Hari', 'Total Emisi (kg CO₂)']).sort_values(by='Total Emisi (kg CO₂)', ascending=False)
+            daily_trend_table_html = "".join([f"<tr><td>{row['Hari']}</td><td style='text-align:right;'>{row['Total Emisi (kg CO₂)']:.1f}</td></tr>" for _, row in daily_df.iterrows()])
+            peak_day = daily_df.iloc[0]['Hari']
+            trend_conclusion = f"Puncak emisi elektronik terjadi pada hari <strong>{peak_day}</strong>."
+            trend_recommendation = f"Fokuskan kampanye hemat energi, seperti 'Matikan Setelah Pakai', pada hari-hari menjelang <strong>{peak_day}</strong>."
+
+    # Insight 2: Faculty Analysis
+    fakultas_table_html = "<tr><td colspan='3'>Data fakultas tidak tersedia.</td></tr>"
+    fakultas_conclusion = "Tidak dapat melakukan analisis per fakultas."
+    fakultas_recommendation = "Integrasikan data responden untuk wawasan per fakultas."
+    if df_responden is not None and not df_responden.empty:
         fakultas_mapping = get_fakultas_mapping()
         df_responden['fakultas'] = df_responden['program_studi'].map(fakultas_mapping).fillna('Lainnya')
-        
-        # Merge with valid responden
-        df_with_fakultas = valid_responden.merge(df_responden[['id_responden', 'fakultas']], on='id_responden', how='left')
-        
-        if not df_with_fakultas.empty and 'emisi_elektronik_mingguan' in df_with_fakultas.columns:
-            fakultas_emissions = df_with_fakultas.groupby('fakultas').agg({
-                'emisi_elektronik_mingguan': ['mean', 'count']
-            }).reset_index()
-            fakultas_emissions.columns = ['fakultas', 'avg_emission', 'student_count']
-            fakultas_emissions = fakultas_emissions[fakultas_emissions['student_count'] >= 2]  
-            top_fakultas = fakultas_emissions.nlargest(3, 'avg_emission')
-        else:
-            top_fakultas = pd.DataFrame()
-    else:
-        top_fakultas = pd.DataFrame()
-    
-    # Duration distribution analysis
-    duration_stats = {}
-    if 'durasi_hp' in valid_responden.columns:
-        smartphone_data = valid_responden[valid_responden['durasi_hp'] > 0]['durasi_hp']
-        if not smartphone_data.empty:
-            duration_stats['Smartphone'] = {
-                'median': smartphone_data.median(),
-                'q75': smartphone_data.quantile(0.75),
-                'q25': smartphone_data.quantile(0.25),
-                'max': smartphone_data.max(),
-                'users': len(smartphone_data)
-            }
-    
-    if 'durasi_laptop' in valid_responden.columns:
-        laptop_data = valid_responden[valid_responden['durasi_laptop'] > 0]['durasi_laptop']
-        if not laptop_data.empty:
-            duration_stats['Laptop'] = {
-                'median': laptop_data.median(),
-                'q75': laptop_data.quantile(0.75),
-                'q25': laptop_data.quantile(0.25),
-                'max': laptop_data.max(),
-                'users': len(laptop_data)
-            }
-    
-    if 'durasi_tab' in valid_responden.columns:
-        tablet_data = valid_responden[valid_responden['durasi_tab'] > 0]['durasi_tab']
-        if not tablet_data.empty:
-            duration_stats['Tablet'] = {
-                'median': tablet_data.median(),
-                'q75': tablet_data.quantile(0.75),
-                'q25': tablet_data.quantile(0.25),
-                'max': tablet_data.max(),
-                'users': len(tablet_data)
-            }
-    
-    # Heatmap analysis
-    heatmap_conclusion = "Data aktivitas harian tidak tersedia."
-    peak_time_range = "N/A"
-    peak_day = "N/A"
-    if not activities_df.empty:
-        # Find peak emission time and day
-        activities_df['total_emisi_activity'] = activities_df['emisi_ac'] + activities_df['emisi_lampu']
-        if not activities_df.empty:
-            peak_activity = activities_df.loc[activities_df['total_emisi_activity'].idxmax()]
-            peak_time_range = peak_activity.get('time_range', 'N/A')
-            peak_day = peak_activity.get('day', 'N/A')
-            heatmap_conclusion = f"Aktivitas tertinggi terjadi pada hari {peak_day} di jam {peak_time_range} dengan emisi {peak_activity['total_emisi_activity']:.2f} kg CO₂."
-    
-    # Device emissions analysis for insights
-    if device_emissions:
-        dominant_device = max(device_emissions.items(), key=lambda x: x[1])
-        dominant_percentage = (dominant_device[1] / total_emisi * 100) if total_emisi > 0 else 0
-        
-        # Infrastructure vs Personal devices
-        infrastructure_devices = ['AC', 'Lampu']
-        personal_devices = ['Smartphone', 'Laptop', 'Tablet']
-        
-        infrastructure_total = sum([device_emissions.get(device, 0) for device in infrastructure_devices])
-        personal_total = sum([device_emissions.get(device, 0) for device in personal_devices])
-        
-        infrastructure_percentage = (infrastructure_total / total_emisi * 100) if total_emisi > 0 else 0
-        personal_percentage = (personal_total / total_emisi * 100) if total_emisi > 0 else 0
-    else:
-        dominant_device = ('N/A', 0)
-        dominant_percentage = 0
-    
-    # CONSISTENT WITH TRANSPORTATION REPORT STYLING
+        df_with_fakultas = filtered_df.merge(df_responden[['id_responden', 'fakultas']], on='id_responden', how='left')
+        if not df_with_fakultas.empty and 'fakultas' in df_with_fakultas.columns:
+            fakultas_stats = df_with_fakultas.groupby('fakultas')['emisi_elektronik_mingguan'].agg(['sum', 'count']).round(2)
+            fakultas_stats = fakultas_stats[fakultas_stats['count'] >= 1].sort_values('sum', ascending=False)
+            if not fakultas_stats.empty:
+                fakultas_table_html = "".join([f"<tr><td>{fakultas}</td><td style='text-align:right;'>{row['sum']:.2f}</td><td style='text-align:center;'>{int(row['count'])}</td></tr>" for fakultas, row in fakultas_stats.head(10).iterrows()])
+                highest_fakultas = fakultas_stats.index[0]
+                fakultas_conclusion = f"Total emisi elektronik tertinggi berasal dari fakultas <strong>{highest_fakultas}</strong>."
+                fakultas_recommendation = f"Lakukan audit penggunaan perangkat di fakultas <strong>{highest_fakultas}</strong> untuk mengidentifikasi penyebabnya, apakah dari perangkat pribadi atau fasilitas kampus."
+
+    # Insight 3: Device Proportion
+    device_table_html = "".join([f"<tr><td>{device}</td><td style='text-align:right;'>{emisi:.2f}</td><td style='text-align:right;'>{(emisi/total_emisi*100 if total_emisi > 0 else 0):.1f}%</td></tr>" for device, emisi in sorted(device_emissions.items(), key=lambda item: item[1], reverse=True)])
+    dominant_device = max(device_emissions, key=device_emissions.get) if device_emissions else "N/A"
+    device_conclusion = f"Perangkat <strong>{dominant_device}</strong> adalah penyumbang emisi terbesar dari sektor elektronik."
+    device_recommendation = f"Fokuskan kebijakan hemat energi pada penggunaan <strong>{dominant_device}</strong>. Jika itu AC/Lampu, pertimbangkan upgrade ke perangkat hemat energi. Jika Laptop/HP, promosikan mode 'power saving'."
+
+    # Insight 4: Daily Activity Heatmap
+    heatmap_conclusion = "Pola penggunaan fasilitas (AC & Lampu) menunjukkan adanya jam-jam sibuk tertentu."
+    heatmap_recommendation = "Gunakan data heatmap untuk mengimplementasikan sistem kontrol pencahayaan dan AC otomatis yang menyesuaikan dengan jadwal penggunaan ruangan."
+
+    # Insight 5: Popular Classrooms
+    class_activities = activities_df[activities_df['kegiatan'].str.contains('kelas', case=False, na=False)]
+    location_table_html = "<tr><td colspan='3'>Data aktivitas kelas tidak tersedia.</td></tr>"
+    location_conclusion = "Tidak dapat mengidentifikasi gedung kelas populer."
+    location_recommendation = "Lengkapi data aktivitas harian untuk analisis penggunaan fasilitas yang lebih baik."
+    if not class_activities.empty:
+        location_stats = class_activities.groupby('lokasi')['duration'].agg(['sum', 'count']).sort_values('count', ascending=False)
+        location_stats.columns = ['Total Jam Pakai', 'Jumlah Sesi']
+        location_table_html = "".join([f"<tr><td>{loc}</td><td style='text-align:center;'>{int(row['Jumlah Sesi'])}</td><td style='text-align:right;'>{row['Total Jam Pakai']:.1f}</td></tr>" for loc, row in location_stats.head(10).iterrows()])
+        popular_building = location_stats.index[0]
+        location_conclusion = f"Gedung <strong>{popular_building}</strong> adalah yang paling sering digunakan untuk aktivitas kelas."
+        location_recommendation = f"Prioritaskan audit energi dan pemasangan sensor otomatis (lampu/AC) di gedung <strong>{popular_building}</strong> untuk efisiensi maksimal."
+
+    # --- HTML Generation ---
     html_content = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <title>Laporan Emisi Elektronik ITB</title>
-        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-        <style>
-            @page {{
-                size: A4;
-                margin: 15mm;
-            }}
-            
-            @media print {{
-                body {{
-                    -webkit-print-color-adjust: exact !important;
-                    color-adjust: exact !important;
-                    print-color-adjust: exact !important;
-                }}
-                
-                .no-print {{
-                    display: none !important;
-                }}
-                
-                .page-break {{
-                    page-break-before: always;
-                }}
-                
-                .avoid-break {{
-                    page-break-inside: avoid;
-                }}
-            }}
-            
-            body {{
-                font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
-                line-height: 1.4;
-                color: #1f2937;
-                margin: 0;
-                padding: 0;
-                font-size: 11px;
-                background: white;
-            }}
-            
-            .header {{
-                text-align: center;
-                margin-bottom: 25px;
-                padding: 20px 0;
-                border-bottom: 2px solid #16a34a;
-            }}
-            
-            .header h1 {{
-                font-size: 20px;
-                font-weight: 600;
-                color: #16a34a;
-                margin: 0 0 8px 0;
-            }}
-            
-            .header .subtitle {{
-                font-size: 12px;
-                color: #6b7280;
-                margin-bottom: 5px;
-                font-weight: 400;
-            }}
-            
-            .header .timestamp {{
-                font-size: 9px;
-                color: #9ca3af;
-                font-weight: 300;
-            }}
-            
-            .print-instruction {{
-                background: #f0fdf4;
-                border: 1px solid #bbf7d0;
-                border-radius: 4px;
-                padding: 10px;
-                margin-bottom: 20px;
-                text-align: center;
-                font-weight: 500;
-                color: #16a34a;
-                font-size: 10px;
-            }}
-            
-            .executive-summary {{
-                background: #fafafa;
-                border: 1px solid #e5e7eb;
-                border-radius: 6px;
-                padding: 20px;
-                margin-bottom: 25px;
-            }}
-            
-            .metrics-grid {{
-                display: grid;
-                grid-template-columns: repeat(2, 1fr);
-                gap: 15px;
-                margin-bottom: 10px;
-            }}
-            
-            .metric-card {{
-                background: white;
-                border: 1px solid #16a34a;
-                border-radius: 6px;
-                padding: 15px;
-                text-align: center;
-            }}
-            
-            .metric-value {{
-                font-size: 20px;
-                font-weight: 600;
-                color: #16a34a;
-                margin-bottom: 4px;
-                display: block;
-            }}
-            
-            .metric-label {{
-                font-size: 9px;
-                color: #6b7280;
-                font-weight: 400;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-            }}
-            
-            .section {{
-                margin-bottom: 20px;
-                page-break-inside: avoid;
-            }}
-            
-            .section-title {{
-                font-size: 13px;
-                font-weight: 600;
-                color: #16a34a;
-                margin-bottom: 10px;
-                padding-bottom: 5px;
-                border-bottom: 1px solid #16a34a;
-            }}
-            
-            .section-content {{
-                background: #fafafa;
-                border: 1px solid #e5e7eb;
-                border-radius: 4px;
-                padding: 15px;
-            }}
-            
-            .conclusion {{
-                background: #f0fdf4;
-                border-left: 3px solid #16a34a;
-                padding: 10px;
-                margin-top: 10px;
-                font-style: italic;
-                color: #374151;
-                font-size: 10px;
-            }}
-            
-            table {{
-                width: 100%;
-                border-collapse: collapse;
-                margin-bottom: 10px;
-                background: white;
-                font-size: 9px;
-            }}
-            
-            th {{
-                background: #16a34a !important;
-                color: white !important;
-                padding: 8px 5px;
-                text-align: center;
-                font-weight: 500;
-                border: 1px solid #16a34a;
-                font-size: 8px;
-            }}
-            
-            td {{
-                padding: 6px 5px;
-                text-align: center;
-                border: 1px solid #e5e7eb;
-                font-size: 8px;
-            }}
-            
-            tr:nth-child(even) {{
-                background: #f9fafb !important;
-            }}
-            
-            .footer {{
-                margin-top: 25px;
-                padding-top: 15px;
-                border-top: 1px solid #16a34a;
-                text-align: center;
-                font-size: 9px;
-                color: #6b7280;
-                page-break-inside: avoid;
-            }}
-        </style>
-    </head>
-    <body>
-        <div class="print-instruction no-print">
-            <strong>Export PDF:</strong> Tekan Ctrl+P (Windows) atau Cmd+P (Mac), pilih "Save as PDF", lalu klik Save
-        </div>
-        
-        <div class="header">
-            <h1>LAPORAN EMISI ELEKTRONIK</h1>
-            <div class="subtitle">Institut Teknologi Bandung</div>
-            <div class="timestamp">Dibuat pada {datetime.now().strftime('%d %B %Y, %H:%M WIB')}</div>
-        </div>
-        
-        <div class="executive-summary avoid-break">
-            <h2 style="margin-top: 0; color: #16a34a; font-size: 14px; font-weight: 600;">Ringkasan</h2>
-            <div class="metrics-grid">
-                <div class="metric-card">
-                    <span class="metric-value">{total_emisi:.1f}</span>
-                    <div class="metric-label">Total Emisi (kg CO₂)</div>
-                </div>
-                <div class="metric-card">
-                    <span class="metric-value">{avg_emisi_per_person:.2f}</span>
-                    <div class="metric-label">Rata-rata per Mahasiswa</div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- 1. Tren Emisi Harian -->
-        <div class="section avoid-break">
-            <h2 class="section-title">1. Tren Emisi Harian</h2>
-            <div class="section-content">
-    """
-    
-    if daily_analysis:
-        html_content += """
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Hari</th>
-                            <th>Total Emisi (kg CO₂)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        """
-        for day_data in daily_analysis:
-            html_content += f"""
-                        <tr>
-                            <td style="text-align: left; font-weight: 500;">{day_data['day']}</td>
-                            <td>{day_data['emission']:.2f}</td>
-                        </tr>
-            """
-        html_content += "</tbody></table>"
-    else:
-        html_content += "<p>Data emisi harian tidak tersedia.</p>"
-    
-    html_content += f"""
-                <div class="conclusion">
-                    <strong>Kesimpulan:</strong> Hari {highest_day['day']} mencatat emisi tertinggi ({highest_day['emission']:.1f} kg CO₂), hari {lowest_day['day']} terendah ({lowest_day['emission']:.1f} kg CO₂).
-                </div>
-            </div>
-        </div>
-        
-        <!-- 2. Emisi per Fakultas -->
-        <div class="section avoid-break">
-            <h2 class="section-title">2. Emisi per Fakultas</h2>
-            <div class="section-content">
-    """
-    
-    if not top_fakultas.empty:
-        html_content += """
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Ranking</th>
-                            <th>Fakultas</th>
-                            <th>Rata-rata Emisi (kg CO₂/minggu)</th>
-                            <th>Jumlah Mahasiswa</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        """
-        
-        for idx, (_, row) in enumerate(top_fakultas.iterrows(), 1):
-            html_content += f"""
-                        <tr>
-                            <td><strong>#{idx}</strong></td>
-                            <td style="text-align: left; font-weight: 500;">{row['fakultas']}</td>
-                            <td>{row['avg_emission']:.2f}</td>
-                            <td>{row['student_count']} mahasiswa</td>
-                        </tr>
-            """
-        
-        html_content += """
-                    </tbody>
-                </table>
-        """
-        fakultas_conclusion = f"{top_fakultas.iloc[0]['fakultas']} memiliki rata-rata emisi elektronik tertinggi sebesar {top_fakultas.iloc[0]['avg_emission']:.2f} kg CO₂ per minggu."
-    else:
-        html_content += "<p>Data fakultas tidak tersedia.</p>"
-        fakultas_conclusion = "Data fakultas tidak tersedia."
-    
-    html_content += f"""
-                <div class="conclusion">
-                    <strong>Kesimpulan:</strong> {fakultas_conclusion}
-                </div>
-            </div>
+    <!DOCTYPE html><html><head><title>Laporan Emisi Elektronik</title><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body {{ font-family: 'Poppins', sans-serif; color: #333; line-height: 1.6; font-size: 11px; }}
+        .page {{ padding: 25px; max-width: 800px; margin: auto; }}
+        .header {{ text-align: center; border-bottom: 2px solid #059669; padding-bottom: 15px; margin-bottom: 25px; }}
+        h1 {{ color: #059669; margin: 0; }} h2 {{ color: #065f46; border-bottom: 1px solid #d1fae5; padding-bottom: 8px; margin-top: 30px; margin-bottom: 15px;}}
+        .grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 25px; }}
+        .card {{ background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; }}
+        .card.primary {{ border-left: 4px solid #10b981; }} .card.primary strong {{ color: #059669; }}
+        .card.secondary {{ border-left: 4px solid #3b82f6; }} .card.secondary strong {{ color: #3b82f6; }}
+        .card strong {{ font-size: 1.5em; display: block; }}
+        .conclusion, .recommendation {{ padding: 12px 15px; margin-top: 10px; border-radius: 6px; }}
+        .conclusion {{ background: #f0fdf4; border-left: 4px solid #10b981; }}
+        .recommendation {{ background: #fffbeb; border-left: 4px solid #f59e0b; }}
+        ul {{ padding-left: 20px; margin-top: 8px; margin-bottom: 0; }} li {{ margin-bottom: 5px; }}
+        table {{ width: 100%; border-collapse: collapse; margin-top: 15px; }} th, td {{ padding: 8px; text-align: left; border: 1px solid #e5e7eb; }}
+        th {{ background-color: #f3f4f6; font-weight: 600; text-align: center; }}
+        td:first-child {{ font-weight: 500; }}
+    </style></head>
+    <body><div class="page">
+        <div class="header"><h1>Laporan Emisi Elektronik</h1><p>Institut Teknologi Bandung | Dibuat pada: {datetime.now().strftime('%d %B %Y')}</p></div>
+        <div class="grid">
+            <div class="card primary"><strong>{total_emisi:.1f} kg CO₂</strong>Total Emisi</div>
+            <div class="card secondary"><strong>{avg_emisi:.2f} kg CO₂</strong>Rata-rata/Mahasiswa</div>
         </div>
 
-        <!-- 3. Proporsi Emisi per Perangkat -->
-        <div class="section avoid-break">
-            <h2 class="section-title">3. Proporsi Emisi per Perangkat</h2>
-            <div class="section-content">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Perangkat</th>
-                            <th>Total Emisi (kg CO₂)</th>
-                            <th>Persentase (%)</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
+        <h2>1. Tren Emisi Harian</h2>
+        <table><thead><tr><th>Hari</th><th>Total Emisi (kg CO₂)</th></tr></thead><tbody>{daily_trend_table_html}</tbody></table>
+        <div class="conclusion"><strong>Insight:</strong> {trend_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {trend_recommendation}</div>
+
+        <h2>2. Emisi per Fakultas</h2>
+        <table><thead><tr><th>Fakultas</th><th>Total Emisi (kg CO₂)</th><th>Jumlah Responden</th></tr></thead><tbody>{fakultas_table_html}</tbody></table>
+        <div class="conclusion"><strong>Insight:</strong> {fakultas_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {fakultas_recommendation}</div>
+
+        <h2>3. Proporsi Emisi per Perangkat</h2>
+        <table><thead><tr><th>Perangkat</th><th>Total Emisi (kg CO₂)</th><th>Persentase</th></tr></thead><tbody>{device_table_html}</tbody></table>
+        <div class="conclusion"><strong>Insight:</strong> {device_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {device_recommendation}</div>
+
+        <h2>4. Pola Penggunaan Fasilitas Kampus</h2>
+        <div class="conclusion"><strong>Insight:</strong> {heatmap_conclusion}</div>
+        <div class="recommendation"><strong>Rekomendasi:</strong> {heatmap_recommendation}</div>
+
+        <h2>5. Gedung Kelas Paling Populer</h2>
+        <table><thead><tr><th>Gedung</th><th>Jumlah Sesi</th><th>Total Jam Pakai</th></tr></thead><tbody>{location_table_html}</tbody></table>
+        <div class="conclusion"><strong>Insight:</strong> {location_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {location_recommendation}</div>
+    </div></body></html>
     """
-    
-    # Add device emissions data
-    for device, emisi in device_emissions.items():
-        percentage = (emisi / total_emisi * 100) if total_emisi > 0 else 0
-        if percentage > 30:
-            status = 'Tinggi'
-        elif percentage > 15:
-            status = 'Sedang'
-        else:
-            status = 'Rendah'
-        
-        html_content += f"""
-                        <tr>
-                            <td style="text-align: left; font-weight: 500;">{device}</td>
-                            <td>{emisi:.2f}</td>
-                            <td>{percentage:.1f}%</td>
-                            <td>{status}</td>
-                        </tr>
-        """
-    
-    html_content += f"""
-                    </tbody>
-                </table>
-                <div class="conclusion">
-                    <strong>Kesimpulan:</strong> {dominant_device[0]} mendominasi dengan {dominant_percentage:.1f}% total emisi perangkat elektronik.
-                </div>
-            </div>
-        </div>
-        
-        <!-- 4. Heatmap Hari dan Jam -->
-        <div class="section avoid-break">
-            <h2 class="section-title">4. Heatmap Hari dan Jam</h2>
-            <div class="section-content">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Metrik</th>
-                            <th>Nilai</th>
-                            <th>Keterangan</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td style="text-align: left; font-weight: 500;">Waktu Puncak</td>
-                            <td>{peak_time_range}</td>
-                            <td>Jam dengan aktivitas tertinggi</td>
-                        </tr>
-                        <tr>
-                            <td style="text-align: left; font-weight: 500;">Hari Puncak</td>
-                            <td>{peak_day}</td>
-                            <td>Hari dengan aktivitas tertinggi</td>
-                        </tr>
-                        <tr>
-                            <td style="text-align: left; font-weight: 500;">Total Aktivitas</td>
-                            <td>{len(activities_df)} sesi</td>
-                            <td>Jumlah sesi pembelajaran</td>
-                        </tr>
-                    </tbody>
-                </table>
-                <div class="conclusion">
-                    <strong>Kesimpulan:</strong> {heatmap_conclusion}
-                </div>
-            </div>
-        </div>
-        
-        <!-- 5. Gedung Kelas Terpopuler -->
-        <div class="section avoid-break">
-            <h2 class="section-title">5. Gedung Kelas Terpopuler</h2>
-            <div class="section-content">
-    """
-    
-    # Calculate location stats for report
-    if not activities_df.empty and 'lokasi' in activities_df.columns:
-        class_activities_report = activities_df[activities_df['kegiatan'].str.contains('kelas', case=False, na=False)]
-        
-        if not class_activities_report.empty:
-            location_stats_report = class_activities_report.groupby('lokasi').agg({
-                'emisi_ac': 'sum',
-                'emisi_lampu': 'sum',
-                'duration': 'sum'
-            }).reset_index()
-            location_stats_report['total_emisi'] = location_stats_report['emisi_ac'] + location_stats_report['emisi_lampu']
-            location_stats_report['session_count'] = class_activities_report.groupby('lokasi').size().values
-            location_stats_report['avg_emisi_per_session'] = location_stats_report['total_emisi'] / location_stats_report['session_count']
-            
-            # Sort by session count and take top 5 for report
-            top_locations = location_stats_report.sort_values('session_count', ascending=False).head(5)
-            
-            html_content += """
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Ranking</th>
-                            <th>Gedung Kelas</th>
-                            <th>Jumlah Sesi</th>
-                            <th>Total Emisi (kg CO₂)</th>
-                            <th>Emisi per Sesi (kg CO₂)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            """
-            
-            for idx, (_, row) in enumerate(top_locations.iterrows(), 1):
-                html_content += f"""
-                            <tr>
-                                <td><strong>#{idx}</strong></td>
-                                <td style="text-align: left; font-weight: 500;">{row['lokasi']}</td>
-                                <td>{row['session_count']}</td>
-                                <td>{row['total_emisi']:.2f}</td>
-                                <td>{row['avg_emisi_per_session']:.2f}</td>
-                            </tr>
-                """
-            
-            html_content += "</tbody></table>"
-            
-            # Calculate insights for location usage
-            most_used_location = top_locations.iloc[0]
-            total_sessions = top_locations['session_count'].sum()
-            most_used_percentage = (most_used_location['session_count'] / total_sessions * 100)
-            
-            location_conclusion = f"Gedung {most_used_location['lokasi']} merupakan gedung terpopuler dengan {most_used_location['session_count']} sesi ({most_used_percentage:.1f}% dari total aktivitas) dan emisi rata-rata {most_used_location['avg_emisi_per_session']:.2f} kg CO₂ per sesi."
-        else:
-            html_content += "<p>Data aktivitas kelas tidak tersedia.</p>"
-            location_conclusion = "Data aktivitas kelas tidak tersedia."
-    else:
-        html_content += "<p>Data lokasi kelas tidak tersedia.</p>"
-        location_conclusion = "Data lokasi kelas tidak tersedia."
-    
-    html_content += f"""
-                <div class="conclusion">
-                    <strong>Kesimpulan:</strong> {location_conclusion}
-                </div>
-            </div>
-        </div>
-        
-        <div class="footer">
-            <p><strong>Institut Teknologi Bandung</strong></p>
-            <p>Carbon Emission Dashboard - Electronic Devices Report</p>
-        </div>
-    </body>
-    </html>
-    """
-    
     return html_content
 
 def show():
@@ -905,13 +414,14 @@ def show():
             st.download_button(
                 "Laporan", 
                 data=pdf_content, 
-                file_name=f"electronic_{len(filtered_df)}.html", 
+                file_name=f"electronic_report_{len(filtered_df)}.html", 
                 mime="text/html", 
                 use_container_width=True, 
                 key="electronic_export_pdf"
             )
         except Exception as e:
             st.error(f"Error generating PDF: {e}")
+
 
     if filtered_df.empty:
         st.warning("Tidak ada data yang sesuai dengan filter yang dipilih. Silakan ubah atau kosongkan filter.")
@@ -1060,7 +570,7 @@ def show():
                     )  
                     st.plotly_chart(fig_devices, config=MODEBAR_CONFIG, use_container_width=True)
 
-        time.sleep(0.2)  # Delay for row 1 charts
+        time.sleep(0.2) 
 
     # Row 2: Second 3 visualizations with loading
     with loading():
