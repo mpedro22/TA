@@ -1,26 +1,30 @@
 #!/usr/bin/env python3
 
-import subprocess
 import sys
 import os
+from streamlit.web import cli as stcli
 
 def main():
-    """Run the Streamlit application"""
-    # Get the directory of this script
+    """
+    Run the Streamlit application by directly invoking its command-line interface.
+    This ensures that Streamlit's file watcher and hot-reloading work correctly.
+    """
+    # Get the directory of this script to build the full path to main.py
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    main_file = os.path.join(script_dir, "src", "main.py")
-    
-    # Run streamlit with the main file
-    cmd = [sys.executable, "-m", "streamlit", "run", main_file] + sys.argv[1:]
-    
-    try:
-        subprocess.run(cmd, check=True)
-    except subprocess.CalledProcessError as e:
-        print(f"Error running Streamlit: {e}")
-        sys.exit(1)
-    except KeyboardInterrupt:
-        print("\nApplication stopped by user")
-        sys.exit(0)
+    main_py_path = os.path.join(script_dir, "src", "main.py")
+
+    # To run Streamlit programmatically, we need to manipulate sys.argv
+    # to mimic the command line arguments: `streamlit run src/main.py`
+    sys.argv = [
+        "streamlit",
+        "run",
+        main_py_path,
+        # You can add other streamlit arguments here if needed, e.g.:
+        # "--server.port", "8502"
+    ]
+
+    # Call Streamlit's main entry point
+    sys.exit(stcli.main())
 
 if __name__ == "__main__":
     main()

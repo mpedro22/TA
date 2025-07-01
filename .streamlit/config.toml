@@ -1,7 +1,8 @@
 [server]
 port = 8501
-headless = true
 enableCORS = false
+runOnSave = true
+fileWatcherType = "watchdog"
 
 [theme]
 primaryColor = "#059669"
@@ -12,3 +13,6 @@ font = "sans serif"
 
 [browser]
 gatherUsageStats = false
+
+
+

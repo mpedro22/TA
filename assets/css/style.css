@@ -38,11 +38,7 @@ div.block-container {
     margin-top: 0 !important;
 }
 
-/* Hide Streamlit Elements */
-#MainMenu, footer, header, .stDeployButton {
-    visibility: hidden !important;
-    display: none !important;
-}
+
 
 /* Hide ALL sidebar controls: toggle buttons, close buttons, resize handles */
 button[data-testid="collapsedControl"],

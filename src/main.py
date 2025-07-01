@@ -2,6 +2,7 @@ import streamlit as st
 import sys
 import os
 import time
+import importlib
 
 # Add src to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -60,9 +61,6 @@ def main():
                         st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
 
-            # --- KEY CHANGE: REMOVED st.divider() TO MAKE SPACING CONSISTENT ---
-            # st.divider() # This line was removed
-
             # Conditionally add "Tambah Akun" for admins
             if is_admin():
                 st.markdown('<div class="nav-item-wrapper">', unsafe_allow_html=True)
@@ -83,8 +81,7 @@ def main():
             
             st.markdown('</div>', unsafe_allow_html=True)
 
-
-    # === AUTH LOGIC - (No changes below this line) ===
+    # === AUTH LOGIC ===
     
     if st.query_params.get("logged_in") != "true":
         from src.auth.login import show
@@ -116,24 +113,32 @@ def main():
 
     create_sidebar()
 
+    # Page routing dengan force reload untuk development
     if page == 'overview':
         from src.pages import overview
+        # Force reload module untuk development (hapus di production)
+        importlib.reload(overview)
         overview.show()
     elif page == 'transportation':
         from src.pages import transportation
+        importlib.reload(transportation)
         transportation.show()
     elif page == 'electronic':
         from src.pages import electronic
+        importlib.reload(electronic)
         electronic.show()
     elif page == 'sampah':
         from src.pages import food_drink_waste
+        importlib.reload(food_drink_waste)
         food_drink_waste.show()
     elif page == 'about':
         from src.pages import about
+        importlib.reload(about)
         about.show()
     elif page == 'register':
         if is_admin():
             from src.auth import register
+            importlib.reload(register)
             register.show()
         else:
             st.error("Akses ditolak!")
