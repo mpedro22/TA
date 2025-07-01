@@ -1003,9 +1003,7 @@ div[data-testid="stButton"] > button:hover {
     border-radius: 16px !important;
 }
 
-.modebar {
-    display: none !important;
-}
+
 
 .stColumn {
     padding: 0 0.3rem !important;
@@ -1437,3 +1435,61 @@ section[data-testid="stSidebar"] .nav-menu {
     visibility: visible !important;
 }
 
+/* assets/css/style.css */
+
+/* assets/css/style.css */
+
+/* --- FINAL PLOTLY MODEBAR STYLING v5 (FORCE ALIGNMENT & COLOR) --- */
+
+/* 1. Kustomisasi container utama modebar */
+.modebar {
+    background: linear-gradient(135deg, #059669 0%, #10b981 100%) !important;
+    border: 1px solid rgba(110, 231, 183, 0.4) !important;
+    border-radius: 10px !important;
+    box-shadow: 0 4px 12px rgba(5, 150, 105, 0.2) !important;
+    padding: 2px !important; /* Kurangi padding untuk menaikkan sedikit */
+    transition: all 0.3s ease;
+}
+
+/* 2. Gunakan flexbox untuk memusatkan grup tombol */
+.modebar-group {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    background: transparent !important;
+}
+
+/* 3. Atur tombol individual */
+.modebar-btn {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 1px !important;
+    padding: 2px !important; /* Kurangi padding di tombol */
+    border-radius: 6px;
+    transition: background-color 0.2s ease;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    height: 24px !important; /* Tentukan tinggi tetap untuk konsistensi */
+    width: 24px !important;  /* Tentukan lebar tetap untuk konsistensi */
+}
+
+/* 4. Kustomisasi ikon SVG di dalam tombol (SANGAT SPESIFIK) */
+.modebar-btn svg path {
+    fill: #ffffff !important; /* Paksa warna putih pada path di dalam SVG */
+}
+
+/* 5. Efek hover yang halus */
+.modebar-btn:hover {
+    background: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* 6. Atur posisi modebar container */
+.js-plotly-plot .modebar-container {
+    right: 12px !important;
+    top: 8px !important; /* Naikkan sedikit posisi container */
+}

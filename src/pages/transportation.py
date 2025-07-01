@@ -6,6 +6,7 @@ import numpy as np
 from src.components.loading import loading, loading_decorator
 import time
 
+
 # CONSISTENT COLOR PALETTE
 MAIN_PALETTE = ['#9e0142', '#d53e4f', '#f46d43', '#fdae61', '#fee08b', 
                 '#e6f598', '#abdda4', '#66c2a5', '#3288bd', '#5e4fa2']
@@ -21,6 +22,28 @@ TRANSPORT_COLORS = {
     'Motor': '#fdae61', 'Sepeda Motor': '#f46d43', 'Motorcycle': '#fdae61', 'Ojek': '#f46d43',
     # High emission - reds
     'Mobil': '#d53e4f', 'Mobil Pribadi': '#9e0142', 'Car': '#d53e4f', 'Taksi': '#9e0142', 'Taxi': '#9e0142'
+}
+
+MODEBAR_CONFIG = {
+    'displayModeBar': True,
+    'displaylogo': False,  # Remove Plotly logo
+    'modeBarButtonsToRemove': [
+        'pan2d', 'pan3d',
+        'select2d', 'lasso2d', 
+        'zoom2d', 'zoom3d', 'zoomIn2d', 'zoomOut2d', 
+        'autoScale2d', 'resetScale2d', 'resetScale3d',
+        'hoverClosestCartesian', 'hoverCompareCartesian',
+        'toggleSpikelines', 'hoverClosest3d',
+        'orbitRotation', 'tableRotation',
+        'resetCameraDefault3d', 'resetCameraLastSave3d'
+    ],
+    'toImageButtonOptions': {
+        'format': 'png',
+        'filename': 'carbon_emission_chart',
+        'height': 600,
+        'width': 800,
+        'scale': 2
+    }
 }
 
 @st.cache_data(ttl=3600)
@@ -823,7 +846,7 @@ def show():
                     xaxis=dict(showgrid=False, tickfont=dict(size=10), title=dict(text="Hari", font=dict(size=10))),
                     yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=10), title=dict(text="Total Emisi (Kg CO₂)", font=dict(size=10)))
                 )
-                st.plotly_chart(fig_trend, use_container_width=True, config={'displayModeBar': False})
+                st.plotly_chart(fig_trend, config=MODEBAR_CONFIG, use_container_width=True)
             else:
                 st.info("Data tren harian tidak tersedia")
 
@@ -876,7 +899,7 @@ def show():
                             yaxis=dict(tickfont=dict(size=10), title=dict(text="Fakultas/Sekolah", font=dict(size=10)))
                         )
                         
-                        st.plotly_chart(fig_fakultas, use_container_width=True, config={'displayModeBar': False})
+                        st.plotly_chart(fig_fakultas, config=MODEBAR_CONFIG, use_container_width=True)
                     else:
                         st.info("Data fakultas tidak cukup (min 2 mahasiswa)")
                 else:
@@ -909,7 +932,7 @@ def show():
                 title=dict(text="<b>Komposisi Moda Transportasi</b>", x=0.3, y=0.95, 
                           font=dict(size=12, color="#000000"))
             )
-            st.plotly_chart(fig_donut, use_container_width=True, config={'displayModeBar': False})
+            st.plotly_chart(fig_donut, config=MODEBAR_CONFIG, use_container_width=True)
 
         time.sleep(0.2)  # Small delay for charts rendering
 
@@ -970,7 +993,7 @@ def show():
                     yaxis=dict(tickfont=dict(size=10), title=dict(text="Hari", font=dict(size=10))),
                     paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
                 )
-                st.plotly_chart(fig_heatmap, use_container_width=True, config={'displayModeBar': False})
+                st.plotly_chart(fig_heatmap, config=MODEBAR_CONFIG, use_container_width=True)
             else:
                 st.info("Data pola harian tidak tersedia")
 
@@ -1049,7 +1072,7 @@ def show():
                         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                         showlegend=False
                     )
-                    st.plotly_chart(fig_kecamatan, use_container_width=True, config={'displayModeBar': False})
+                    st.plotly_chart(fig_kecamatan, config=MODEBAR_CONFIG, use_container_width=True)
                 else:
                     st.info("Data kecamatan tidak mencukupi untuk analisis")
             else:

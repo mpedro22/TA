@@ -16,6 +16,28 @@ PERIOD_COLORS = {
     'Malam': '#5e4fa2'         
 }
 
+MODEBAR_CONFIG = {
+    'displayModeBar': True,
+    'displaylogo': False,  # Remove Plotly logo
+    'modeBarButtonsToRemove': [
+        'pan2d', 'pan3d',
+        'select2d', 'lasso2d', 
+        'zoom2d', 'zoom3d', 'zoomIn2d', 'zoomOut2d', 
+        'autoScale2d', 'resetScale2d', 'resetScale3d',
+        'hoverClosestCartesian', 'hoverCompareCartesian',
+        'toggleSpikelines', 'hoverClosest3d',
+        'orbitRotation', 'tableRotation',
+        'resetCameraDefault3d', 'resetCameraLastSave3d'
+    ],
+    'toImageButtonOptions': {
+        'format': 'png',
+        'filename': 'carbon_emission_chart',
+        'height': 600,
+        'width': 800,
+        'scale': 2
+    }
+}
+
 @st.cache_data(ttl=3600)
 @loading_decorator()
 def load_daily_activities_data():
@@ -852,7 +874,7 @@ def show():
                 yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=10), title=dict(text="Emisi (Kg CO₂)", font=dict(size=10)))
             )
             
-            st.plotly_chart(fig_trend, use_container_width=True, config={'displayModeBar': False})
+            st.plotly_chart(fig_trend, config=MODEBAR_CONFIG, use_container_width=True)
 
         with col2:
             # 2. Emisi per Fakultas
@@ -903,7 +925,7 @@ def show():
                             yaxis=dict(tickfont=dict(size=10), title=dict(text="Fakultas/Sekolah", font=dict(size=10)))
                         )
                         
-                        st.plotly_chart(fig_fakultas, use_container_width=True, config={'displayModeBar': False})
+                        st.plotly_chart(fig_fakultas, config=MODEBAR_CONFIG, use_container_width=True)
                     else:
                         st.info("Data fakultas tidak cukup (min 3 aktivitas)")
                 else:
@@ -940,7 +962,7 @@ def show():
                           font=dict(size=12, color="#000000"))
             )
             
-            st.plotly_chart(fig_period, use_container_width=True, config={'displayModeBar': False})
+            st.plotly_chart(fig_period, config=MODEBAR_CONFIG, use_container_width=True)
 
         time.sleep(0.18)  # Row 1 charts loading time
 
@@ -982,7 +1004,7 @@ def show():
                     yaxis=dict(tickfont=dict(size=10)),
                     paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
                 )
-                st.plotly_chart(fig_heatmap, use_container_width=True, config={'displayModeBar': False})
+                st.plotly_chart(fig_heatmap, config=MODEBAR_CONFIG, use_container_width=True)
             else:
                 st.info("Data heatmap tidak tersedia")
 
@@ -1095,7 +1117,7 @@ def show():
                             showlegend=False
                         )
                         
-                        st.plotly_chart(fig_canteen, use_container_width=True, config={'displayModeBar': False})
+                        st.plotly_chart(fig_canteen, config=MODEBAR_CONFIG, use_container_width=True)
                     else:
                         st.info("Data kantin tidak cukup untuk analisis")
                 else:

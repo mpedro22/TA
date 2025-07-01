@@ -23,6 +23,28 @@ FACULTY_PALETTE = ['#9e0142', '#d53e4f', '#f46d43', '#fdae61', '#fee08b', '#e6f5
 # K-MEANS CLUSTER COLORS
 CLUSTER_COLORS = ['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf']
 
+MODEBAR_CONFIG = {
+    'displayModeBar': True,
+    'displaylogo': False,  # Remove Plotly logo
+    'modeBarButtonsToRemove': [
+        'pan2d', 'pan3d',
+        'select2d', 'lasso2d', 
+        'zoom2d', 'zoom3d', 'zoomIn2d', 'zoomOut2d', 
+        'autoScale2d', 'resetScale2d', 'resetScale3d',
+        'hoverClosestCartesian', 'hoverCompareCartesian',
+        'toggleSpikelines', 'hoverClosest3d',
+        'orbitRotation', 'tableRotation',
+        'resetCameraDefault3d', 'resetCameraLastSave3d'
+    ],
+    'toImageButtonOptions': {
+        'format': 'png',
+        'filename': 'carbon_emission_chart',
+        'height': 600,
+        'width': 800,
+        'scale': 2
+    }
+}
+
 @st.cache_data(ttl=3600)
 @loading_decorator()
 def load_all_data():
@@ -385,499 +407,135 @@ def categorize_emission_level(total_emisi):
         return 'Emisi Sangat Tinggi'
 
 @loading_decorator()
-def generate_overview_pdf_report(filtered_df, selected_days, selected_categories, selected_fakultas):
-    """Generate comprehensive overview PDF report based on FILTERED data"""
+def generate_overview_pdf_report(filtered_df, daily_df, fakultas_stats_full):
+    """
+    Generate comprehensive and insightful overview PDF report.
+    REVISED with dynamic, data-driven, and actionable recommendations.
+    """
     from datetime import datetime
-    
-    time.sleep(0.6)  # Complex report generation
-    
-    # Calculate metrics from FILTERED data
+    time.sleep(0.6)
+
+    if filtered_df.empty:
+        return "<html><body><h1>Tidak ada data untuk dilaporkan</h1><p>Silakan ubah filter Anda dan coba lagi.</p></body></html>"
+
+    # --- 1. Data Preparation & Insight Generation ---
     total_emisi = filtered_df['total_emisi'].sum()
     avg_emisi = filtered_df['total_emisi'].mean()
     total_responden = len(filtered_df)
-    transport_total = filtered_df['transportasi'].sum()
-    electronic_total = filtered_df['elektronik'].sum()
-    food_total = filtered_df['sampah_makanan'].sum()
+
+    # Insight 1: Komposisi Emisi
+    composition_data = {
+        'Transportasi': filtered_df['transportasi'].sum(),
+        'Elektronik': filtered_df['elektronik'].sum(),
+        'Sampah Makanan': filtered_df['sampah_makanan'].sum()
+    }
+    dominant_cat = max(composition_data, key=composition_data.get) if total_emisi > 0 else "N/A"
+    dominant_pct = (composition_data.get(dominant_cat, 0) / total_emisi * 100) if total_emisi > 0 else 0
+    composition_conclusion = f"Sumber emisi utama adalah **{dominant_cat}**, yang menyumbang **{dominant_pct:.1f}%** dari total jejak karbon yang dianalisis. Ini menunjukkan bahwa perilaku terkait {dominant_cat.lower()} memiliki dampak paling signifikan."
     
-    transport_pct = (transport_total / total_emisi * 100) if total_emisi > 0 else 0
-    electronic_pct = (electronic_total / total_emisi * 100) if total_emisi > 0 else 0
-    food_pct = (food_total / total_emisi * 100) if total_emisi > 0 else 0
+    rec_map_cat = {
+        'Transportasi': "Prioritaskan kebijakan untuk mengurangi penggunaan kendaraan pribadi. **Tindakan Nyata:** Luncurkan program 'Subsidi Transportasi Umum' bagi mahasiswa atau adakan 'Pekan Bersepeda ke Kampus' dengan hadiah.",
+        'Elektronik': "Konsumsi energi dari perangkat elektronik menjadi perhatian utama. **Tindakan Nyata:** Lakukan audit energi mendadak di beberapa gedung dan berikan 'Penghargaan Gedung Hemat Energi' untuk mendorong kompetisi positif.",
+        'Sampah Makanan': "Limbah makanan merupakan kontributor signifikan. **Tindakan Nyata:** Bekerja sama dengan 5 kantin terpopuler untuk mengukur sisa makanan per hari dan tetapkan target pengurangan limbah sebesar 20% dalam 3 bulan."
+    }
+    composition_recommendation = rec_map_cat.get(dominant_cat, "Analisis lebih lanjut diperlukan.")
+
+    # Insight 2: Tren Emisi Harian
+    trend_conclusion, trend_recommendation = "Data tren harian tidak cukup untuk dianalisis.", ""
+    if not daily_df.empty:
+        daily_totals = daily_df.set_index('day').sum(axis=1)
+        if not daily_totals.empty:
+            peak_day = daily_totals.idxmax()
+            low_day = daily_totals.idxmin()
+            weekend_avg = daily_totals.loc[['Sabtu', 'Minggu']].mean()
+            weekday_avg = daily_totals.loc[['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat']].mean()
+            if weekday_avg > weekend_avg * 1.5:
+                trend_conclusion = f"Emisi secara signifikan lebih tinggi pada hari kerja, memuncak pada hari **{peak_day}**. Ini jelas mengindikasikan bahwa aktivitas akademik dan komuter adalah pendorong utama."
+                trend_recommendation = f"**Tindakan Nyata:** Fokuskan kampanye hemat energi dan transportasi berkelanjutan pada hari **Senin hingga Jumat**. Khususnya pada hari **{peak_day}**, pertimbangkan untuk mengirimkan notifikasi pengingat hemat energi melalui sistem akademik."
+            else:
+                trend_conclusion = f"Pola emisi relatif merata sepanjang minggu, dengan puncak pada **{peak_day}**. Ini mungkin menunjukkan bahwa gaya hidup di luar jam akademik juga memiliki dampak besar."
+                trend_recommendation = f"**Tindakan Nyata:** Program intervensi tidak boleh hanya menargetkan aktivitas di dalam kampus, tetapi juga perilaku di asrama atau tempat tinggal mahasiswa, terutama pada akhir pekan."
     
-    # Calculate Gini coefficient from filtered data
-    gini_coeff = calculate_gini_coefficient(filtered_df['total_emisi'])
-    
-    # Faculty analysis from filtered data
-    fakultas_stats = filtered_df.groupby('fakultas')['total_emisi'].agg(['sum', 'mean', 'count']).round(2)
-    fakultas_stats.columns = ['total_emisi', 'rata_rata_emisi', 'jumlah_mahasiswa']
-    fakultas_stats = fakultas_stats.sort_values('rata_rata_emisi', ascending=False)
-    
-    # Applied filters summary
-    filter_summary = []
-    if selected_days:
-        filter_summary.append(f"Hari: {', '.join(selected_days)}")
-    if selected_categories:
-        filter_summary.append(f"Kategori: {', '.join(selected_categories)}")
-    if selected_fakultas:
-        filter_summary.append(f"Fakultas: {', '.join(selected_fakultas)}")
-    
-    filter_text = "; ".join(filter_summary) if filter_summary else "Semua data"
-    
-    # Clustering on filtered data - hanya untuk laporan
-    df_kmeans, n_clusters_kmeans, _ = perform_kmeans_clustering(filtered_df)
-    df_hierarchical, n_clusters_hierarchical, _ = perform_hierarchical_clustering(filtered_df)
-    
-    cluster_stats_kmeans = df_kmeans.groupby('kmeans_cluster')['total_emisi'].agg(['count', 'mean']).round(2) if n_clusters_kmeans > 0 else pd.DataFrame()
-    cluster_stats_hierarchical = df_hierarchical.groupby('hierarchical_cluster')['total_emisi'].agg(['count', 'mean']).round(2) if n_clusters_hierarchical > 0 else pd.DataFrame()
-    
+    # Insight 3: Emisi per Fakultas
+    fakultas_conclusion, fakultas_recommendation = "Data fakultas tidak cukup untuk dianalisis.", ""
+    if not fakultas_stats_full.empty and len(fakultas_stats_full) > 1:
+        fakultas_report = fakultas_stats_full.sort_values('total_emisi', ascending=False)
+        highest_fakultas_row = fakultas_report.iloc[0]
+        lowest_fakultas_row = fakultas_report.iloc[-1]
+        fakultas_conclusion = f"Fakultas **{highest_fakultas_row['fakultas']}** menunjukkan total emisi tertinggi ({highest_fakultas_row['total_emisi']:.1f} kg CO₂), sementara **{lowest_fakultas_row['fakultas']}** mencatat yang terendah ({lowest_fakultas_row['total_emisi']:.1f} kg CO₂). Ini menyoroti adanya perbedaan budaya atau fasilitas antar fakultas."
+        fakultas_recommendation = f"**Tindakan Nyata:** Bentuk tim gabungan untuk melakukan 'Studi Banding Internal' antara fakultas **{highest_fakultas_row['fakultas']}** dan **{lowest_fakultas_row['fakultas']}**. Identifikasi 3 perbedaan utama dalam hal infrastruktur (misal, jenis AC), jadwal, dan kebiasaan mahasiswa yang dapat menjelaskan disparitas ini."
+
+    # Insight 4: Segmentasi Perilaku
+    df_clustered, n_clusters, centers_df = perform_kmeans_clustering(filtered_df.copy())
+    segmentation_conclusion, segmentation_recommendation = "Data tidak cukup untuk segmentasi.", ""
+    if n_clusters > 0:
+        segmentation_conclusion = f"Analisis berhasil mengidentifikasi **{n_clusters} segmen perilaku** yang berbeda di antara populasi mahasiswa, memungkinkan intervensi yang lebih tertarget."
+        profiles = []
+        rec_map_cluster = {
+            'transportasi': "Sediakan insentif diskon di ojek online untuk perjalanan singkat atau voucher parkir sepeda.",
+            'elektronik': "Adakan 'kompetisi antar kamar asrama' untuk penggunaan listrik paling efisien.",
+            'sampah_makanan': "Targetkan klaster ini dengan kampanye visual di kantin tentang dampak sisa makanan."
+        }
+        centers_df['total_emisi'] = centers_df.sum(axis=1)
+        for i, row in centers_df.sort_values('total_emisi').iterrows():
+            dominant_feature = row.drop('total_emisi').idxmax()
+            profile_name = f"**Profil {i+1}: '{dominant_feature.replace('_', ' ').title()} Enthusiast'** ({categorize_emission_level(row['total_emisi'])})"
+            profile_rec = rec_map_cluster.get(dominant_feature, "Intervensi umum diperlukan.")
+            profiles.append(f"<li>{profile_name}: Kelompok ini cenderung memiliki emisi tinggi dari {dominant_feature.lower()}. **Tindakan Nyata:** {profile_rec}</li>")
+        segmentation_recommendation = f"Alih-alih pendekatan 'satu untuk semua', alokasikan sumber daya sesuai profil segmen: <ul>{''.join(profiles)}</ul>"
+
+    # --- HTML Generation ---
     html_content = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <title>Laporan Overview Emisi Karbon ITB</title>
-        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-        <style>
-            @page {{
-                size: A4;
-                margin: 15mm;
-            }}
-            
-            @media print {{
-                body {{
-                    -webkit-print-color-adjust: exact !important;
-                    color-adjust: exact !important;
-                    print-color-adjust: exact !important;
-                }}
-                
-                .no-print {{
-                    display: none !important;
-                }}
-                
-                .page-break {{
-                    page-break-before: always;
-                }}
-                
-                .avoid-break {{
-                    page-break-inside: avoid;
-                }}
-            }}
-            
-            body {{
-                font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
-                line-height: 1.4;
-                color: #1f2937;
-                margin: 0;
-                padding: 0;
-                font-size: 11px;
-                background: white;
-            }}
-            
-            .header {{
-                text-align: center;
-                margin-bottom: 25px;
-                padding: 20px 0;
-                border-bottom: 2px solid #16a34a;
-            }}
-            
-            .header h1 {{
-                font-size: 20px;
-                font-weight: 600;
-                color: #16a34a;
-                margin: 0 0 8px 0;
-            }}
-            
-            .header .subtitle {{
-                font-size: 12px;
-                color: #6b7280;
-                margin-bottom: 5px;
-                font-weight: 400;
-            }}
-            
-            .header .timestamp {{
-                font-size: 9px;
-                color: #9ca3af;
-                font-weight: 300;
-            }}
-            
-            .print-instruction {{
-                background: #f0fdf4;
-                border: 1px solid #bbf7d0;
-                border-radius: 4px;
-                padding: 10px;
-                margin-bottom: 20px;
-                text-align: center;
-                font-weight: 500;
-                color: #16a34a;
-                font-size: 10px;
-            }}
-            
-            .filter-summary {{
-                background: #e0f2fe;
-                border: 1px solid #0288d1;
-                border-radius: 4px;
-                padding: 10px;
-                margin-bottom: 20px;
-                font-size: 10px;
-                color: #01579b;
-            }}
-            
-            .executive-summary {{
-                background: #fafafa;
-                border: 1px solid #e5e7eb;
-                border-radius: 6px;
-                padding: 20px;
-                margin-bottom: 25px;
-            }}
-            
-            .metrics-grid {{
-                display: grid;
-                grid-template-columns: repeat(2, 1fr);
-                gap: 15px;
-                margin-bottom: 10px;
-            }}
-            
-            .metric-card {{
-                background: white;
-                border: 1px solid #16a34a;
-                border-radius: 6px;
-                padding: 15px;
-                text-align: center;
-            }}
-            
-            .metric-value {{
-                font-size: 20px;
-                font-weight: 600;
-                color: #16a34a;
-                margin-bottom: 4px;
-                display: block;
-            }}
-            
-            .metric-label {{
-                font-size: 9px;
-                color: #6b7280;
-                font-weight: 400;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-            }}
-            
-            .section {{
-                margin-bottom: 20px;
-                page-break-inside: avoid;
-            }}
-            
-            .section-title {{
-                font-size: 13px;
-                font-weight: 600;
-                color: #16a34a;
-                margin-bottom: 10px;
-                padding-bottom: 5px;
-                border-bottom: 1px solid #16a34a;
-            }}
-            
-            .section-content {{
-                background: #fafafa;
-                border: 1px solid #e5e7eb;
-                border-radius: 4px;
-                padding: 15px;
-            }}
-            
-            .conclusion {{
-                background: #f0fdf4;
-                border-left: 3px solid #16a34a;
-                padding: 10px;
-                margin-top: 10px;
-                font-style: italic;
-                color: #374151;
-                font-size: 10px;
-            }}
-            
-            table {{
-                width: 100%;
-                border-collapse: collapse;
-                margin-bottom: 10px;
-                background: white;
-                font-size: 9px;
-            }}
-            
-            th {{
-                background: #16a34a !important;
-                color: white !important;
-                padding: 8px 5px;
-                text-align: center;
-                font-weight: 500;
-                border: 1px solid #16a34a;
-                font-size: 8px;
-            }}
-            
-            td {{
-                padding: 6px 5px;
-                text-align: center;
-                border: 1px solid #e5e7eb;
-                font-size: 8px;
-            }}
-            
-            tr:nth-child(even) {{
-                background: #f9fafb !important;
-            }}
-            
-            .footer {{
-                margin-top: 25px;
-                padding-top: 15px;
-                border-top: 1px solid #16a34a;
-                text-align: center;
-                font-size: 9px;
-                color: #6b7280;
-                page-break-inside: avoid;
-            }}
-        </style>
-    </head>
-    <body>
-        <div class="print-instruction no-print">
-            <strong>Export PDF:</strong> Tekan Ctrl+P (Windows) atau Cmd+P (Mac), pilih "Save as PDF", lalu klik Save
+    <!DOCTYPE html><html><head><title>Laporan Overview</title><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body {{ font-family: 'Poppins', sans-serif; color: #333; line-height: 1.6; font-size: 11px; }}
+        .page {{ padding: 25px; max-width: 800px; margin: auto; }}
+        .header {{ text-align: center; border-bottom: 2px solid #059669; padding-bottom: 15px; margin-bottom: 25px; }}
+        h1 {{ color: #059669; margin: 0; }} h2 {{ color: #065f46; border-bottom: 1px solid #d1fae5; padding-bottom: 8px; margin-top: 30px; margin-bottom: 15px;}}
+        .grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 25px; }}
+        .card {{ background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; border-left: 4px solid #10b981;}}
+        .card strong {{ font-size: 1.5em; color: #059669; display: block; }}
+        .conclusion, .recommendation {{ padding: 12px 15px; margin-top: 10px; border-radius: 6px; }}
+        .conclusion {{ background: #f0fdf4; border-left: 4px solid #10b981; }}
+        .recommendation {{ background: #fffbeb; border-left: 4px solid #f59e0b; }}
+        ul {{ padding-left: 20px; margin-top: 8px; margin-bottom: 0; }} li {{ margin-bottom: 5px; }}
+        table {{ width: 100%; border-collapse: collapse; margin-top: 15px; }} th, td {{ padding: 8px; text-align: left; border: 1px solid #e5e7eb; }}
+        th {{ background-color: #f3f4f6; font-weight: 600; text-align: center; }}
+        td:first-child {{ font-weight: 500; }}
+    </style></head>
+    <body><div class="page">
+        <div class="header"><h1>Laporan Overview Emisi Karbon</h1><p>Institut Teknologi Bandung | Dibuat pada: {datetime.now().strftime('%d %B %Y')}</p></div>
+        <div class="grid">
+            <div class="card"><strong>{total_emisi:.1f} kg CO₂</strong>Total Emisi</div>
+            <div class="card"><strong>{avg_emisi:.2f} kg CO₂</strong>Rata-rata/Mahasiswa</div>
         </div>
-        
-        <div class="header">
-            <h1>LAPORAN OVERVIEW EMISI KARBON ITB</h1>
-            <div class="subtitle">Institut Teknologi Bandung - Dashboard Utama</div>
-            <div class="timestamp">Dibuat pada {datetime.now().strftime('%d %B %Y, %H:%M WIB')}</div>
-        </div>
-        
-        <div class="filter-summary">
-            <strong>Filter Aktif:</strong> {filter_text}
-        </div>
-        
-        <div class="executive-summary avoid-break">
-            <h2 style="margin-top: 0; color: #16a34a; font-size: 14px; font-weight: 600;">Ringkasan Eksekutif</h2>
-            <div class="metrics-grid">
-                <div class="metric-card">
-                    <span class="metric-value">{total_emisi:.1f}</span>
-                    <div class="metric-label">Total Emisi Kampus (kg CO₂)</div>
-                </div>
-                <div class="metric-card">
-                    <span class="metric-value">{avg_emisi:.2f}</span>
-                    <div class="metric-label">Rata-rata per Mahasiswa</div>
-                </div>
-            </div>
-            <p style="margin-top: 15px; font-size: 10px; color: #6b7280; text-align: center;">
-                Analisis berdasarkan {total_responden} mahasiswa dengan filter yang diterapkan
-            </p>
-        </div>
-        
-        <!-- 1. Komposisi Emisi per Kategori -->
-        <div class="section avoid-break">
-            <h2 class="section-title">1. Komposisi Emisi per Kategori</h2>
-            <div class="section-content">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Kategori</th>
-                            <th>Total Emisi (kg CO₂)</th>
-                            <th>Persentase (%)</th>
-                            <th>Rata-rata per Mahasiswa</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td style="text-align: left; font-weight: 500;">Transportasi</td>
-                            <td>{transport_total:.1f}</td>
-                            <td>{transport_pct:.1f}%</td>
-                            <td>{(transport_total/total_responden):.2f}</td>
-                        </tr>
-                        <tr>
-                            <td style="text-align: left; font-weight: 500;">Elektronik</td>
-                            <td>{electronic_total:.1f}</td>
-                            <td>{electronic_pct:.1f}%</td>
-                            <td>{(electronic_total/total_responden):.2f}</td>
-                        </tr>
-                        <tr>
-                            <td style="text-align: left; font-weight: 500;">Sampah Makanan</td>
-                            <td>{food_total:.1f}</td>
-                            <td>{food_pct:.1f}%</td>
-                            <td>{(food_total/total_responden):.2f}</td>
-                        </tr>
-                    </tbody>
-                </table>
-                <div class="conclusion">
-                    <strong>Kesimpulan:</strong> Berdasarkan filter yang diterapkan, kategori dengan kontribusi terbesar adalah {'Transportasi' if transport_pct > electronic_pct and transport_pct > food_pct else 'Elektronik' if electronic_pct > food_pct else 'Sampah Makanan'} ({max(transport_pct, electronic_pct, food_pct):.1f}% dari total emisi).
-                </div>
-            </div>
-        </div>
-        
-        <!-- 2. Ranking Fakultas -->
-        <div class="section avoid-break">
-            <h2 class="section-title">2. Ranking Emisi per Fakultas</h2>
-            <div class="section-content">
+
+        <h2>1. Komposisi Emisi</h2>
+        <table><thead><tr><th>Kategori</th><th>Total Emisi (kg CO₂)</th><th>Persentase</th></tr></thead><tbody>
+        {''.join([f"<tr><td>{cat}</td><td style='text-align:right;'>{val:.1f}</td><td style='text-align:right;'>{(val/total_emisi*100 if total_emisi>0 else 0):.1f}%</td></tr>" for cat, val in composition_data.items()])}
+        </tbody></table>
+        <div class="conclusion"><strong>Insight:</strong> {composition_conclusion}</div>
+        <div class="recommendation"><strong>Rekomendasi:</strong> {composition_recommendation}</div>
+
+        <h2>2. Tren Emisi Harian</h2>
+        <table><thead><tr><th>Hari</th><th>Total Emisi (kg CO₂)</th></tr></thead><tbody>
+        {''.join([f"<tr><td>{row['day']}</td><td style='text-align:right;'>{row.drop('day').sum():.1f}</td></tr>" for idx, row in daily_df.iterrows()])}
+        </tbody></table>
+        <div class="conclusion"><strong>Insight:</strong> {trend_conclusion}</div>
+        <div class="recommendation"><strong>Rekomendasi:</strong> {trend_recommendation}</div>
+
+        <h2>3. Emisi per Fakultas</h2>
+        <table><thead><tr><th>Fakultas</th><th>Total Emisi (kg CO₂)</th></tr></thead><tbody>
+        {''.join([f"<tr><td>{row['fakultas']}</td><td style='text-align:right;'>{row['total_emisi']:.1f}</td></tr>" for idx, row in fakultas_report.head(10).iterrows()])}
+        </tbody></table>
+        <div class="conclusion"><strong>Insight:</strong> {fakultas_conclusion}</div>
+        <div class="recommendation"><strong>Rekomendasi:</strong> {fakultas_recommendation}</div>
+
+        <h2>4. Segmentasi Perilaku</h2>
+        <div class="conclusion"><strong>Insight:</strong> {segmentation_conclusion}</div>
+        <div class="recommendation"><strong>Rekomendasi:</strong> {segmentation_recommendation}</div>
+    </div></body></html>
     """
-    
-    if not fakultas_stats.empty:
-        html_content += """
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Ranking</th>
-                            <th>Fakultas</th>
-                            <th>Mahasiswa</th>
-                            <th>Total Emisi (kg CO₂)</th>
-                            <th>Rata-rata Emisi</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        """
-        
-        for idx, (fakultas, row) in enumerate(fakultas_stats.head(10).iterrows(), 1):
-            html_content += f"""
-                            <tr>
-                                <td><strong>#{idx}</strong></td>
-                                <td style="text-align: left; font-weight: 500;">{fakultas}</td>
-                                <td>{row['jumlah_mahasiswa']}</td>
-                                <td>{row['total_emisi']:.1f}</td>
-                                <td>{row['rata_rata_emisi']:.2f}</td>
-                            </tr>
-            """
-        
-        html_content += "</tbody></table>"
-        
-        highest_fakultas = fakultas_stats.index[0]
-        lowest_fakultas = fakultas_stats.index[-1]
-        fakultas_conclusion = f"{highest_fakultas} memiliki rata-rata emisi tertinggi ({fakultas_stats.iloc[0]['rata_rata_emisi']:.2f} kg CO₂), sedangkan {lowest_fakultas} terendah ({fakultas_stats.iloc[-1]['rata_rata_emisi']:.2f} kg CO₂)."
-    else:
-        html_content += "<p>Data fakultas tidak tersedia dengan filter yang diterapkan.</p>"
-        fakultas_conclusion = "Data fakultas tidak tersedia dengan filter yang diterapkan."
-    
-    html_content += f"""
-                <div class="conclusion">
-                    <strong>Kesimpulan:</strong> {fakultas_conclusion}
-                </div>
-            </div>
-        </div>
-        
-        <!-- 3. Analisis Distribusi dan Ketimpangan -->
-        <div class="section avoid-break">
-            <h2 class="section-title">3. Analisis Distribusi dan Ketimpangan (Gini Coefficient)</h2>
-            <div class="section-content">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Metrik</th>
-                            <th>Nilai</th>
-                            <th>Interpretasi</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td style="text-align: left; font-weight: 500;">Gini Coefficient</td>
-                            <td>{gini_coeff:.3f}</td>
-                            <td>{'Rendah (merata)' if gini_coeff < 0.3 else 'Sedang' if gini_coeff < 0.5 else 'Tinggi (timpang)'}</td>
-                        </tr>
-                        <tr>
-                            <td style="text-align: left; font-weight: 500;">Total Responden</td>
-                            <td>{total_responden} mahasiswa</td>
-                            <td>Data setelah filtering</td>
-                        </tr>
-                        <tr>
-                            <td style="text-align: left; font-weight: 500;">Range Emisi</td>
-                            <td>{filtered_df['total_emisi'].min():.1f} - {filtered_df['total_emisi'].max():.1f} kg CO₂</td>
-                            <td>Minimum hingga maksimum</td>
-                        </tr>
-                    </tbody>
-                </table>
-                <div class="conclusion">
-                    <strong>Kesimpulan:</strong> Berdasarkan data yang difilter, distribusi emisi menunjukkan tingkat ketimpangan {'rendah' if gini_coeff < 0.3 else 'sedang' if gini_coeff < 0.5 else 'tinggi'} (Gini = {gini_coeff:.3f}).
-                </div>
-            </div>
-        </div>
-    """
-    
-    # Add clustering sections
-    if n_clusters_kmeans > 0 and not cluster_stats_kmeans.empty:
-        html_content += f"""
-        <!-- 4. K-Means Clustering Responden -->
-        <div class="section avoid-break">
-            <h2 class="section-title">4. K-Means Clustering Pola Emisi Responden</h2>
-            <div class="section-content">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Klaster</th>
-                            <th>Jumlah Responden</th>
-                            <th>Rata-rata Emisi</th>
-                            <th>Kategori</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        """
-        
-        cluster_stats_kmeans.columns = ['jumlah_responden', 'rata_rata_emisi']
-        for cluster_id, row in cluster_stats_kmeans.iterrows():
-            category = categorize_emission_level(row['rata_rata_emisi'])
-            html_content += f"""
-                            <tr>
-                                <td><strong>Klaster {cluster_id + 1}</strong></td>
-                                <td>{row['jumlah_responden']}</td>
-                                <td>{row['rata_rata_emisi']:.2f}</td>
-                                <td>{category}</td>
-                            </tr>
-            """
-        
-        html_content += f"""
-                    </tbody>
-                </table>
-                <div class="conclusion">
-                    <strong>Kesimpulan:</strong> K-Means berhasil mengidentifikasi {n_clusters_kmeans} klaster dengan pola emisi yang berbeda pada data yang difilter.
-                </div>
-            </div>
-        </div>
-        """
-    
-    if n_clusters_hierarchical > 0 and not cluster_stats_hierarchical.empty:
-        html_content += f"""
-        <!-- 5. Hierarchical Clustering Responden -->
-        <div class="section avoid-break">
-            <h2 class="section-title">5. Hierarchical Clustering Pola Emisi Responden</h2>
-            <div class="section-content">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Klaster</th>
-                            <th>Jumlah Responden</th>
-                            <th>Rata-rata Emisi</th>
-                            <th>Kategori</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        """
-        
-        cluster_stats_hierarchical.columns = ['jumlah_responden', 'rata_rata_emisi']
-        for cluster_id, row in cluster_stats_hierarchical.iterrows():
-            category = categorize_emission_level(row['rata_rata_emisi'])
-            html_content += f"""
-                            <tr>
-                                <td><strong>Klaster {cluster_id + 1}</strong></td>
-                                <td>{row['jumlah_responden']}</td>
-                                <td>{row['rata_rata_emisi']:.2f}</td>
-                                <td>{category}</td>
-                            </tr>
-            """
-        
-        html_content += f"""
-                    </tbody>
-                </table>
-                <div class="conclusion">
-                    <strong>Kesimpulan:</strong> Hierarchical clustering berhasil mengidentifikasi {n_clusters_hierarchical} klaster dengan pola emisi yang berbeda, memberikan perspektif alternatif dalam segmentasi responden.
-                </div>
-            </div>
-        </div>
-        """
-    
-    html_content += """
-        <div class="footer">
-            <p><strong>Institut Teknologi Bandung</strong></p>
-            <p>Carbon Emission Dashboard - Overview Report</p>
-        </div>
-    </body>
-    </html>
-    """
-    
     return html_content
 
 def show():
@@ -917,72 +575,63 @@ def show():
 
     # Filters - UPDATED: periode -> jenis
     filter_col1, filter_col2, filter_col3, export_col1, export_col2 = st.columns([1.8, 1.8, 1.8, 1, 1])
-
     with filter_col1:
-        day_options = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
-        selected_days = st.multiselect(
-            "Hari:", 
-            options=day_options, 
-            placeholder="Pilih Opsi", 
-            key='overview_day_filter'
-        )
-    
+        selected_days = st.multiselect("Hari:", ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'], key='overview_day_filter')
     with filter_col2:
-        # CHANGED: periode -> jenis/kategori
-        category_options = ['Transportasi', 'Elektronik', 'Sampah Makanan']
-        selected_categories = st.multiselect(
-            "Jenis:", 
-            options=category_options, 
-            placeholder="Pilih Opsi", 
-            key='overview_category_filter'
-        )
-    
+        selected_categories = st.multiselect("Jenis:", ['Transportasi', 'Elektronik', 'Sampah Makanan'], key='overview_category_filter')
     with filter_col3:
-        if not df_responden.empty and 'program_studi' in df_responden.columns:
-            fakultas_mapping = get_fakultas_mapping()
-            df_responden['fakultas'] = df_responden['program_studi'].map(fakultas_mapping).fillna('Lainnya')
-            available_fakultas = sorted(df_responden['fakultas'].unique())
-            selected_fakultas = st.multiselect(
-                "Fakultas:", 
-                options=available_fakultas, 
-                placeholder="Pilih Opsi", 
-                key='overview_fakultas_filter'
-            )
-        else:
-            selected_fakultas = []
+        available_fakultas = sorted(df_unified['fakultas'].unique())
+        selected_fakultas = st.multiselect("Fakultas:", available_fakultas, key='overview_fakultas_filter')
 
-    # Apply filters with loading - FIXED function call
+    # 3. Terapkan filter ke data
     filtered_df = apply_overview_filters(df_unified, df_transport, df_electronic, df_food, selected_days, selected_categories, selected_fakultas)
-
     if filtered_df.empty:
-        st.warning("Tidak ada data yang sesuai dengan filter yang dipilih. Silakan ubah atau kosongkan filter.")
-        return
+        st.warning("Tidak ada data yang sesuai dengan filter."); return
 
-    # Export buttons - FIXED to use filtered data
+    # --- PERUBAHAN UTAMA: HITUNG DATA UNTUK VISUALISASI & LAPORAN DI SINI ---
+    # 4. Lakukan semua kalkulasi data yang dibutuhkan SEBELUM rendering kolom
+    
+    # Data untuk chart Fakultas
+    fakultas_stats = filtered_df.groupby('fakultas')['total_emisi'].sum().reset_index()
+    
+    # Data untuk chart Tren Harian
+    ids = filtered_df['id_responden']
+    days_order = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
+    daily_data = []
+    for day in days_order:
+        row = {'day': day}
+        for cat, df_source, col_prefix in [('transportasi', df_transport, 'emisi_transportasi_'), ('elektronik', df_electronic, 'emisi_elektronik_')]:
+            col = f"{col_prefix}{day.lower()}"
+            row[cat] = df_source.loc[df_source['id_responden'].isin(ids), col].sum() if not df_source.empty and col in df_source.columns else 0
+        row['sampah_makanan'] = df_food.loc[(df_food['id_responden'].isin(ids)) & (df_food['day'] == day), 'emisi_makanan'].sum() if not df_food.empty else 0
+        daily_data.append(row)
+    daily_df = pd.DataFrame(daily_data)
+    # --- AKHIR DARI BLOK KALKULASI DATA ---
+
+    # 5. Tampilkan tombol Export
     with export_col1:
-        csv_data = filtered_df.to_csv(index=False)
         st.download_button(
-            "Raw Data", 
-            data=csv_data, 
-            file_name=f"overview_filtered_{len(filtered_df)}.csv", 
-            mime="text/csv", 
-            use_container_width=True, 
+            "Raw Data",
+            filtered_df.to_csv(index=False),
+            f"overview_filtered_{len(filtered_df)}.csv",
+            "text/csv",
+            use_container_width=True,
             key="overview_export_csv"
         )
-    
     with export_col2:
         try:
-            pdf_content = generate_overview_pdf_report(filtered_df, selected_days, selected_categories, selected_fakultas)
+            # Sekarang pemanggilan ini aman karena daily_df dan fakultas_stats sudah ada
+            pdf_content = generate_overview_pdf_report(filtered_df, daily_df, fakultas_stats)
             st.download_button(
-                "Laporan", 
-                data=pdf_content, 
-                file_name=f"overview_filtered_{len(filtered_df)}.html", 
-                mime="text/html", 
-                use_container_width=True, 
-                key="overview_export_pdf"
+                "Laporan",
+                pdf_content,
+                f"overview_report_{len(filtered_df)}.html",
+                "text/html",
+                use_container_width=True,
+                key="overview_export_pdf_final"
             )
         except Exception as e:
-            st.error(f"Error generating PDF: {e}")
+            st.error(f"Error generating PDF report: {e}")
 
     col1, col2, col3 = st.columns([1, 1, 1.5], gap="small")
 
@@ -1004,9 +653,9 @@ def show():
             x=fakultas_stats['total_emisi'], y=fakultas_stats['fakultas'],
             orientation='h', marker_color=fakultas_stats['color']
         ))
-        fig_fakultas.update_layout(height=380, title_text="<b>Emisi per Fakultas</b>", title_x=0.5,
+        fig_fakultas.update_layout(height=382, title_text="<b>Emisi per Fakultas</b>", title_x=0.32,
             margin=dict(t=40, b=0, l=0, r=0), xaxis_title=None, yaxis_title=None, showlegend=False)
-        st.plotly_chart(fig_fakultas, use_container_width=True, config={'displayModeBar': False})
+        st.plotly_chart(fig_fakultas, config=MODEBAR_CONFIG, use_container_width=True)
         
 
     with col2:
@@ -1030,10 +679,10 @@ def show():
             if col_name in daily_df.columns:
                 fig_trend.add_trace(go.Scatter(x=daily_df['day'], y=daily_df[col_name], name=cat, mode='lines+markers', line=dict(color=CATEGORY_COLORS[cat])))
         
-        fig_trend.update_layout(height=265, title_text="<b>Tren Emisi Harian</b>", title_x=0.5,
+        fig_trend.update_layout(height=265, title_text="<b>Tren Emisi Harian</b>", title_x=0.32,
             margin=dict(t=40, b=0, l=0, r=0), legend_title_text='', yaxis_title="Emisi (kg CO₂)", xaxis_title=None,
             legend=dict(orientation="h", yanchor="bottom", y=-0.4, xanchor="center", x=0.5, font_size=9))
-        st.plotly_chart(fig_trend, use_container_width=True, config={'displayModeBar': False})
+        st.plotly_chart(fig_trend, config=MODEBAR_CONFIG, use_container_width=True)
 
         
         categories_data = {'Transportasi': filtered_df['transportasi'].sum(), 'Elektronik': filtered_df['elektronik'].sum(), 'Sampah Makanan': filtered_df['sampah_makanan'].sum()}
@@ -1044,11 +693,11 @@ def show():
                 labels=list(data_pie.keys()), values=list(data_pie.values()), hole=0.5,
                 marker_colors=[CATEGORY_COLORS.get(cat) for cat in data_pie.keys()]
             ))
-            fig_composition.update_layout(height=325, title_text="<b>Komposisi Emisi</b>", title_x=0.5,
+            fig_composition.update_layout(height=280, title_text="<b>Komposisi Emisi</b>", title_x=0.32, title_y=0.95,
                 margin=dict(t=40, b=0, l=0, r=0), showlegend=True,
                 legend=dict(orientation="h", yanchor="bottom", y=-0.1, xanchor="center", x=0.5, font=dict(size=9))
             )
-            st.plotly_chart(fig_composition, use_container_width=True, config={'displayModeBar': False})
+            st.plotly_chart(fig_composition, config=MODEBAR_CONFIG, use_container_width=True)
     
     with col3:
         # --- KOLOM 3: CLUSTERING 3D ---
@@ -1092,7 +741,7 @@ def show():
                 ))
             
             fig_3d.update_layout(
-                height=600, title_text="<b>Segmentasi Perilaku Emisi</b>", title_x=0.5,
+                height=570, title_text="<b>Segmentasi Perilaku Emisi</b>", title_x=0.33, title_y=0.965,
                 margin=dict(l=0, r=0, b=0, t=40),
                 scene=dict(
                     xaxis_title='Transportasi', yaxis_title='Elektronik', zaxis_title='Sampah',
@@ -1100,7 +749,7 @@ def show():
                     aspectratio=dict(x=1, y=1, z=0.8)),
                 legend=dict(orientation="h", yanchor="bottom", y=-0.1, xanchor="center", x=0.5, font_size=9)
             )
-            st.plotly_chart(fig_3d, use_container_width=True, config={'displayModeBar': False})
+            st.plotly_chart(fig_3d, config=MODEBAR_CONFIG, use_container_width=True)
         else:
             st.info("Data tidak cukup untuk clustering.")
             
