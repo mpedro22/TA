@@ -374,10 +374,89 @@ select:hover {
     scrollbar-color: #2ecc71 transparent !important;
 }
 
-.stMultiSelect svg {
-    transition: transform 0.3s ease !important;
-    width: 12px !important;
-    height: 12px !important;
+.stMultiSelect > div > div > div > div::-webkit-scrollbar {
+    width: 4px !important;
+    height: 4px !important;
+}
+
+.stMultiSelect > div > div > div > div::-webkit-scrollbar-track {
+    background: transparent !important;
+}
+
+.stMultiSelect > div > div > div > div::-webkit-scrollbar-thumb {
+    background: #2ecc71 !important;
+    border-radius: 2px !important;
+}
+
+.stMultiSelect > div > div > div:focus-within {
+    border-color: #2ecc71 !important;
+    box-shadow: 0 0 0 2px rgba(46, 204, 113, 0.2) !important;
+    transform: translateY(-1px) !important;
+}
+
+.stMultiSelect span[data-baseweb="tag"] {
+    background: linear-gradient(135deg, #2ecc71, #27ae60) !important;
+    color: white !important;
+    border: 1px solid #27ae60 !important;
+    border-radius: 15px !important;
+    font-family: 'Poppins', sans-serif !important;
+    font-weight: 500 !important;
+    font-size: 10px !important;
+    padding: 2px 8px !important;
+    margin: 1px !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 1px 3px rgba(46, 204, 113, 0.2) !important;
+    max-height: 20px !important;
+    line-height: 16px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+}
+
+.stMultiSelect span[data-baseweb="tag"]:hover {
+    background: linear-gradient(135deg, #27ae60, #229954) !important;
+    transform: translateY(-1px) scale(1.02) !important;
+    box-shadow: 0 4px 8px rgba(46, 204, 113, 0.3) !important;
+}
+
+/* Multiselect styling */
+.stMultiSelect, .stMultiSelect * {
+    font-family: 'Poppins', sans-serif !important;
+}
+
+.stMultiSelect {
+    height: 75px !important;
+    max-height: 75px !important;
+    overflow: visible !important;
+    position: relative !important;
+    padding-bottom: 3px !important;
+}
+
+.stMultiSelect > div > div > div {
+    border-color: #27ae60 !important;
+    border-radius: 8px !important;
+    transition: all 0.3s ease !important;
+    font-family: 'Poppins', sans-serif !important;
+    height: 42px !important;
+    max-height: 42px !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-content: flex-start !important;
+    border-width: 1px !important;
+    border-style: solid !important;
+    background: linear-gradient(135deg, #f8f9fa 0%, #f1f3f5 100%);
+}
+
+.stMultiSelect > div > div > div > div {
+    max-height: 38px !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 2px !important;
+    scrollbar-width: thin !important;
+    scrollbar-color: #2ecc71 transparent !important;
 }
 
 .stMultiSelect > div > div > div > div::-webkit-scrollbar {
@@ -414,6 +493,8 @@ select:hover {
     box-shadow: 0 1px 3px rgba(46, 204, 113, 0.2) !important;
     max-height: 20px !important;
     line-height: 16px !important;
+    display: inline-flex !important;
+    align-items: center !important;
 }
 
 .stMultiSelect span[data-baseweb="tag"]:hover {
@@ -422,24 +503,74 @@ select:hover {
     box-shadow: 0 4px 8px rgba(46, 204, 113, 0.3) !important;
 }
 
-.stMultiSelect span[data-baseweb="tag"] svg {
-    fill: white !important;
+/* --- PENDEKATAN EKSTREM: TRANSFORM SCALE --- */
+
+/* Aturan #1: Biarkan semua SVG ukuran default dulu */
+.stMultiSelect svg {
     transition: all 0.2s ease !important;
 }
 
-.stMultiSelect span[data-baseweb="tag"]:hover svg {
-    fill: #f8f9fa !important;
-    transform: rotate(90deg) !important;
+/* Aturan #2: Gunakan transform scale untuk memperkecil SVG di dalam tag */
+.stMultiSelect span[data-baseweb="tag"] svg,
+.stMultiSelect span[data-baseweb="tag"] * svg,
+[data-testid="stMultiSelect"] span[data-baseweb="tag"] svg,
+[data-testid="stMultiSelect"] span[data-baseweb="tag"] * svg,
+span[data-baseweb="tag"] svg,
+span[data-baseweb="tag"] * svg {
+    transform: scale(1) !important; /* Perkecil jadi 40% dari ukuran asli */
+    transform-origin: center !important;
+    fill: white !important;
+    margin-left: 2px !important;
+    margin-right: 2px !important;
 }
 
-.stMultiSelect > div > div > div > div > div > svg {
-    fill: #2ecc71 !important;
+/* Aturan hover untuk Ikon X KECIL dengan scale */
+.stMultiSelect span[data-baseweb="tag"]:hover svg,
+.stMultiSelect span[data-baseweb="tag"]:hover * svg,
+[data-testid="stMultiSelect"] span[data-baseweb="tag"]:hover svg,
+[data-testid="stMultiSelect"] span[data-baseweb="tag"]:hover * svg,
+span[data-baseweb="tag"]:hover svg,
+span[data-baseweb="tag"]:hover * svg {
+    transform: scale(1) rotate(90deg) !important;
+    fill: #f8f9fa !important;
+}
+
+/* Aturan #3: Gunakan transform scale untuk memperbesar SVG di pojok kanan */
+.stMultiSelect div[data-baseweb="select"] > div:last-child svg,
+.stMultiSelect > div > div > div:last-child svg,
+[data-testid="stMultiSelect"] div[data-baseweb="select"] > div:last-child svg,
+[data-testid="stMultiSelect"] > div > div > div:last-child svg {
+    transform: scale(1) !important; /* Perbesar jadi 150% dari ukuran asli */
+    transform-origin: center !important;
     transition: all 0.3s ease !important;
 }
 
-.stMultiSelect > div > div > div:focus-within > div > div > svg {
+/* Aturan #4: Override untuk dropdown arrow saat focus */
+.stMultiSelect div[data-baseweb="select"]:focus-within > div:last-child svg:last-child,
+[data-testid="stMultiSelect"] div[data-baseweb="select"]:focus-within > div:last-child svg:last-child {
     fill: #27ae60 !important;
-    transform: rotate(180deg) !important;
+    transform: scale(1) rotate(180deg) !important;
+}
+
+.stMultiSelect {
+    --tag-icon-size: 0.4;
+    --control-icon-size: 1.5;
+}
+
+html body .stMultiSelect span[data-baseweb="tag"] svg,
+html body [data-testid="stMultiSelect"] span[data-baseweb="tag"] svg,
+html body div[data-testid="stMultiSelect"] span[data-baseweb="tag"] svg {
+    transform: scale(0.9) !important;
+    transform-origin: center !important;
+    fill: white !important;
+}
+
+.stMultiSelect span[data-baseweb="tag"] {
+    font-size: 10px !important;
+}
+
+.stMultiSelect span[data-baseweb="tag"] svg {
+    font-size: 10px !important;
 }
 
 .stMultiSelect > div > div {
@@ -504,6 +635,7 @@ select:hover {
     margin-bottom: 4px !important;
 }
 
+/* Animasi slideDown */
 @keyframes slideDown {
     from {
         opacity: 0;
@@ -1435,13 +1567,6 @@ section[data-testid="stSidebar"] .nav-menu {
     visibility: visible !important;
 }
 
-/* assets/css/style.css */
-
-/* assets/css/style.css */
-
-/* --- FINAL PLOTLY MODEBAR STYLING v5 (FORCE ALIGNMENT & COLOR) --- */
-
-/* 1. Kustomisasi container utama modebar */
 .modebar {
     background: linear-gradient(135deg, #059669 0%, #10b981 100%) !important;
     border: 1px solid rgba(110, 231, 183, 0.4) !important;

@@ -10,6 +10,8 @@ from sklearn.preprocessing import StandardScaler
 from scipy.cluster.hierarchy import dendrogram, linkage
 import warnings
 warnings.filterwarnings('ignore')
+from src.utils.db_connector import run_query
+
 
 # CONSISTENT COLOR PALETTE
 MAIN_PALETTE = ['#9e0142', '#d53e4f', '#f46d43', '#fdae61', '#fee08b', 
@@ -48,29 +50,17 @@ MODEBAR_CONFIG = {
 @st.cache_data(ttl=3600)
 @loading_decorator()
 def load_all_data():
-    """Load all data sources for overview dashboard"""
-    # Transportation data
-    transport_url = "https://docs.google.com/spreadsheets/d/11Y7cx9SqtLeG5S09F34nDQSnwaZDfUkZKVnNwRLi8V4/export?format=csv&gid=155140281"
-    
-    # Electronic data
-    electronic_url = "https://docs.google.com/spreadsheets/d/11Y7cx9SqtLeG5S09F34nDQSnwaZDfUkZKVnNwRLi8V4/export?format=csv&gid=622151341"
-    
-    # Daily activities data (for food waste)
-    activities_url = "https://docs.google.com/spreadsheets/d/11Y7cx9SqtLeG5S09F34nDQSnwaZDfUkZKVnNwRLi8V4/export?format=csv&gid=1749257811"
-    
-    # Responden data
-    responden_url = "https://docs.google.com/spreadsheets/d/11Y7cx9SqtLeG5S09F34nDQSnwaZDfUkZKVnNwRLi8V4/export?format=csv&gid=1606042726"
-    
+    """Load all data sources for overview dashboard from Supabase"""
     try:
         time.sleep(0.4) 
-        df_transport = pd.read_csv(transport_url)
-        df_electronic = pd.read_csv(electronic_url)
-        df_activities = pd.read_csv(activities_url)
-        df_responden = pd.read_csv(responden_url)
+        df_transport_raw = run_query("transportasi")
+        df_electronic_raw = run_query("elektronik")
+        df_activities_raw = run_query("aktivitas_harian")
+        df_responden_raw = run_query("informasi_responden")
         
-        return df_transport, df_electronic, df_activities, df_responden
+        return df_transport_raw, df_electronic_raw, df_activities_raw, df_responden_raw
     except Exception as e:
-        st.error(f"Error loading data: {e}")
+        st.error(f"Error loading data from Supabase: {e}")
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
 def get_fakultas_mapping():
@@ -93,30 +83,29 @@ def get_fakultas_mapping():
 
 @loading_decorator()
 def parse_food_activities(df_activities):
-    """Parse food waste activities from daily activities data"""
+    """Parse food waste activities from Supabase daily activities data"""
     food_activities = []
-    
     if df_activities.empty:
         return pd.DataFrame()
-    
-    # Filter untuk kegiatan Makan atau Minum
-    meal_df = df_activities[df_activities['kegiatan'].str.contains('Makan|Minum', case=False, na=False)] if 'kegiatan' in df_activities.columns else df_activities
-    
+
+    meal_df = df_activities[
+        df_activities['kegiatan'].str.contains('Makan|Minum', case=False, na=False) &
+        (pd.to_numeric(df_activities['emisi_makanminum'], errors='coerce').fillna(0) > 0)
+    ].copy()
+
+    if meal_df.empty:
+        return pd.DataFrame()
+
     for _, row in meal_df.iterrows():
-        # Parse hari column (format: senin_1012)
-        hari_value = str(row.get('hari', ''))
-        if '_' in hari_value:
-            parts = hari_value.split('_')
-            if len(parts) == 2:
-                day_name = parts[0].capitalize()
-                
-                food_activities.append({
-                    'id_responden': row.get('id_responden', ''),
-                    'day': day_name,
-                    'emisi_makanan': pd.to_numeric(row.get('emisi_makanminum', 0), errors='coerce'),
-                    'kategori': 'Sampah Makanan'
-                })
-    
+        day_name = str(row.get('hari', '')).capitalize()
+        if day_name:
+            food_activities.append({
+                'id_responden': row.get('id_responden', ''),
+                'day': day_name,
+                'emisi_makanan': pd.to_numeric(row.get('emisi_makanminum', 0), errors='coerce'),
+                'kategori': 'Sampah Makanan'
+            })
+            
     time.sleep(0.1)
     return pd.DataFrame(food_activities)
 
@@ -125,62 +114,33 @@ def create_unified_dataset(df_transport, df_electronic, df_food, df_responden):
     """Create unified dataset for overview analysis"""
     unified_data = []
     
-    # Add fakultas mapping
     fakultas_mapping = get_fakultas_mapping()
     if not df_responden.empty and 'program_studi' in df_responden.columns:
         df_responden['fakultas'] = df_responden['program_studi'].map(fakultas_mapping).fillna('Lainnya')
     
-    # Process all respondents
-    all_respondents = set()
-    if not df_transport.empty and 'id_responden' in df_transport.columns:
-        all_respondents.update(df_transport['id_responden'].dropna())
-    if not df_electronic.empty and 'id_responden' in df_electronic.columns:
-        all_respondents.update(df_electronic['id_responden'].dropna())
-    if not df_food.empty and 'id_responden' in df_food.columns:
-        all_respondents.update(df_food['id_responden'].dropna())
-    
+    all_respondents = set(df_responden['id_responden'].dropna())
+
     for resp_id in all_respondents:
-        if pd.isna(resp_id) or resp_id == '' or resp_id == 0:
+        if pd.isna(resp_id) or resp_id == '':
             continue
             
-        # Get responden info
-        fakultas = 'Unknown'
-        if not df_responden.empty and 'id_responden' in df_responden.columns:
-            resp_info = df_responden[df_responden['id_responden'] == resp_id]
-            if not resp_info.empty:
-                fakultas = resp_info.iloc[0].get('fakultas', 'Unknown')
+        resp_info = df_responden[df_responden['id_responden'] == resp_id]
+        fakultas = resp_info.iloc[0].get('fakultas', 'Unknown') if not resp_info.empty else 'Unknown'
         
-        # Transport emissions
-        transport_emisi = 0
-        if not df_transport.empty and 'id_responden' in df_transport.columns:
-            transport_data = df_transport[df_transport['id_responden'] == resp_id]
-            if not transport_data.empty and 'emisi_mingguan' in transport_data.columns:
-                transport_emisi = transport_data['emisi_mingguan'].fillna(0).sum()
+        # Ambil emisi mingguan yang sudah dihitung sebelumnya
+        transport_emisi = df_transport.loc[df_transport['id_responden'] == resp_id, 'emisi_mingguan'].sum()
+        electronic_emisi = df_electronic.loc[df_electronic['id_responden'] == resp_id, 'emisi_elektronik_mingguan'].sum()
         
-        # Electronic emissions
-        electronic_emisi = 0
-        if not df_electronic.empty and 'id_responden' in df_electronic.columns:
-            electronic_data = df_electronic[df_electronic['id_responden'] == resp_id]
-            if not electronic_data.empty and 'emisi_elektronik_mingguan' in electronic_data.columns:
-                electronic_emisi = electronic_data['emisi_elektronik_mingguan'].fillna(0).sum()
-        
-        # Food emissions
-        food_emisi = 0
-        if not df_food.empty and 'id_responden' in df_food.columns:
-            food_data = df_food[df_food['id_responden'] == resp_id]
-            if not food_data.empty:
-                food_emisi = food_data['emisi_makanan'].fillna(0).sum()
+        # Emisi makanan adalah total dari semua aktivitas makan per responden
+        food_emisi = df_food.loc[df_food['id_responden'] == resp_id, 'emisi_makanan'].sum()
         
         total_emisi = transport_emisi + electronic_emisi + food_emisi
         
         if total_emisi > 0:  
             unified_data.append({
-                'id_responden': resp_id,
-                'fakultas': fakultas,
-                'transportasi': transport_emisi,
-                'elektronik': electronic_emisi,
-                'sampah_makanan': food_emisi,
-                'total_emisi': total_emisi
+                'id_responden': resp_id, 'fakultas': fakultas,
+                'transportasi': transport_emisi, 'elektronik': electronic_emisi,
+                'sampah_makanan': food_emisi, 'total_emisi': total_emisi
             })
     
     time.sleep(0.15)
@@ -555,31 +515,56 @@ def show():
         """, unsafe_allow_html=True)
         time.sleep(0.25)
 
-    # Load all data with loading
-    df_transport, df_electronic, df_activities, df_responden = load_all_data()
+    df_transport_raw, df_electronic_raw, df_activities_raw, df_responden = load_all_data()
     
-    if df_transport.empty and df_electronic.empty and df_activities.empty:
-        st.error("Data tidak tersedia")
+    if df_transport_raw.empty or df_electronic_raw.empty or df_activities_raw.empty:
+        st.error("Satu atau lebih sumber data tidak tersedia.")
         return
 
-    # Parse food data and create unified dataset with loading
+    # 2. Pra-pemrosesan data untuk setiap kategori
     with loading():
-        df_food = parse_food_activities(df_activities)
+        # --- Transformasi Data Transportasi ---
+        df_transport = df_transport_raw.copy()
+        df_transport['emisi_transportasi'] = pd.to_numeric(df_transport['emisi_transportasi'], errors='coerce').fillna(0)
+        df_transport['hari_datang'] = df_transport['hari_datang'].astype(str).fillna('')
+        df_transport['jumlah_hari_datang'] = df_transport['hari_datang'].str.split(',').str.len()
+        df_transport['emisi_mingguan'] = df_transport['emisi_transportasi'] * df_transport['jumlah_hari_datang']
+        days_of_week = ['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'minggu']
+        for day in days_of_week:
+            col_name = f'emisi_transportasi_{day}'
+            df_transport[col_name] = np.where(df_transport['hari_datang'].str.contains(day.capitalize(), na=False), df_transport['emisi_transportasi'], 0)
+
+        # --- Transformasi Data Elektronik ---
+        df_electronic = df_electronic_raw.copy()
+        if 'emisi_elektronik' in df_electronic.columns:
+            df_electronic = df_electronic.rename(columns={'emisi_elektronik': 'emisi_elektronik_mingguan'})
+        df_electronic['emisi_elektronik_mingguan'] = pd.to_numeric(df_electronic['emisi_elektronik_mingguan'], errors='coerce').fillna(0)
+        df_electronic['hari_datang'] = df_electronic['hari_datang'].astype(str).fillna('')
+        df_electronic['jumlah_hari_datang'] = df_electronic['hari_datang'].str.split(',').str.len()
+        df_electronic['emisi_harian'] = df_electronic['emisi_elektronik_mingguan'] / (df_electronic['jumlah_hari_datang'] + 1e-9)
+        for day in days_of_week:
+            col_name = f'emisi_elektronik_{day}'
+            df_electronic[col_name] = np.where(df_electronic['hari_datang'].str.contains(day.capitalize(), na=False), df_electronic['emisi_harian'], 0)
+
+        # --- Transformasi Data Makanan (dari aktivitas harian) ---
+        df_food = parse_food_activities(df_activities_raw)
+        
+        # 3. Buat dataset terpadu
         df_unified = create_unified_dataset(df_transport, df_electronic, df_food, df_responden)
         time.sleep(0.2)
     
     if df_unified.empty:
-        st.error("Tidak ada data unified yang tersedia")
+        st.warning("Tidak ada data gabungan yang dapat ditampilkan. Periksa sumber data.")
         return
 
     filter_col1, filter_col2, filter_col3, export_col1, export_col2 = st.columns([1.8, 1.8, 1.8, 1, 1])
     with filter_col1:
-        selected_days = st.multiselect("Hari:", ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'], key='overview_day_filter')
+        selected_days = st.multiselect("Hari:", ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'], placeholder="Pilih Opsi", key='overview_day_filter')
     with filter_col2:
-        selected_categories = st.multiselect("Jenis:", ['Transportasi', 'Elektronik', 'Sampah Makanan'], key='overview_category_filter')
+        selected_categories = st.multiselect("Jenis:", ['Transportasi', 'Elektronik', 'Sampah Makanan'], placeholder="Pilih Opsi", key='overview_category_filter')
     with filter_col3:
         available_fakultas = sorted(df_unified['fakultas'].unique())
-        selected_fakultas = st.multiselect("Fakultas:", available_fakultas, key='overview_fakultas_filter')
+        selected_fakultas = st.multiselect("Fakultas:", available_fakultas, placeholder="Pilih Opsi", key='overview_fakultas_filter')
 
     # 3. Terapkan filter ke data
     filtered_df = apply_overview_filters(df_unified, df_transport, df_electronic, df_food, selected_days, selected_categories, selected_fakultas)
@@ -629,6 +614,8 @@ def show():
 
     col1, col2, col3 = st.columns([1, 1, 1.5], gap="small")
 
+# Ganti blok kode di dalam with col1:
+
     with col1:
         # --- KOLOM 1: KPI & FAKULTAS ---
         total_emisi = filtered_df['total_emisi'].sum()
@@ -636,19 +623,56 @@ def show():
         st.markdown(f'<div class="kpi-card primary" style="margin-bottom: 1rem;"><div class="kpi-value">{total_emisi:.1f}</div><div class="kpi-label">Total Emisi (kg CO₂)</div></div>', unsafe_allow_html=True)
         st.markdown(f'<div class="kpi-card secondary" style="margin-bottom: 1.5rem;"><div class="kpi-value">{avg_emisi:.2f}</div><div class="kpi-label">Rata-rata/Mahasiswa</div></div>', unsafe_allow_html=True)
         
-        fakultas_stats = filtered_df.groupby('fakultas')['total_emisi'].sum().reset_index().sort_values('total_emisi', ascending=False)
-        color_palette = ['#9e0142', '#d53e4f', '#f46d43', '#fdae61', '#fee08b', '#e6f598', '#abdda4', '#66c2a5']
-        n_fakultas = len(fakultas_stats)
-        colors = [color_palette[int(i / (n_fakultas - 1) * (len(color_palette) - 1))] if n_fakultas > 1 else color_palette[0] for i in range(n_fakultas)]
-        fakultas_stats['color'] = colors
-        fakultas_stats = fakultas_stats.sort_values('total_emisi', ascending=True)
+        # --- PERUBAHAN UTAMA DI SINI ---
+        fakultas_stats = filtered_df.groupby('fakultas')['total_emisi'].agg(['sum', 'count']).reset_index()
+        fakultas_stats.columns = ['fakultas', 'total_emisi', 'count']
+        fakultas_stats = fakultas_stats.sort_values('total_emisi', ascending=False)
+        
+        # Ambil top 13 untuk menjaga chart tetap rapi
+        fakultas_stats_display = fakultas_stats.head(13).sort_values('total_emisi', ascending=True)
 
-        fig_fakultas = go.Figure(go.Bar(
-            x=fakultas_stats['total_emisi'], y=fakultas_stats['fakultas'],
-            orientation='h', marker_color=fakultas_stats['color']
-        ))
-        fig_fakultas.update_layout(height=382, title_text="<b>Emisi per Fakultas</b>", title_x=0.32,
-            margin=dict(t=40, b=0, l=0, r=0), xaxis_title=None, yaxis_title=None, showlegend=False)
+        fig_fakultas = go.Figure()
+
+        # Gunakan loop untuk membuat bar, sama seperti di halaman lain
+        for _, row in fakultas_stats_display.iterrows():
+            # Logika pewarnaan bisa disederhanakan jika mau, atau tetap seperti ini
+            max_emisi = fakultas_stats_display['total_emisi'].max()
+            min_emisi = fakultas_stats_display['total_emisi'].min()
+            if max_emisi > min_emisi:
+                ratio = (row['total_emisi'] - min_emisi) / (max_emisi - min_emisi)
+                color_palette = ['#66c2a5', '#abdda4', '#fdae61', '#f46d43', '#d53e4f', '#9e0142']
+                color_idx = int(ratio * (len(color_palette) - 1))
+                color = color_palette[color_idx]
+            else:
+                color = MAIN_PALETTE[0]
+
+            fig_fakultas.add_trace(go.Bar(
+                x=[row['total_emisi']], 
+                y=[row['fakultas']], 
+                orientation='h',
+                marker=dict(color=color), 
+                showlegend=False,
+                text=[f"{row['total_emisi']:.1f}"], 
+                textposition='inside',
+                textfont=dict(color='white', size=10, weight='bold'),
+                hovertemplate=f'<b>{row["fakultas"]}</b><br>Total Emisi: {row["total_emisi"]:.1f} kg CO₂<br>Jumlah Mahasiswa: {row["count"]}<extra></extra>'
+            ))
+
+        fig_fakultas.update_layout(
+            height=382, 
+            title_text="<b>Emisi per Fakultas</b>", 
+            title_x=0.32,
+            margin=dict(t=40, b=0, l=0, r=20), 
+            xaxis_title="Total Emisi (kg CO₂)", 
+            yaxis_title=None, 
+            showlegend=False,
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)'),
+            yaxis=dict(showgrid=False)
+        )
+        # --- AKHIR PERUBAHAN ---
+        
         st.plotly_chart(fig_fakultas, config=MODEBAR_CONFIG, use_container_width=True)
         
 
@@ -684,13 +708,34 @@ def show():
         
         if data_pie:
             fig_composition = go.Figure(go.Pie(
-                labels=list(data_pie.keys()), values=list(data_pie.values()), hole=0.5,
-                marker_colors=[CATEGORY_COLORS.get(cat) for cat in data_pie.keys()]
+                labels=list(data_pie.keys()), 
+                values=list(data_pie.values()), 
+                hole=0.45, # Samakan ukuran lubang
+                marker=dict(
+                    colors=[CATEGORY_COLORS.get(cat) for cat in data_pie.keys()],
+                    line=dict(color='#FFFFFF', width=2) # Tambahkan garis putih pemisah
+                ),
+                textposition='outside', # Pindahkan label ke luar
+                textinfo='label+percent', # Tampilkan label dan persen
+                textfont=dict(size=10, family="Poppins"),
+                hovertemplate='<b>%{label}</b><br>Emisi: %{value:.1f} kg CO₂ (%{percent})<extra></extra>' # Hover template kustom
             ))
-            fig_composition.update_layout(height=280, title_text="<b>Komposisi Emisi</b>", title_x=0.32, title_y=0.95,
-                margin=dict(t=40, b=0, l=0, r=0), showlegend=True,
-                legend=dict(orientation="h", yanchor="bottom", y=-0.1, xanchor="center", x=0.5, font=dict(size=9))
+
+            total_emisi_pie = sum(data_pie.values())
+            center_text = f"<b style='font-size:14px'>{total_emisi_pie:.1f}</b><br><span style='font-size:8px'>kg CO₂</span>"
+            fig_composition.add_annotation(text=center_text, x=0.5, y=0.5, font_size=10, showarrow=False)
+            
+            # Sesuaikan layout agar konsisten
+            fig_composition.update_layout(
+                height=280, 
+                title_text="<b>Komposisi Emisi</b>", 
+                title_x=0.32, 
+                title_y=0.95,
+                margin=dict(t=65, b=30, l=0, r=0), # Margin minimal karena tidak ada legenda
+                showlegend=False # Matikan legenda
             )
+            # --- AKHIR PERBAIKAN ---
+
             st.plotly_chart(fig_composition, config=MODEBAR_CONFIG, use_container_width=True)
     
     with col3:
@@ -701,13 +746,9 @@ def show():
             fig_3d = go.Figure()
 
             if n_clusters == 3:
-                # --- Logika Penamaan & Pewarnaan Klaster Baru ---
-                # 1. Urutkan pusat klaster berdasarkan total emisi
                 centers_df = centers_df.sort_values('total_emisi')
-                
-                # 2. Definisikan nama dan warna secara eksplisit
                 profile_names = ["Profil 1: Emitor Rendah", "Profil 2: Emitor Sedang", "Profil 3: Emitor Tinggi"]
-                profile_colors = ['#4daf4a', '#ff7f00', '#e41a1c'] # Hijau, Oren, Merah
+                profile_colors = ['#4daf4a', '#ff7f00', '#e41a1c'] 
 
                 # 3. Buat pemetaan dari ID klaster asli ke profil baru
                 name_map = {original_idx: name for original_idx, name in zip(centers_df.index, profile_names)}

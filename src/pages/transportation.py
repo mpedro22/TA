@@ -1,3 +1,5 @@
+# src/pages/transportation.py
+
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -5,6 +7,7 @@ import plotly.graph_objects as go
 import numpy as np
 from src.components.loading import loading, loading_decorator
 import time
+from src.utils.db_connector import run_query
 
 
 # CONSISTENT COLOR PALETTE
@@ -46,26 +49,24 @@ MODEBAR_CONFIG = {
     }
 }
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=1)
 @loading_decorator()
 def load_data():
-    """Load transportation data from Google Sheets"""
-    url = "https://docs.google.com/spreadsheets/d/11Y7cx9SqtLeG5S09F34nDQSnwaZDfUkZKVnNwRLi8V4/export?format=csv&gid=155140281"
+    """Load transportation data from Supabase"""
     try:
-        time.sleep(0.3)  
-        return pd.read_csv(url)
+        time.sleep(0.3)
+        return run_query("transportasi") 
     except Exception as e:
         st.error(f"Error loading transportation data: {e}")
         return pd.DataFrame()
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=1)
 @loading_decorator()
 def load_responden_data():
-    """Load responden data for fakultas information"""
-    url = "https://docs.google.com/spreadsheets/d/11Y7cx9SqtLeG5S09F34nDQSnwaZDfUkZKVnNwRLi8V4/export?format=csv&gid=1606042726"
+    """Load responden data for fakultas information from Supabase"""
     try:
-        time.sleep(0.2)  
-        return pd.read_csv(url)
+        time.sleep(0.2)
+        return run_query("informasi_responden") 
     except Exception as e:
         return pd.DataFrame()
 
@@ -138,11 +139,15 @@ def apply_filters(df, selected_days, selected_modes, selected_fakultas, df_respo
     time.sleep(0.1) 
     return filtered_df
 
+# Ganti seluruh fungsi generate_pdf_report() dengan kode ini
+
+# Ganti seluruh fungsi generate_pdf_report() dengan kode ini
+
 @loading_decorator()
 def generate_pdf_report(filtered_df, df_responden=None):
     """
-    REVISED to generate a professional HTML report with tables, insights, and recommendations,
-    matching the style of the overview report.
+    REVISED to generate a professional HTML report with distinct, actionable insights 
+    and realistic recommendations for university management.
     """
     from datetime import datetime
     import pandas as pd
@@ -155,25 +160,28 @@ def generate_pdf_report(filtered_df, df_responden=None):
     total_emisi = filtered_df['emisi_mingguan'].sum()
     avg_emisi = filtered_df['emisi_mingguan'].mean()
 
-    # Insight 1: Daily Trend
+    # --- Insight 1: Analisis Ritme Mingguan Kampus ---
     hari_cols = [c for c in filtered_df.columns if 'emisi_transportasi_' in c and c != 'emisi_transportasi_mingguan']
     daily_trend_table_html = "<tr><td colspan='2'>Data emisi harian tidak tersedia.</td></tr>"
-    trend_conclusion = "Data tren harian tidak lengkap."
-    trend_recommendation = "Lengkapi data emisi harian untuk mendapatkan wawasan tren mingguan."
+    trend_conclusion = "Pola mobilitas mingguan belum dapat dipetakan."
+    trend_recommendation = "Lengkapi data perjalanan harian untuk analisis ritme kampus yang lebih akurat."
     if hari_cols:
         daily_totals = {col.replace('emisi_transportasi_', '').capitalize(): filtered_df[col].sum() for col in hari_cols}
-        if daily_totals:
+        if any(daily_totals.values()):
             daily_df = pd.DataFrame(list(daily_totals.items()), columns=['Hari', 'Total Emisi (kg CO₂)']).sort_values(by='Total Emisi (kg CO₂)', ascending=False)
             if not daily_df.empty:
                 daily_trend_table_html = "".join([f"<tr><td>{row['Hari']}</td><td style='text-align:right;'>{row['Total Emisi (kg CO₂)']:.1f}</td></tr>" for _, row in daily_df.iterrows()])
                 peak_day = daily_df.iloc[0]['Hari']
-                trend_conclusion = f"Puncak emisi transportasi terjadi pada hari <strong>{peak_day}</strong>."
-                trend_recommendation = f"Fokuskan kampanye 'bike to campus' atau promosi transportasi umum pada hari-hari menjelang <strong>{peak_day}</strong> untuk mengurangi emisi puncak."
+                low_day = daily_df.iloc[-1]['Hari']
+                weekend_emissions = daily_df[daily_df['Hari'].isin(['Sabtu', 'Minggu'])]['Total Emisi (kg CO₂)'].sum()
+                weekday_emissions = daily_df[~daily_df['Hari'].isin(['Sabtu', 'Minggu'])]['Total Emisi (kg CO₂)'].sum()
+                trend_conclusion = f"Terdapat disparitas emisi yang jelas antara hari kerja dan akhir pekan. Puncak mobilitas terjadi pada <strong>{peak_day}</strong>, menunjukkan bahwa mayoritas perjalanan terkait aktivitas akademik dan operasional kampus."
+                trend_recommendation = f"Fokuskan kebijakan transportasi pada hari kerja (Senin-Jumat). Pertimbangkan untuk mengkaji kemungkinan penerapan 'flexible working/studying day' (misal: satu hari dalam sebulan) sebagai studi kasus untuk melihat dampaknya terhadap pengurangan emisi puncak."
 
-    # Insight 2: Faculty
+    # --- Insight 2: Analisis Demografi Spasial (Fakultas) ---
     fakultas_table_html = "<tr><td colspan='3'>Data fakultas tidak tersedia.</td></tr>"
-    fakultas_conclusion = "Tidak dapat melakukan analisis per fakultas."
-    fakultas_recommendation = "Integrasikan data responden untuk mendapatkan wawasan per fakultas yang lebih mendalam."
+    fakultas_conclusion = "Profil emisi berdasarkan fakultas tidak dapat dibuat."
+    fakultas_recommendation = "Data demografi responden diperlukan untuk analisis kebijakan yang lebih tertarget."
     if df_responden is not None and not df_responden.empty:
         fakultas_mapping = get_fakultas_mapping()
         df_responden['fakultas'] = df_responden['program_studi'].map(fakultas_mapping).fillna('Lainnya')
@@ -184,33 +192,63 @@ def generate_pdf_report(filtered_df, df_responden=None):
             if not fakultas_stats.empty:
                 fakultas_table_html = "".join([f"<tr><td>{fakultas}</td><td style='text-align:right;'>{row['mean']:.2f}</td><td style='text-align:center;'>{int(row['count'])}</td></tr>" for fakultas, row in fakultas_stats.head(10).iterrows()])
                 highest_fakultas = fakultas_stats.index[0]
-                lowest_fakultas = fakultas_stats.index[-1] if len(fakultas_stats) > 1 else highest_fakultas
-                fakultas_conclusion = f"Rata-rata emisi tertinggi berasal dari fakultas <strong>{highest_fakultas}</strong> ({fakultas_stats.iloc[0]['mean']:.2f} kg CO₂/mhs), dan terendah dari <strong>{lowest_fakultas}</strong>."
-                fakultas_recommendation = f"Lakukan survei lebih lanjut di <strong>{highest_fakultas}</strong> untuk memahami pola perjalanan mereka. Promosikan praktik terbaik dari <strong>{lowest_fakultas}</strong> ke fakultas lain."
-    
-    # Insight 3: Transport Mode Composition
+                fakultas_conclusion = f"Mahasiswa dari fakultas <strong>{highest_fakultas}</strong> secara rata-rata memiliki jejak karbon transportasi tertinggi. Hal ini bisa mengindikasikan bahwa komunitas fakultas ini cenderung tinggal lebih jauh atau lebih bergantung pada kendaraan pribadi."
+                fakultas_recommendation = f"Alih-alih kebijakan umum, terapkan intervensi berbasis lokasi. Prioritaskan penambahan atau perbaikan fasilitas parkir sepeda dan shelter 'drop-off' ojek online di sekitar gedung fakultas <strong>{highest_fakultas}</strong>."
+
+    # --- Insight 3: Analisis Preferensi Moda Transportasi ---
     mode_stats = filtered_df.groupby('transportasi')['emisi_mingguan'].agg(['count', 'mean']).round(2).sort_values('count', ascending=False)
     mode_table_html = "".join([f"<tr><td>{mode}</td><td style='text-align:center;'>{int(row['count'])}</td><td style='text-align:right;'>{row['mean']:.2f}</td></tr>" for mode, row in mode_stats.iterrows()])
     dominant_mode = mode_stats.index[0]
-    mode_conclusion = f"Moda transportasi yang paling populer adalah <strong>{dominant_mode}</strong>, digunakan oleh {int(mode_stats.iloc[0]['count'])} responden."
-    mode_recommendation = f"Karena <strong>{dominant_mode}</strong> sangat populer, prioritaskan intervensi pada moda ini. Jika itu kendaraan pribadi, promosikan 'carpool'. Jika angkutan umum, usulkan peningkatan layanan."
+    dominant_mode_emission_cat = categorize_emission_level(dominant_mode)
+    mode_conclusion = f"<strong>{dominant_mode}</strong> (kategori: {dominant_mode_emission_cat}) adalah moda transportasi pilihan utama komunitas kampus. Ini mencerminkan infrastruktur dan kondisi eksisting yang paling mendukung moda tersebut."
+    rec_text = f"Penggunaan <strong>{dominant_mode}</strong> yang tinggi menunjukkan keberhasilan. Kebijakan selanjutnya adalah meningkatkan 'user experience', seperti menambah jumlah unit 'bike sharing' atau memperluas cakupan jalur pejalan kaki yang teduh." if dominant_mode_emission_cat in ['Eco-friendly', 'Low Emission'] else f"Ketergantungan tinggi pada <strong>{dominant_mode}</strong> adalah tantangan utama. Kebijakan 'mode shifting' diperlukan, contohnya dengan mempertimbangkan pembatasan akses kendaraan pribadi di zona tertentu kampus (Low Emission Zone)."
+    mode_recommendation = rec_text
 
-    # Insight 4: Daily Mode Usage (Heatmap)
-    heatmap_conclusion = "Pola penggunaan moda transportasi bervariasi sepanjang minggu."
-    heatmap_recommendation = "Gunakan data heatmap untuk menjadwalkan kampanye. Misalnya, promosikan sepeda pada hari dengan penggunaan motor yang tinggi."
+    # --- Insight 4: Analisis Pola Perilaku Harian ---
+    heatmap_table_html = "<tr><td colspan='7'>Data penggunaan harian tidak tersedia.</td></tr>"
+    heatmap_header_html = "<tr><th>Hari</th><th>Moda Populer 1</th><th>Moda Populer 2</th></tr>"
+    heatmap_conclusion = "Pola perilaku spesifik harian belum teridentifikasi."
+    heatmap_recommendation = "Data yang lebih detail akan membantu merumuskan kampanye perilaku yang lebih efektif."
+    if hari_cols:
+        transport_day_data = []
+        for mode in filtered_df['transportasi'].unique():
+            mode_data = filtered_df[filtered_df['transportasi'] == mode]
+            for col in hari_cols:
+                day = col.replace('emisi_transportasi_', '').capitalize()
+                users_count = (mode_data[col] > 0).sum()
+                transport_day_data.append({'transportasi': mode, 'hari': day, 'pengguna': users_count})
+        if transport_day_data:
+            heatmap_df = pd.DataFrame(transport_day_data)
+            day_order = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
+            pivot_df = heatmap_df.pivot(index='hari', columns='transportasi', values='pengguna').fillna(0).reindex(index=day_order, fill_value=0)
+            top_modes = pivot_df.sum(axis=0).nlargest(6).index
+            pivot_df_filtered = pivot_df[top_modes]
+            if not pivot_df_filtered.empty:
+                header_cells_html = "<th>Hari</th>" + "".join([f"<th>{mode}</th>" for mode in pivot_df_filtered.columns])
+                heatmap_header_html = f"<tr>{header_cells_html}</tr>"
+                body_rows_list = []
+                for day, row in pivot_df_filtered.iterrows():
+                    cells_html = "".join([f"<td style='text-align:center;'>{int(count)}</td>" for count in row])
+                    body_rows_list.append(f"<tr><td><strong>{day}</strong></td>{cells_html}</tr>")
+                heatmap_table_html = "".join(body_rows_list)
+                
+                peak_usage_day = pivot_df_filtered.sum(axis=1).idxmax()
+                peak_usage_mode = pivot_df_filtered.loc[peak_usage_day].idxmax()
+                heatmap_conclusion = f"Teridentifikasi sebuah kebiasaan kuat (strong habit): penggunaan <strong>{peak_usage_mode}</strong> secara masif pada hari <strong>{peak_usage_day}</strong>."
+                heatmap_recommendation = f"Fokus pada intervensi perilaku. Usulkan program 'Tantangan <strong>{peak_usage_day}</strong> Hijau': ajak komunitas untuk tidak menggunakan <strong>{peak_usage_mode}</strong> pada hari itu dan berbagi pengalamannya di media sosial dengan tagar resmi. Berikan apresiasi (bukan hadiah) bagi partisipan terbaik."
 
-    # Insight 5: District Hotspots
+    # --- Insight 5: Analisis Geografis Asal Perjalanan ---
     kecamatan_table_html = "<tr><td colspan='3'>Data kecamatan tidak tersedia.</td></tr>"
-    kecamatan_conclusion = "Tidak dapat mengidentifikasi hotspot emisi."
-    # --- PERBAIKAN DI SINI: Inisialisasi variabel di luar blok if ---
-    rec_kecamatan = "Lengkapi data asal kecamatan untuk memetakan area prioritas untuk intervensi, seperti penyediaan shuttle bus."
+    kecamatan_conclusion = "Analisis 'hotspot' geografis belum dapat dilakukan."
+    rec_kecamatan = "Sertakan data asal perjalanan untuk merumuskan kebijakan berbasis kewilayahan."
     if 'kecamatan' in filtered_df.columns and not filtered_df['kecamatan'].isnull().all():
         kecamatan_stats = filtered_df.groupby('kecamatan')['emisi_mingguan'].agg(['sum', 'count']).sort_values('sum', ascending=False)
         if not kecamatan_stats.empty:
             kecamatan_table_html = "".join([f"<tr><td>{kecamatan}</td><td style='text-align:right;'>{row['sum']:.1f}</td><td style='text-align:center;'>{int(row['count'])}</td></tr>" for kecamatan, row in kecamatan_stats.head(10).iterrows()])
             hottest_spot = kecamatan_stats.index[0]
-            kecamatan_conclusion = f"Kecamatan <strong>{hottest_spot}</strong> menjadi sumber emisi terbesar."
-            rec_kecamatan = f"Pertimbangkan untuk menyediakan 'feeder' atau 'shuttle bus' dari <strong>{hottest_spot}</strong> untuk mengurangi penggunaan kendaraan pribadi."
+            student_count = int(kecamatan_stats.iloc[0]['count'])
+            kecamatan_conclusion = f"Kecamatan <strong>{hottest_spot}</strong> merupakan 'feeder' utama komuter ke kampus, sekaligus menjadi sumber emisi terbesar. Ini adalah titik intervensi paling strategis di luar kampus."
+            rec_kecamatan = f"Gunakan data ini sebagai dasar proposal ke pemerintah daerah (Dishub) untuk pembukaan atau optimalisasi rute angkutan umum dari <strong>{hottest_spot}</strong>. Di level kampus, pertimbangkan untuk menjadikan <strong>{hottest_spot}</strong> sebagai titik jemput utama untuk layanan shuttle."
     
     # --- HTML Generation ---
     html_content = f"""
@@ -240,22 +278,23 @@ def generate_pdf_report(filtered_df, df_responden=None):
             <div class="card secondary"><strong>{avg_emisi:.2f} kg CO₂</strong>Rata-rata/Mahasiswa</div>
         </div>
 
-        <h2>1. Tren Emisi Harian</h2>
+        <h2>1. Ritme Mobilitas Mingguan</h2>
         <table><thead><tr><th>Hari</th><th>Total Emisi (kg CO₂)</th></tr></thead><tbody>{daily_trend_table_html}</tbody></table>
         <div class="conclusion"><strong>Insight:</strong> {trend_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {trend_recommendation}</div>
         
-        <h2>2. Emisi per Fakultas</h2>
+        <h2>2. Profil Demografi Spasial (Fakultas)</h2>
         <table><thead><tr><th>Fakultas</th><th>Rata-rata Emisi (kg CO₂)</th><th>Jumlah Responden</th></tr></thead><tbody>{fakultas_table_html}</tbody></table>
         <div class="conclusion"><strong>Insight:</strong> {fakultas_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {fakultas_recommendation}</div>
         
-        <h2>3. Komposisi Moda Transportasi</h2>
+        <h2>3. Preferensi Moda Transportasi</h2>
         <table><thead><tr><th>Moda Transportasi</th><th>Jumlah Pengguna</th><th>Rata-rata Emisi (kg CO₂)</th></tr></thead><tbody>{mode_table_html}</tbody></table>
         <div class="conclusion"><strong>Insight:</strong> {mode_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {mode_recommendation}</div>
 
-        <h2>4. Pola Penggunaan Transportasi</h2>
+        <h2>4. Analisis Pola Perilaku Harian</h2>
+        <table><thead>{heatmap_header_html}</thead><tbody>{heatmap_table_html}</tbody></table>
         <div class="conclusion"><strong>Insight:</strong> {heatmap_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {heatmap_recommendation}</div>
 
-        <h2>5. Hotspot Emisi per Kecamatan</h2>
+        <h2>5. Hotspot Geografis Asal Perjalanan</h2>
         <table><thead><tr><th>Kecamatan</th><th>Total Emisi (kg CO₂)</th><th>Jumlah Responden</th></tr></thead><tbody>{kecamatan_table_html}</tbody></table>
         <div class="conclusion"><strong>Insight:</strong> {kecamatan_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {rec_kecamatan}</div>
     </div></body></html>
@@ -263,7 +302,6 @@ def generate_pdf_report(filtered_df, df_responden=None):
     return html_content
 
 def show():
-    # Header with loading
     with loading():
         st.markdown("""
         <div class="wow-header">
@@ -278,7 +316,6 @@ def show():
         """, unsafe_allow_html=True)
         time.sleep(0.2) 
 
-    # Load data with loading decorators
     df = load_data()
     df_responden = load_responden_data()
     
@@ -286,14 +323,22 @@ def show():
         st.error("Data transportasi tidak tersedia")
         return
 
-    # Data processing with loading
     with loading():
-        df['emisi_mingguan'] = pd.to_numeric(df['emisi_mingguan'], errors='coerce')
+        df['emisi_transportasi'] = pd.to_numeric(df['emisi_transportasi'], errors='coerce').fillna(0)
+        # Kolom hari datang, pastikan string dan handle nilai null
+        df['hari_datang'] = df['hari_datang'].astype(str).fillna('')
+        df['jumlah_hari_datang'] = df['hari_datang'].str.split(',').str.len()
+        df['emisi_mingguan'] = df['emisi_transportasi'] * df['jumlah_hari_datang']
+        days_of_week = ['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'minggu']
+        for day in days_of_week:
+            col_name = f'emisi_transportasi_{day}'
+            df[col_name] = np.where(df['hari_datang'].str.contains(day.capitalize(), na=False), df['emisi_transportasi'], 0)
+        
         df = df.dropna(subset=['transportasi'])
         df['emission_category'] = df['transportasi'].apply(categorize_emission_level)
         time.sleep(0.1)
     
-    # Filters
+    # Filter
     filter_col1, filter_col2, filter_col3, export_col1, export_col2 = st.columns([1.8, 1.8, 1.8, 1, 1])
 
     with filter_col1:
@@ -335,6 +380,8 @@ def show():
         st.warning("Tidak ada data yang sesuai dengan filter yang dipilih. Silakan ubah atau kosongkan filter.")
         return
     
+
+    
     # Calculate metrics for export
     total_emisi = filtered_df['emisi_mingguan'].sum()
     avg_emisi = filtered_df['emisi_mingguan'].mean()
@@ -356,7 +403,6 @@ def show():
 
     with export_col2:
         try:
-            # Panggil dengan argumen yang sudah diperbarui
             pdf_content = generate_pdf_report(filtered_df, df_responden)
             
             st.download_button(
@@ -430,7 +476,6 @@ def show():
                     if not fakultas_stats.empty:
                         fig_fakultas = go.Figure()
                         
-                        # Use color gradient based on emission level
                         max_emisi = fakultas_stats['total_emisi'].max()
                         min_emisi = fakultas_stats['total_emisi'].min()
                         
@@ -528,7 +573,6 @@ def show():
                 pivot_df = heatmap_df.pivot(index='hari', columns='transportasi', values='pengguna').fillna(0)
                 pivot_df = pivot_df.reindex(index=day_order, fill_value=0)
                 
-                # Ambil top 6 transportasi berdasarkan total penggunaan
                 top_modes = pivot_df.sum(axis=0).nlargest(6).index
                 pivot_df_filtered = pivot_df[top_modes]
                 
@@ -562,7 +606,6 @@ def show():
                 st.info("Data pola harian tidak tersedia")
 
         with col2:
-            # MOVED: Chart 6: Emisi per Kecamatan - Vertical Bar Chart
             if 'kecamatan' in filtered_df.columns:
                 kecamatan_stats = filtered_df.groupby('kecamatan')['emisi_mingguan'].agg(['mean', 'count', 'sum']).reset_index()
                 kecamatan_stats.columns = ['kecamatan', 'rata_rata_emisi', 'jumlah_mahasiswa', 'total_emisi']
@@ -586,7 +629,6 @@ def show():
                         else:
                             color = MAIN_PALETTE[i % len(MAIN_PALETTE)]
                         
-                        # Shorten kecamatan names for display
                         display_name = row['kecamatan'] if len(row['kecamatan']) <= 10 else row['kecamatan'][:8] + '..'
                         
                         fig_kecamatan.add_trace(go.Bar(
@@ -601,7 +643,6 @@ def show():
                             name=row['kecamatan']
                         ))
                     
-                    # Add average line for reference
                     avg_emisi = kecamatan_display['rata_rata_emisi'].mean()
                     fig_kecamatan.add_hline(
                         y=avg_emisi,

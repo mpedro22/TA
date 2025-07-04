@@ -5,6 +5,8 @@ import plotly.graph_objects as go
 import numpy as np
 from src.components.loading import loading, loading_decorator
 import time
+from src.utils.db_connector import run_query
+
 
 MAIN_PALETTE = ['#9e0142', '#d53e4f', '#f46d43', '#fdae61', '#fee08b', 
                 '#e6f598', '#abdda4', '#66c2a5', '#3288bd', '#5e4fa2']
@@ -41,11 +43,10 @@ MODEBAR_CONFIG = {
 @st.cache_data(ttl=3600)
 @loading_decorator()
 def load_daily_activities_data():
-    """Load daily activities data from Google Sheets"""
-    url = "https://docs.google.com/spreadsheets/d/11Y7cx9SqtLeG5S09F34nDQSnwaZDfUkZKVnNwRLi8V4/export?format=csv&gid=1749257811"
+    """Load daily activities data from Supabase"""
     try:
         time.sleep(0.35)  
-        return pd.read_csv(url)
+        return run_query("aktivitas_harian")
     except Exception as e:
         st.error(f"Error loading daily activities data: {e}")
         return pd.DataFrame()
@@ -53,11 +54,10 @@ def load_daily_activities_data():
 @st.cache_data(ttl=3600)
 @loading_decorator()
 def load_responden_data():
-    """Load responden data for fakultas information"""
-    url = "https://docs.google.com/spreadsheets/d/11Y7cx9SqtLeG5S09F34nDQSnwaZDfUkZKVnNwRLi8V4/export?format=csv&gid=1606042726"
+    """Load responden data for fakultas information from Supabase"""
     try:
         time.sleep(0.2)  
-        return pd.read_csv(url)
+        return run_query("informasi_responden")
     except Exception as e:
         return pd.DataFrame()
 
@@ -80,64 +80,66 @@ def get_fakultas_mapping():
     }
 
 @loading_decorator()
-def parse_meal_activities(df):
-    """Parse meal activities from daily activities data - filter kegiatan Makan/Minum"""
+def parse_meal_activities(df_activities):
+    """Parse meal activities from Supabase daily activities data."""
     meal_activities = []
     
-    if df.empty:
+    if df_activities.empty:
         return pd.DataFrame()
     
-    # Filter untuk kegiatan Makan atau Minum
-    meal_df = df[df['kegiatan'].str.contains('Makan|Minum', case=False, na=False)] if 'kegiatan' in df.columns else df
+    # Filter untuk kegiatan Makan/Minum dan emisi > 0
+    meal_df = df_activities[
+        df_activities['kegiatan'].str.contains('Makan|Minum', case=False, na=False) &
+        (pd.to_numeric(df_activities['emisi_makanminum'], errors='coerce').fillna(0) > 0)
+    ].copy()
     
+    if meal_df.empty:
+        return pd.DataFrame()
+
     for _, row in meal_df.iterrows():
-        # Parse hari column (format: senin_1012)
-        hari_value = str(row.get('hari', ''))
-        if '_' in hari_value:
-            parts = hari_value.split('_')
-            if len(parts) == 2:
-                day_name = parts[0].capitalize()
-                time_str = parts[1]
+        day_name = row.get('hari', '').capitalize()
+        waktu_str = str(row.get('waktu', ''))
+
+        # Pastikan kolom hari dan waktu tidak kosong
+        if day_name and '-' in waktu_str:
+            try:
+                # Parse waktu, contoh: "10-12"
+                start_hour_str, end_hour_str = waktu_str.split('-')
+                start_hour = int(start_hour_str)
+                end_hour = int(end_hour_str)
                 
-                if len(time_str) == 4:  
-                    start_hour = int(time_str[:2])
-                    end_hour = int(time_str[2:])
-                    
-                    # Categorize meal periods - 4 periods
-                    if 6 <= start_hour < 11:
-                        meal_period = 'Pagi'
-                    elif 11 <= start_hour < 15:
-                        meal_period = 'Siang'
-                    elif 15 <= start_hour < 18:
-                        meal_period = 'Sore'
-                    elif 18 <= start_hour < 22:
-                        meal_period = 'Malam'
-                    else:
-                        meal_period = 'Lainnya'
-                    
-                    # Keep original location without categorization
-                    lokasi = str(row.get('lokasi', ''))
-                    if not lokasi or lokasi == 'nan':
-                        lokasi = 'Unknown'
-                    
-                    # Determine meal type
-                    kegiatan = str(row.get('kegiatan', '')).lower()
-                    meal_type = 'Makan' if 'makan' in kegiatan else 'Minum' if 'minum' in kegiatan else 'Lainnya'
-                    
-                    meal_activities.append({
-                        'id_responden': row.get('id_responden', ''),
-                        'day': day_name,
-                        'start_hour': start_hour,
-                        'end_hour': end_hour,
-                        'duration': end_hour - start_hour,
-                        'time_slot': f"{start_hour:02d}:00-{end_hour:02d}:00",
-                        'meal_period': meal_period,
-                        'meal_type': meal_type,
-                        'lokasi': lokasi,
-                        'emisi_makanminum': pd.to_numeric(row.get('emisi_makanminum', 0), errors='coerce'),
-                        'day_order': {'Senin': 1, 'Selasa': 2, 'Rabu': 3, 'Kamis': 4, 'Jumat': 5, 'Sabtu': 6, 'Minggu': 7}.get(day_name, 0),
-                        'is_weekend': day_name in ['Sabtu', 'Minggu']
-                    })
+                # Categorize meal periods
+                if 6 <= start_hour < 11:
+                    meal_period = 'Pagi'
+                elif 11 <= start_hour < 15:
+                    meal_period = 'Siang'
+                elif 15 <= start_hour < 18:
+                    meal_period = 'Sore'
+                elif 18 <= start_hour < 22:
+                    meal_period = 'Malam'
+                else:
+                    meal_period = 'Lainnya'
+                
+                lokasi = str(row.get('lokasi', '')) or 'Unknown'
+                kegiatan = str(row.get('kegiatan', '')).lower()
+                meal_type = 'Makan' if 'makan' in kegiatan else 'Minum' if 'minum' in kegiatan else 'Lainnya'
+                
+                meal_activities.append({
+                    'id_responden': row.get('id_responden', ''),
+                    'day': day_name,
+                    'start_hour': start_hour,
+                    'end_hour': end_hour,
+                    'duration': end_hour - start_hour,
+                    'time_slot': f"{start_hour:02d}:00-{end_hour:02d}:00",
+                    'meal_period': meal_period,
+                    'meal_type': meal_type,
+                    'lokasi': lokasi,
+                    'emisi_makanminum': pd.to_numeric(row.get('emisi_makanminum', 0), errors='coerce'),
+                    'day_order': {'Senin': 1, 'Selasa': 2, 'Rabu': 3, 'Kamis': 4, 'Jumat': 5, 'Sabtu': 6, 'Minggu': 7}.get(day_name, 0),
+                    'is_weekend': day_name in ['Sabtu', 'Minggu']
+                })
+            except (ValueError, IndexError):
+                continue
     
     time.sleep(0.12)  
     return pd.DataFrame(meal_activities)
@@ -168,11 +170,13 @@ def apply_filters(df, selected_days, selected_periods, selected_fakultas, df_res
     return filtered_df
 
 
+# Ganti seluruh fungsi generate_pdf_report() dengan kode ini
+
 @loading_decorator()
 def generate_pdf_report(filtered_df, df_responden=None):
     """
-    REVISED to generate a professional HTML report with tables, insights, and recommendations,
-    matching the latest design.
+    REVISED to generate a professional HTML report with actionable insights 
+    and realistic recommendations for university management.
     """
     from datetime import datetime
     import pandas as pd
@@ -182,22 +186,24 @@ def generate_pdf_report(filtered_df, df_responden=None):
         return "<html><body><h1>Tidak ada data untuk dilaporkan</h1><p>Silakan ubah filter Anda.</p></body></html>"
 
     total_emisi = filtered_df['emisi_makanminum'].sum()
-    avg_emisi = filtered_df['emisi_makanminum'].mean()
-    
-    # Insight 1: Daily Trend
-    daily_stats = filtered_df.groupby('day')['emisi_makanminum'].sum().reset_index()
-    day_order = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
-    daily_stats['day_order'] = daily_stats['day'].map({day: i for i, day in enumerate(day_order)})
-    daily_stats = daily_stats.sort_values('day_order').drop(columns=['day_order'])
-    daily_trend_table_html = "".join([f"<tr><td>{row['day']}</td><td style='text-align:right;'>{row['emisi_makanminum']:.1f}</td></tr>" for _, row in daily_stats.iterrows()])
-    peak_day = daily_stats.sort_values('emisi_makanminum', ascending=False).iloc[0]['day']
-    trend_conclusion = f"Puncak emisi dari sampah makanan & minuman terjadi pada hari <strong>{peak_day}</strong>."
-    trend_recommendation = f"Fokuskan kampanye 'zero food waste' atau 'habiskan makananmu' pada hari <strong>{peak_day}</strong>, terutama di kantin-kantin populer."
+    avg_emisi_per_activity = filtered_df['emisi_makanminum'].mean()
 
-    # Insight 2: Faculty Analysis
+    # --- Insight 1: Analisis Tren Temporal (Harian) ---
+    daily_stats = filtered_df.groupby('day')['emisi_makanminum'].agg(['sum', 'mean', 'count']).reset_index()
+    day_order = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
+    daily_stats['day_order'] = pd.Categorical(daily_stats['day'], categories=day_order, ordered=True)
+    daily_stats = daily_stats.sort_values('day_order')
+    daily_trend_table_html = "".join([f"<tr><td>{row['day']}</td><td style='text-align:right;'>{row['sum']:.1f}</td><td style='text-align:right;'>{row['mean']:.2f}</td><td style='text-align:center;'>{row['count']}</td></tr>" for _, row in daily_stats.iterrows()])
+    
+    peak_day_row = daily_stats.sort_values('sum', ascending=False).iloc[0]
+    peak_day = peak_day_row['day']
+    trend_conclusion = f"Emisi sampah makanan secara signifikan memuncak pada hari <strong>{peak_day}</strong>, dengan total <strong>{peak_day_row['sum']:.1f} kg CO₂</strong>. Ini menunjukkan adanya pola konsumsi mingguan yang dapat diintervensi."
+    trend_recommendation = f"Pihak pengelola kampus dapat mengarahkan kampanye 'Zero Food Waste' atau 'Habiskan Makananmu' agar lebih intensif pada hari <strong>{peak_day}</strong>. Ini bisa dilakukan melalui media sosial resmi atau poster di kantin-kantin utama."
+
+    # --- Insight 2: Analisis Spasial (Fakultas) ---
     fakultas_table_html = "<tr><td colspan='3'>Data fakultas tidak tersedia.</td></tr>"
-    fakultas_conclusion = "Tidak dapat melakukan analisis per fakultas."
-    fakultas_recommendation = "Integrasikan data responden untuk mendapatkan wawasan per fakultas."
+    fakultas_conclusion = "Distribusi emisi antar fakultas belum dapat dianalisis."
+    fakultas_recommendation = "Integrasikan data responden untuk memetakan fakultas 'high-impact' dan 'low-impact' sebagai dasar intervensi yang tertarget."
     if df_responden is not None and not df_responden.empty:
         fakultas_mapping = get_fakultas_mapping()
         df_responden['fakultas'] = df_responden['program_studi'].map(fakultas_mapping).fillna('Lainnya')
@@ -208,26 +214,53 @@ def generate_pdf_report(filtered_df, df_responden=None):
             if not fakultas_stats.empty:
                 fakultas_table_html = "".join([f"<tr><td>{fakultas}</td><td style='text-align:right;'>{row['sum']:.2f}</td><td style='text-align:center;'>{int(row['count'])}</td></tr>" for fakultas, row in fakultas_stats.head(10).iterrows()])
                 highest_fakultas = fakultas_stats.index[0]
-                fakultas_conclusion = f"Total emisi sampah makanan tertinggi berasal dari fakultas <strong>{highest_fakultas}</strong>."
-                fakultas_recommendation = f"Lakukan program edukasi limbah makanan yang ditargetkan untuk fakultas <strong>{highest_fakultas}</strong>, possibly di kantin terdekat mereka."
+                fakultas_conclusion = f"Fakultas <strong>{highest_fakultas}</strong> merupakan kontributor emisi sampah makanan terbesar. Ini mengindikasikan kemungkinan adanya kantin populer atau kebiasaan konsumsi yang spesifik di sekitar fakultas tersebut."
+                fakultas_recommendation = f"Jadikan fakultas <strong>{highest_fakultas}</strong> sebagai area prioritas. Pengelola kampus dapat berkolaborasi dengan pengelola kantin terdekat untuk membahas opsi penyesuaian porsi atau diversifikasi menu berdasarkan data ini."
 
-    # Insight 3: Meal Period Distribution
-    period_stats = filtered_df.groupby('meal_period')['emisi_makanminum'].agg(['count', 'sum']).round(2).sort_values('count', ascending=False)
+    # --- Insight 3: Analisis Periode Waktu Makan ---
+    period_stats = filtered_df.groupby('meal_period')['emisi_makanminum'].agg(['count', 'sum', 'mean']).round(2).sort_values('count', ascending=False)
     period_table_html = "".join([f"<tr><td>{period}</td><td style='text-align:center;'>{int(row['count'])}</td><td style='text-align:right;'>{row['sum']:.1f}</td></tr>" for period, row in period_stats.iterrows()])
-    peak_period = period_stats.index[0]
-    period_conclusion = f"Aktivitas makan & minum paling banyak terjadi pada periode <strong>{peak_period}</strong>."
-    period_recommendation = f"Pastikan ketersediaan pilihan makanan porsi kecil/sedang selama periode <strong>{peak_period}</strong> untuk mengurangi potensi sisa makanan."
+    peak_period_row = period_stats.iloc[0]
+    peak_period = peak_period_row.name
+    avg_waste_peak_period = peak_period_row['mean']
+    period_conclusion = f"Periode <strong>{peak_period}</strong> memiliki frekuensi aktivitas makan tertinggi, dengan rata-rata limbah per aktivitas sebesar <strong>{avg_waste_peak_period:.2f} kg CO₂</strong>. Ini adalah 'critical window' untuk intervensi."
+    recommendation = "Pengelola kampus dapat bekerja sama dengan vendor untuk memastikan ketersediaan pilihan makanan porsi kecil/sedang selama periode <strong>{peak_period}</strong> untuk mengurangi potensi sisa makanan."
+    period_recommendation = recommendation
 
-    # Insight 4: Location vs. Time Heatmap
-    heatmap_conclusion = "Pola emisi menunjukkan adanya kombinasi waktu dan lokasi tertentu dengan emisi sangat tinggi."
-    heatmap_recommendation = "Gunakan data heatmap untuk mengidentifikasi 'hotspot' (misal: kantin tertentu di jam makan siang) dan tempatkan intervensi (seperti poster atau petugas) di sana."
+    # --- Insight 4: Analisis Pola Spatio-Temporal (Lokasi vs Waktu) ---
+    heatmap_header_html = "<tr><th>Waktu</th><th>Lokasi Populer 1</th><th>Lokasi Populer 2</th></tr>"
+    heatmap_body_html = "<tr><td colspan='3'>Data tidak cukup untuk membuat tabel pola.</td></tr>"
+    heatmap_conclusion = "Pola emisi antar lokasi dan waktu belum dapat dipetakan secara mendalam."
+    heatmap_recommendation = "Kumpulkan lebih banyak data untuk mengidentifikasi 'hotspot' (kombinasi lokasi dan waktu) yang menjadi target prioritas tertinggi untuk intervensi di tempat."
+    heatmap_data = filtered_df.groupby(['lokasi', 'time_slot'])['emisi_makanminum'].sum().reset_index()
+    if not heatmap_data.empty:
+        pivot_df = heatmap_data.pivot_table(index='time_slot', columns='lokasi', values='emisi_makanminum', fill_value=0)
+        if not pivot_df.empty:
+            top_locations = pivot_df.sum(axis=0).nlargest(5).index
+            pivot_df_filtered = pivot_df[top_locations]
+            
+            header_cells = "<th>Waktu</th>" + "".join([f"<th>{loc}</th>" for loc in pivot_df_filtered.columns])
+            heatmap_header_html = f"<tr>{header_cells}</tr>"
+            
+            body_rows_list = []
+            for time_slot, row in pivot_df_filtered.iterrows():
+                cells = "".join([f"<td style='text-align:center;'>{val:.2f}</td>" for val in row])
+                body_rows_list.append(f"<tr><td><strong>{time_slot}</strong></td>{cells}</tr>")
+            heatmap_body_html = "".join(body_rows_list)
+            
+            hotspot_value = pivot_df.max().max()
+            hotspot_location = pivot_df.max().idxmax()
+            hotspot_time = pivot_df.idxmax()[hotspot_location]
+            heatmap_conclusion = f"Teridentifikasi 'hotspot' emisi signifikan di <strong>{hotspot_location}</strong> pada jam <strong>{hotspot_time}</strong> dengan nilai emisi mencapai <strong>{hotspot_value:.2f} kg CO₂</strong>."
+            heatmap_recommendation = f"Fasilitasi pemasangan materi edukasi (poster, stiker) di <strong>{hotspot_location}</strong> yang secara spesifik menargetkan jam <strong>{hotspot_time}</strong> untuk mengingatkan konsumen agar mengambil makanan secukupnya."
 
-    # Insight 5: Canteen/Location Emissions
-    canteen_stats = filtered_df.groupby('lokasi')['emisi_makanminum'].agg(['sum', 'count']).sort_values('sum', ascending=False)
+    # --- Insight 5: Analisis Kontributor Utama (Lokasi/Kantin) ---
+    canteen_stats = filtered_df.groupby('lokasi')['emisi_makanminum'].agg(['sum', 'count', 'mean']).sort_values('sum', ascending=False)
     canteen_table_html = "".join([f"<tr><td>{loc}</td><td style='text-align:right;'>{row['sum']:.1f}</td><td style='text-align:center;'>{int(row['count'])}</td></tr>" for loc, row in canteen_stats.head(10).iterrows()])
-    hottest_canteen = canteen_stats.index[0]
-    canteen_conclusion = f"Lokasi/kantin <strong>{hottest_canteen}</strong> menjadi sumber emisi sampah makanan terbesar."
-    canteen_recommendation = f"Prioritaskan program intervensi di <strong>{hottest_canteen}</strong>. Opsi: perkenalkan sistem penimbangan sisa makanan, tawarkan diskon untuk yang menghabiskan makanan, atau perbaiki manajemen porsi."
+    hottest_canteen_row = canteen_stats.iloc[0]
+    hottest_canteen = hottest_canteen_row.name
+    canteen_conclusion = f"Lokasi/kantin <strong>{hottest_canteen}</strong> adalah kontributor tunggal terbesar terhadap emisi sampah makanan, dengan rata-rata limbah per aktivitas sebesar <strong>{hottest_canteen_row['mean']:.2f} kg CO₂</strong>. Ini menunjukkan adanya masalah sistemik di lokasi ini."
+    canteen_recommendation = f"Jadikan <strong>{hottest_canteen}</strong> sebagai lokasi percontohan program reduksi sampah. Pengelola kampus dapat: (1) Mengadakan diskusi dengan vendor untuk evaluasi porsi. (2) Memfasilitasi sistem pemilahan sampah organik yang lebih baik di lokasi ini. (3) Mempertimbangkan untuk memberikan penghargaan bagi kantin dengan reduksi sampah terbaik."
 
     # --- HTML Generation ---
     html_content = f"""
@@ -240,24 +273,25 @@ def generate_pdf_report(filtered_df, df_responden=None):
         .grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 25px; }}
         .card {{ background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; }}
         .card.primary {{ border-left: 4px solid #10b981; }} .card.primary strong {{ color: #059669; }}
-        .card.secondary {{ border-left: 4px solid #34d399; }} .card.secondary strong {{ color: #10b981; }}
+        .card.secondary {{ border-left: 4px solid #3b82f6; }} .card.secondary strong {{ color: #3b82f6; }}
         .card strong {{ font-size: 1.5em; display: block; }}
         .conclusion, .recommendation {{ padding: 12px 15px; margin-top: 10px; border-radius: 6px; }}
         .conclusion {{ background: #f0fdf4; border-left: 4px solid #10b981; }}
         .recommendation {{ background: #fffbeb; border-left: 4px solid #f59e0b; }}
+        ul {{ padding-left: 20px; margin-top: 8px; margin-bottom: 0; }} li {{ margin-bottom: 5px; }}
         table {{ width: 100%; border-collapse: collapse; margin-top: 15px; }} th, td {{ padding: 8px; text-align: left; border: 1px solid #e5e7eb; }}
-        th {{ background-color: #d1fae5; font-weight: 600; text-align: center; }}
+        th {{ background-color: #f3f4f6; font-weight: 600; text-align: center; }}
         td:first-child {{ font-weight: 500; }}
     </style></head>
     <body><div class="page">
         <div class="header"><h1>Laporan Emisi Sampah Makanan</h1><p>Institut Teknologi Bandung | Dibuat pada: {datetime.now().strftime('%d %B %Y')}</p></div>
         <div class="grid">
             <div class="card primary"><strong>{total_emisi:.1f} kg CO₂</strong>Total Emisi</div>
-            <div class="card secondary"><strong>{avg_emisi:.2f} kg CO₂</strong>Rata-rata/Aktivitas</div>
+            <div class="card secondary"><strong>{avg_emisi_per_activity:.2f} kg CO₂</strong>Rata-rata/Aktivitas</div>
         </div>
 
         <h2>1. Tren Emisi Harian</h2>
-        <table><thead><tr><th>Hari</th><th>Total Emisi (kg CO₂)</th></tr></thead><tbody>{daily_trend_table_html}</tbody></table>
+        <table><thead><tr><th>Hari</th><th>Total Emisi (kg CO₂)</th><th>Rata-rata/Aktivitas</th><th>Jumlah Aktivitas</th></tr></thead><tbody>{daily_trend_table_html}</tbody></table>
         <div class="conclusion"><strong>Insight:</strong> {trend_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {trend_recommendation}</div>
 
         <h2>2. Emisi per Fakultas</h2>
@@ -269,6 +303,7 @@ def generate_pdf_report(filtered_df, df_responden=None):
         <div class="conclusion"><strong>Insight:</strong> {period_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {period_recommendation}</div>
 
         <h2>4. Pola Emisi (Lokasi & Waktu)</h2>
+        <table><thead>{heatmap_header_html}</thead><tbody>{heatmap_body_html}</tbody></table>
         <div class="conclusion"><strong>Insight:</strong> {heatmap_conclusion}</div>
         <div class="recommendation"><strong>Rekomendasi:</strong> {heatmap_recommendation}</div>
 

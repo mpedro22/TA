@@ -5,6 +5,8 @@ import plotly.graph_objects as go
 import numpy as np
 from src.components.loading import loading, loading_decorator
 import time
+from src.utils.db_connector import run_query
+
 
 MAIN_PALETTE = ['#9e0142', '#d53e4f', '#f46d43', '#fdae61', '#fee08b', 
                 '#e6f598', '#abdda4', '#66c2a5', '#3288bd', '#5e4fa2']
@@ -42,11 +44,10 @@ MODEBAR_CONFIG = {
 @st.cache_data(ttl=3600)
 @loading_decorator()
 def load_electronic_data():
-    """Load electronic data from Google Sheets"""
-    url = "https://docs.google.com/spreadsheets/d/11Y7cx9SqtLeG5S09F34nDQSnwaZDfUkZKVnNwRLi8V4/export?format=csv&gid=622151341"
+    """Load electronic data from Supabase"""
     try:
         time.sleep(0.3)  
-        return pd.read_csv(url)
+        return run_query("elektronik")
     except Exception as e:
         st.error(f"Error loading electronic data: {e}")
         return pd.DataFrame()
@@ -54,11 +55,10 @@ def load_electronic_data():
 @st.cache_data(ttl=3600)
 @loading_decorator()
 def load_daily_activities():
-    """Load daily activities data from Google Sheets"""
-    url = "https://docs.google.com/spreadsheets/d/11Y7cx9SqtLeG5S09F34nDQSnwaZDfUkZKVnNwRLi8V4/export?format=csv&gid=1749257811"
+    """Load daily activities data from Supabase"""
     try:
         time.sleep(0.25) 
-        return pd.read_csv(url)
+        return run_query("aktivitas_harian")
     except Exception as e:
         st.error(f"Error loading daily activities data: {e}")
         return pd.DataFrame()
@@ -66,11 +66,10 @@ def load_daily_activities():
 @st.cache_data(ttl=3600)
 @loading_decorator()
 def load_responden_data():
-    """Load responden data for fakultas information"""
-    url = "https://docs.google.com/spreadsheets/d/11Y7cx9SqtLeG5S09F34nDQSnwaZDfUkZKVnNwRLi8V4/export?format=csv&gid=1606042726"
+    """Load responden data for fakultas information from Supabase"""
     try:
         time.sleep(0.2) 
-        return pd.read_csv(url)
+        return run_query("informasi_responden")
     except Exception as e:
         return pd.DataFrame()
 
@@ -94,40 +93,47 @@ def get_fakultas_mapping():
 
 @loading_decorator()
 def parse_time_activities(df_activities):
-    """Parse time and location data from daily activities with loading"""
+    """Parse time and location data from daily activities (Supabase format)"""
     parsed_data = []
-    if df_activities.empty or 'hari' not in df_activities.columns:
+    if df_activities.empty:
         return pd.DataFrame()
     
+    # Loop melalui setiap baris data aktivitas harian dari Supabase
     for _, row in df_activities.iterrows():
-        hari_value = str(row['hari'])
-        if '_' in hari_value:
-            parts = hari_value.split('_')
-            if len(parts) == 2:
-                day = parts[0].capitalize()
-                time_str = parts[1]
-                if len(time_str) == 4:
-                    start_hour = int(time_str[:2])
-                    end_hour = int(time_str[2:])
-                    
-                    time_range = f"{start_hour:02d}:00-{end_hour:02d}:00"
-                    
-                    parsed_data.append({
-                        'id_responden': row.get('id_responden', ''),
-                        'day': day,
-                        'start_hour': start_hour,
-                        'end_hour': end_hour,
-                        'time_range': time_range,
-                        'duration': end_hour - start_hour,
-                        'lokasi': row.get('lokasi', ''),
-                        'kegiatan': row.get('kegiatan', ''),
-                        'ac': row.get('ac', ''),
-                        'emisi_ac': pd.to_numeric(row.get('emisi_ac', 0), errors='coerce'),
-                        'emisi_lampu': pd.to_numeric(row.get('emisi_lampu', 0), errors='coerce'),
-                        'emisi_makanminum': pd.to_numeric(row.get('emisi_makanminum', 0), errors='coerce')
-                    })
+        day = row.get('hari', '').capitalize()
+        waktu_str = str(row.get('waktu', ''))
+
+        # Pastikan kolom hari dan waktu tidak kosong dan formatnya benar (contoh: "10-12")
+        if day and '-' in waktu_str:
+            try:
+                # Pisahkan jam mulai dan selesai dari string "10-12"
+                start_hour_str, end_hour_str = waktu_str.split('-')
+                start_hour = int(start_hour_str)
+                end_hour = int(end_hour_str)
+                
+                # Buat time_range yang konsisten dengan format lama
+                time_range = f"{start_hour:02d}:00-{end_hour:02d}:00"
+                
+                # Tambahkan data yang sudah diparsing ke list
+                parsed_data.append({
+                    'id_responden': row.get('id_responden', ''),
+                    'day': day,
+                    'start_hour': start_hour,
+                    'end_hour': end_hour,
+                    'time_range': time_range,
+                    'duration': end_hour - start_hour,
+                    'lokasi': row.get('lokasi', ''),
+                    'kegiatan': row.get('kegiatan', ''),
+                    'ac': row.get('penggunaan_ac', ''), # Sesuaikan jika nama kolom berbeda
+                    'emisi_ac': pd.to_numeric(row.get('emisi_ac', 0), errors='coerce'),
+                    'emisi_lampu': pd.to_numeric(row.get('emisi_lampu', 0), errors='coerce'),
+                    'emisi_makanminum': pd.to_numeric(row.get('emisi_makanminum', 0), errors='coerce')
+                })
+            except (ValueError, IndexError):
+                # Lewati baris jika format 'waktu' tidak valid
+                continue
     
-    time.sleep(0.1)  # Processing time for activity parsing
+    time.sleep(0.1)
     return pd.DataFrame(parsed_data)
 
 @loading_decorator()
@@ -139,6 +145,7 @@ def apply_electronic_filters(df, selected_days, selected_devices, selected_fakul
     if selected_days and 'hari_datang' in filtered_df.columns:
         day_mask = pd.Series(False, index=filtered_df.index)
         for day in selected_days:
+            # Menggunakan .str.contains() aman karena hari_datang adalah string
             day_mask |= filtered_df['hari_datang'].str.contains(day, case=False, na=False)
         filtered_df = filtered_df[day_mask]
     
@@ -147,12 +154,14 @@ def apply_electronic_filters(df, selected_days, selected_devices, selected_fakul
         device_mask = pd.Series(False, index=filtered_df.index)
         
         for device in selected_devices:
+            # Logika filter diubah untuk menangani boolean (TRUE/FALSE)
             if device == 'Smartphone' and 'penggunaan_hp' in filtered_df.columns:
-                device_mask |= (filtered_df['penggunaan_hp'].str.contains('Ya', case=False, na=False))
+                device_mask |= (filtered_df['penggunaan_hp'] == True)
             elif device == 'Laptop' and 'penggunaan_laptop' in filtered_df.columns:
-                device_mask |= (filtered_df['penggunaan_laptop'].str.contains('Ya', case=False, na=False))
+                device_mask |= (filtered_df['penggunaan_laptop'] == True)
             elif device == 'Tablet' and 'penggunaan_tab' in filtered_df.columns:
-                device_mask |= (filtered_df['penggunaan_tab'].str.contains('Ya', case=False, na=False))
+                device_mask |= (filtered_df['penggunaan_tab'] == True)
+            # Logika untuk AC dan Lampu tetap sama
             elif device == 'AC':
                 device_mask |= pd.Series(True, index=filtered_df.index)
             elif device == 'Lampu':
@@ -194,40 +203,52 @@ def calculate_device_emissions(df, activities_df):
     time.sleep(0.15)  
     return device_emissions
 
+# Ganti seluruh fungsi generate_electronic_pdf_report() dengan kode ini
+
+# Ganti seluruh fungsi generate_electronic_pdf_report() dengan kode ini
+
 @loading_decorator()
 def generate_electronic_pdf_report(filtered_df, activities_df, device_emissions, df_responden=None):
     """
-    REVISED to generate a professional HTML report with tables, insights, and recommendations,
-    matching the latest design.
+    REVISED to generate a professional HTML report with actionable insights 
+    and realistic recommendations for university management.
     """
     from datetime import datetime
     import pandas as pd
     time.sleep(0.6)
 
-    if filtered_df.empty:
+    if filtered_df.empty or activities_df.empty:
         return "<html><body><h1>Tidak ada data untuk dilaporkan</h1><p>Silakan ubah filter Anda.</p></body></html>"
 
     # --- 1. DATA PREPARATION & INSIGHT GENERATION ---
-    total_emisi = sum(device_emissions.values()) if device_emissions else filtered_df['emisi_elektronik_mingguan'].sum()
+    total_emisi = filtered_df['emisi_elektronik_mingguan'].sum()
     avg_emisi = total_emisi / len(filtered_df) if not filtered_df.empty else 0
+    
+    day_order = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
 
     # Insight 1: Daily Trend
-    daily_cols = [c for c in filtered_df.columns if 'emisi_elektronik_' in c and c != 'emisi_elektronik_mingguan']
+    days_of_week = ['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'minggu']
+    daily_cols = [f'emisi_elektronik_{day}' for day in days_of_week if f'emisi_elektronik_{day}' in filtered_df.columns]
     daily_trend_table_html = "<tr><td colspan='2'>Data emisi harian tidak tersedia.</td></tr>"
-    trend_conclusion = "Data tren harian tidak lengkap."
-    trend_recommendation = "Lengkapi data emisi harian untuk analisis tren mingguan."
+    trend_conclusion = "Data tren emisi harian tidak dapat dianalisis."
+    trend_recommendation = "Lengkapi data aktivitas harian untuk mendapatkan wawasan tren mingguan."
     if daily_cols:
         daily_totals = {col.replace('emisi_elektronik_', '').capitalize(): filtered_df[col].sum() for col in daily_cols}
-        if daily_totals:
-            daily_df = pd.DataFrame(list(daily_totals.items()), columns=['Hari', 'Total Emisi (kg CO₂)']).sort_values(by='Total Emisi (kg CO₂)', ascending=False)
-            daily_trend_table_html = "".join([f"<tr><td>{row['Hari']}</td><td style='text-align:right;'>{row['Total Emisi (kg CO₂)']:.1f}</td></tr>" for _, row in daily_df.iterrows()])
-            peak_day = daily_df.iloc[0]['Hari']
-            trend_conclusion = f"Puncak emisi elektronik terjadi pada hari <strong>{peak_day}</strong>."
-            trend_recommendation = f"Fokuskan kampanye hemat energi, seperti 'Matikan Setelah Pakai', pada hari-hari menjelang <strong>{peak_day}</strong>."
+        if any(daily_totals.values()):
+            daily_df = pd.DataFrame(list(daily_totals.items()), columns=['Hari', 'Total Emisi (kg CO₂)'])
+            daily_df['order'] = daily_df['Hari'].map({day: i for i, day in enumerate(day_order)})
+            daily_df = daily_df.sort_values('order').drop(columns='order')
+            if not daily_df.empty:
+                daily_trend_table_html = "".join([f"<tr><td>{row['Hari']}</td><td style='text-align:right;'>{row['Total Emisi (kg CO₂)']:.1f}</td></tr>" for _, row in daily_df.iterrows()])
+                peak_day_df = daily_df.sort_values(by='Total Emisi (kg CO₂)', ascending=False)
+                peak_day = peak_day_df.iloc[0]['Hari']
+                low_day = peak_day_df.iloc[-1]['Hari']
+                trend_conclusion = f"Pola penggunaan elektronik menunjukkan puncak pada hari <strong>{peak_day}</strong> dan menurun signifikan pada <strong>{low_day}</strong>, menandakan adanya korelasi kuat dengan aktivitas akademik."
+                trend_recommendation = f"Pengelola kampus dapat menjadwalkan kampanye komunikasi (misal: email, konten media sosial) mengenai hemat energi pada hari <strong>{peak_day}</strong> atau sehari sebelumnya untuk dampak maksimal."
 
     # Insight 2: Faculty Analysis
     fakultas_table_html = "<tr><td colspan='3'>Data fakultas tidak tersedia.</td></tr>"
-    fakultas_conclusion = "Tidak dapat melakukan analisis per fakultas."
+    fakultas_conclusion = "Tidak dapat melakukan analisis emisi per fakultas."
     fakultas_recommendation = "Integrasikan data responden untuk wawasan per fakultas."
     if df_responden is not None and not df_responden.empty:
         fakultas_mapping = get_fakultas_mapping()
@@ -239,33 +260,60 @@ def generate_electronic_pdf_report(filtered_df, activities_df, device_emissions,
             if not fakultas_stats.empty:
                 fakultas_table_html = "".join([f"<tr><td>{fakultas}</td><td style='text-align:right;'>{row['sum']:.2f}</td><td style='text-align:center;'>{int(row['count'])}</td></tr>" for fakultas, row in fakultas_stats.head(10).iterrows()])
                 highest_fakultas = fakultas_stats.index[0]
-                fakultas_conclusion = f"Total emisi elektronik tertinggi berasal dari fakultas <strong>{highest_fakultas}</strong>."
-                fakultas_recommendation = f"Lakukan audit penggunaan perangkat di fakultas <strong>{highest_fakultas}</strong> untuk mengidentifikasi penyebabnya, apakah dari perangkat pribadi atau fasilitas kampus."
+                fakultas_conclusion = f"Total emisi elektronik tertinggi berasal dari mahasiswa fakultas <strong>{highest_fakultas}</strong>. Ini bisa disebabkan oleh durasi penggunaan perangkat pribadi yang lebih lama atau fasilitas kampus yang intensif digunakan."
+                fakultas_recommendation = f"Jadikan gedung-gedung utama fakultas <strong>{highest_fakultas}</strong> sebagai prioritas untuk program 'walk-through audit' energi. Audit ini bertujuan untuk mengidentifikasi potensi penghematan sederhana seperti mematikan lampu/AC di ruang kosong."
 
     # Insight 3: Device Proportion
-    device_table_html = "".join([f"<tr><td>{device}</td><td style='text-align:right;'>{emisi:.2f}</td><td style='text-align:right;'>{(emisi/total_emisi*100 if total_emisi > 0 else 0):.1f}%</td></tr>" for device, emisi in sorted(device_emissions.items(), key=lambda item: item[1], reverse=True)])
+    total_device_emission = sum(device_emissions.values())
+    device_table_html = "".join([f"<tr><td>{device}</td><td style='text-align:right;'>{emisi:.2f}</td><td style='text-align:right;'>{(emisi/total_device_emission*100 if total_device_emission > 0 else 0):.1f}%</td></tr>" for device, emisi in sorted(device_emissions.items(), key=lambda item: item[1], reverse=True)])
     dominant_device = max(device_emissions, key=device_emissions.get) if device_emissions else "N/A"
-    device_conclusion = f"Perangkat <strong>{dominant_device}</strong> adalah penyumbang emisi terbesar dari sektor elektronik."
-    device_recommendation = f"Fokuskan kebijakan hemat energi pada penggunaan <strong>{dominant_device}</strong>. Jika itu AC/Lampu, pertimbangkan upgrade ke perangkat hemat energi. Jika Laptop/HP, promosikan mode 'power saving'."
+    dominant_percentage = (device_emissions.get(dominant_device, 0) / total_device_emission * 100) if total_device_emission > 0 else 0
+    device_conclusion = f"Perangkat <strong>{dominant_device}</strong> adalah penyumbang emisi terbesar dari sektor elektronik, mencakup <strong>{dominant_percentage:.1f}%</strong> dari total."
+    rec_text = f"Pengelola kampus dapat mempertimbangkan kebijakan pengadaan perangkat <strong>{dominant_device}</strong> hemat energi (label bintang 4 atau 5) untuk penggantian atau pengadaan baru di masa depan." if dominant_device in ['AC', 'Lampu'] else "Pengelola dapat mempromosikan kebiasaan hemat energi untuk perangkat pribadi melalui materi edukasi di website atau layar informasi digital kampus."
+    device_recommendation = rec_text
 
     # Insight 4: Daily Activity Heatmap
-    heatmap_conclusion = "Pola penggunaan fasilitas (AC & Lampu) menunjukkan adanya jam-jam sibuk tertentu."
-    heatmap_recommendation = "Gunakan data heatmap untuk mengimplementasikan sistem kontrol pencahayaan dan AC otomatis yang menyesuaikan dengan jadwal penggunaan ruangan."
+    heatmap_header_html = "<tr><th>Waktu</th><th>Senin</th><th>Selasa</th><th>Rabu</th><th>Kamis</th><th>Jumat</th><th>Sabtu</th><th>Minggu</th></tr>"
+    heatmap_body_html = "<tr><td colspan='8'>Data aktivitas tidak cukup untuk membuat heatmap.</td></tr>"
+    heatmap_conclusion = "Pola penggunaan fasilitas (AC & Lampu) belum dapat diidentifikasi secara detail."
+    heatmap_recommendation = "Tingkatkan kelengkapan data aktivitas harian untuk analisis jam-jam sibuk yang lebih akurat."
+    if not activities_df.empty:
+        heatmap_df = activities_df.groupby(['day', 'time_range']).agg(emisi_ac_sum=('emisi_ac', 'sum'), emisi_lampu_sum=('emisi_lampu', 'sum')).reset_index()
+        heatmap_df['total_emisi'] = heatmap_df['emisi_ac_sum'] + heatmap_df['emisi_lampu_sum']
+        if not heatmap_df.empty:
+            pivot_df = heatmap_df.pivot_table(index='time_range', columns='day', values='total_emisi', fill_value=0)
+            pivot_df = pivot_df.reindex(columns=day_order, fill_value=0) 
+            try:
+                pivot_df.index = sorted(pivot_df.index, key=lambda x: int(x.split(':')[0]))
+            except (ValueError, IndexError):
+                pass 
+            body_rows_list = []
+            for time_slot, row in pivot_df.iterrows():
+                cells = "".join([f"<td style='text-align:center;'>{val:.2f}</td>" for val in row])
+                body_rows_list.append(f"<tr><td><strong>{time_slot}</strong></td>{cells}</tr>")
+            heatmap_body_html = "".join(body_rows_list)
+            peak_time_emissions = pivot_df.sum(axis=1)
+            if not peak_time_emissions.empty:
+                peak_time_slot = peak_time_emissions.idxmax()
+                heatmap_conclusion = f"Emisi dari fasilitas kampus (AC/Lampu) mencapai puncaknya pada jam <strong>{peak_time_slot}</strong>, menunjukkan waktu penggunaan fasilitas paling intensif."
+                heatmap_recommendation = f"Jadikan jam <strong>{peak_time_slot}</strong> sebagai referensi untuk kebijakan operasional, seperti menyetel timer AC untuk mati otomatis setelah jam tersebut di area-area umum atau ruang kelas yang tidak terjadwal."
 
     # Insight 5: Popular Classrooms
-    class_activities = activities_df[activities_df['kegiatan'].str.contains('kelas', case=False, na=False)]
+    class_activities = activities_df[activities_df['kegiatan'].str.contains('kelas', case=False, na=False)] if not activities_df.empty else pd.DataFrame()
     location_table_html = "<tr><td colspan='3'>Data aktivitas kelas tidak tersedia.</td></tr>"
-    location_conclusion = "Tidak dapat mengidentifikasi gedung kelas populer."
+    location_conclusion = "Tidak dapat mengidentifikasi gedung kelas yang paling sering digunakan."
     location_recommendation = "Lengkapi data aktivitas harian untuk analisis penggunaan fasilitas yang lebih baik."
     if not class_activities.empty:
         location_stats = class_activities.groupby('lokasi')['duration'].agg(['sum', 'count']).sort_values('count', ascending=False)
         location_stats.columns = ['Total Jam Pakai', 'Jumlah Sesi']
-        location_table_html = "".join([f"<tr><td>{loc}</td><td style='text-align:center;'>{int(row['Jumlah Sesi'])}</td><td style='text-align:right;'>{row['Total Jam Pakai']:.1f}</td></tr>" for loc, row in location_stats.head(10).iterrows()])
-        popular_building = location_stats.index[0]
-        location_conclusion = f"Gedung <strong>{popular_building}</strong> adalah yang paling sering digunakan untuk aktivitas kelas."
-        location_recommendation = f"Prioritaskan audit energi dan pemasangan sensor otomatis (lampu/AC) di gedung <strong>{popular_building}</strong> untuk efisiensi maksimal."
+        if not location_stats.empty:
+            location_table_html = "".join([f"<tr><td>{loc}</td><td style='text-align:center;'>{int(row['Jumlah Sesi'])}</td><td style='text-align:right;'>{row['Total Jam Pakai']:.1f}</td></tr>" for loc, row in location_stats.head(10).iterrows()])
+            popular_building = location_stats.index[0]
+            sessions = int(location_stats.iloc[0]['Jumlah Sesi'])
+            location_conclusion = f"Gedung <strong>{popular_building}</strong> adalah yang paling sering digunakan untuk aktivitas kelas, dengan tercatat <strong>{sessions}</strong> sesi. Ini menjadikannya target yang efisien untuk intervensi."
+            location_recommendation = f"Usulkan pemasangan sensor gerak untuk lampu dan AC di gedung <strong>{popular_building}</strong> sebagai proyek percontohan 'Smart Building'. Keberhasilan di lokasi ini dapat menjadi justifikasi untuk ekspansi ke gedung lain."
 
-    # --- HTML Generation ---
+    # --- HTML Generation --- (Tidak ada perubahan di sini)
     html_content = f"""
     <!DOCTYPE html><html><head><title>Laporan Emisi Elektronik</title><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
@@ -292,23 +340,19 @@ def generate_electronic_pdf_report(filtered_df, activities_df, device_emissions,
             <div class="card primary"><strong>{total_emisi:.1f} kg CO₂</strong>Total Emisi</div>
             <div class="card secondary"><strong>{avg_emisi:.2f} kg CO₂</strong>Rata-rata/Mahasiswa</div>
         </div>
-
         <h2>1. Tren Emisi Harian</h2>
         <table><thead><tr><th>Hari</th><th>Total Emisi (kg CO₂)</th></tr></thead><tbody>{daily_trend_table_html}</tbody></table>
         <div class="conclusion"><strong>Insight:</strong> {trend_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {trend_recommendation}</div>
-
         <h2>2. Emisi per Fakultas</h2>
         <table><thead><tr><th>Fakultas</th><th>Total Emisi (kg CO₂)</th><th>Jumlah Responden</th></tr></thead><tbody>{fakultas_table_html}</tbody></table>
         <div class="conclusion"><strong>Insight:</strong> {fakultas_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {fakultas_recommendation}</div>
-
         <h2>3. Proporsi Emisi per Perangkat</h2>
         <table><thead><tr><th>Perangkat</th><th>Total Emisi (kg CO₂)</th><th>Persentase</th></tr></thead><tbody>{device_table_html}</tbody></table>
         <div class="conclusion"><strong>Insight:</strong> {device_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {device_recommendation}</div>
-
         <h2>4. Pola Penggunaan Fasilitas Kampus</h2>
+        <table><thead>{heatmap_header_html}</thead><tbody>{heatmap_body_html}</tbody></table>
         <div class="conclusion"><strong>Insight:</strong> {heatmap_conclusion}</div>
         <div class="recommendation"><strong>Rekomendasi:</strong> {heatmap_recommendation}</div>
-
         <h2>5. Gedung Kelas Paling Populer</h2>
         <table><thead><tr><th>Gedung</th><th>Jumlah Sesi</th><th>Total Jam Pakai</th></tr></thead><tbody>{location_table_html}</tbody></table>
         <div class="conclusion"><strong>Insight:</strong> {location_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {location_recommendation}</div>
@@ -345,14 +389,36 @@ def show():
 
     # Data processing with loading
     with loading():
+        # Rename 'emisi_elektronik' -> 'emisi_elektronik_mingguan' for consistency
+        if 'emisi_elektronik' in df_electronic.columns:
+            df_electronic = df_electronic.rename(columns={'emisi_elektronik': 'emisi_elektronik_mingguan'})
+
         df_electronic['emisi_elektronik_mingguan'] = pd.to_numeric(df_electronic['emisi_elektronik_mingguan'], errors='coerce')
         df_electronic = df_electronic.dropna(subset=['emisi_elektronik_mingguan'])
         
+        # Konversi durasi ke numerik, isi NaN dengan 0
         df_electronic['durasi_hp'] = pd.to_numeric(df_electronic['durasi_hp'], errors='coerce').fillna(0)
         df_electronic['durasi_laptop'] = pd.to_numeric(df_electronic['durasi_laptop'], errors='coerce').fillna(0)
         df_electronic['durasi_tab'] = pd.to_numeric(df_electronic['durasi_tab'], errors='coerce').fillna(0)
         
-        time.sleep(0.15)  # Data processing time
+        # Buat kolom emisi harian yang tidak ada di Supabase
+        df_electronic['hari_datang'] = df_electronic['hari_datang'].astype(str).fillna('')
+        df_electronic['jumlah_hari_datang'] = df_electronic['hari_datang'].str.split(',').str.len()
+        
+        # Emisi harian adalah emisi mingguan dibagi jumlah hari datang
+        # Tambah 1e-9 untuk menghindari pembagian dengan nol
+        df_electronic['emisi_harian'] = df_electronic['emisi_elektronik_mingguan'] / (df_electronic['jumlah_hari_datang'] + 1e-9)
+
+        days_of_week = ['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'minggu']
+        for day in days_of_week:
+            col_name = f'emisi_elektronik_{day}'
+            df_electronic[col_name] = np.where(
+                df_electronic['hari_datang'].str.contains(day.capitalize(), na=False), 
+                df_electronic['emisi_harian'], 
+                0
+            )
+        
+        time.sleep(0.15)
     
     activities_parsed = parse_time_activities(df_activities)
 
@@ -439,8 +505,8 @@ def show():
 
         with col1:
             # 1. Tren Harian - Line chart 
-            daily_cols = [col for col in filtered_df.columns if 'emisi_elektronik_' in col and col != 'emisi_elektronik_mingguan']
-            
+            days_of_week = ['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'minggu']
+            daily_cols = [f'emisi_elektronik_{day}' for day in days_of_week if f'emisi_elektronik_{day}' in filtered_df.columns]            
             if daily_cols:
                 daily_data = []
                 for col in daily_cols:
