@@ -40,3 +40,9 @@ htmlcov/
 # Backup files
 *_backup/
 *.bak
+
+# Kredensial dan file sensitif
+.env
+credentials.json
+
+etl_script.py
