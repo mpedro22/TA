@@ -5,25 +5,18 @@ import plotly.graph_objects as go
 import numpy as np
 from src.components.loading import loading, loading_decorator
 import time
-from sklearn.cluster import KMeans, AgglomerativeClustering
-from sklearn.preprocessing import StandardScaler
-from scipy.cluster.hierarchy import dendrogram, linkage
 import warnings
 warnings.filterwarnings('ignore')
 from src.utils.db_connector import run_query
 
 
-# CONSISTENT COLOR PALETTE
+# color pallete
 MAIN_PALETTE = ['#9e0142', '#d53e4f', '#f46d43', '#fdae61', '#fee08b', 
                 '#e6f598', '#abdda4', '#66c2a5', '#3288bd', '#5e4fa2']
-
-# Palet Warna
-CATEGORY_COLORS = {'Transportasi': '#d53e4f', 'Elektronik': '#3288bd', 'Sampah Makanan': '#66c2a5'}
+CATEGORY_COLORS = {'Transportasi': '#d53e4f', 'Elektronik': '#3288bd', 'Sampah': '#66c2a5'}
 CLUSTER_COLORS = ['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00']
 FACULTY_PALETTE = ['#9e0142', '#d53e4f', '#f46d43', '#fdae61', '#fee08b', '#e6f598', '#abdda4', '#66c2a5']
 
-# K-MEANS CLUSTER COLORS
-CLUSTER_COLORS = ['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf']
 
 MODEBAR_CONFIG = {
     'displayModeBar': True,
@@ -103,7 +96,7 @@ def parse_food_activities(df_activities):
                 'id_responden': row.get('id_responden', ''),
                 'day': day_name,
                 'emisi_makanan': pd.to_numeric(row.get('emisi_makanminum', 0), errors='coerce'),
-                'kategori': 'Sampah Makanan'
+                'kategori': 'Sampah'
             })
             
     time.sleep(0.1)
@@ -151,54 +144,45 @@ def apply_overview_filters(df_unified, df_transport, df_electronic, df_food, sel
     """Apply filters to all datasets - FIXED to work with all filters"""
     filtered_unified = df_unified.copy()
     
-    # Filter by fakultas first
     if selected_fakultas:
         filtered_unified = filtered_unified[filtered_unified['fakultas'].isin(selected_fakultas)]
     
-    # Filter by category - zero out non-selected categories
     if selected_categories:
         if 'Transportasi' not in selected_categories:
             filtered_unified['transportasi'] = 0
         if 'Elektronik' not in selected_categories:
             filtered_unified['elektronik'] = 0
-        if 'Sampah Makanan' not in selected_categories:
+        if 'Sampah' not in selected_categories:
             filtered_unified['sampah_makanan'] = 0
         
-        # Recalculate total after category filtering
         filtered_unified['total_emisi'] = (
             filtered_unified['transportasi'] + 
             filtered_unified['elektronik'] + 
             filtered_unified['sampah_makanan']
         )
         
-        # Remove rows with zero total emission after category filtering
         filtered_unified = filtered_unified[filtered_unified['total_emisi'] > 0]
     
-    # Filter by days - complex logic to filter based on daily data
     if selected_days:
         valid_respondents = set(filtered_unified['id_responden'])
         day_filtered_respondents = set()
         
-        # Check transport daily data
-        if not df_transport.empty and 'Transportasi' in (selected_categories or ['Transportasi', 'Elektronik', 'Sampah Makanan']):
+        if not df_transport.empty and 'Transportasi' in (selected_categories or ['Transportasi', 'Elektronik', 'Sampah']):
             for day in selected_days:
                 day_col = f'emisi_transportasi_{day.lower()}'
                 if day_col in df_transport.columns:
                     day_users = df_transport[df_transport[day_col] > 0]['id_responden'].dropna()
                     day_filtered_respondents.update(day_users)
         
-        # Check food daily data
-        if not df_food.empty and 'Sampah Makanan' in (selected_categories or ['Transportasi', 'Elektronik', 'Sampah Makanan']):
+        if not df_food.empty and 'Sampah' in (selected_categories or ['Transportasi', 'Elektronik', 'Sampah']):
             day_food_users = df_food[df_food['day'].isin(selected_days)]['id_responden'].dropna()
             day_filtered_respondents.update(day_food_users)
         
-        # For electronic, include all since it doesn't have daily breakdown
-        if 'Elektronik' in (selected_categories or ['Transportasi', 'Elektronik', 'Sampah Makanan']):
+        if 'Elektronik' in (selected_categories or ['Transportasi', 'Elektronik', 'Sampah']):
             if not df_electronic.empty:
                 electronic_users = df_electronic['id_responden'].dropna()
                 day_filtered_respondents.update(electronic_users)
         
-        # Apply day filter only for relevant respondents
         if day_filtered_respondents:
             valid_respondents = valid_respondents.intersection(day_filtered_respondents)
             filtered_unified = filtered_unified[filtered_unified['id_responden'].isin(valid_respondents)]
@@ -206,145 +190,31 @@ def apply_overview_filters(df_unified, df_transport, df_electronic, df_food, sel
     time.sleep(0.1)
     return filtered_unified
 
-@loading_decorator()
-def calculate_gini_coefficient(emissions):
-    """Calculate Gini coefficient for emission inequality"""
-    emissions = np.array(emissions)
-    emissions = emissions[emissions > 0]  
+# Menentukan profil perilaku mahasiswa berdasarkan emisi
+def create_behavior_profile(row, thresholds):
+    """Membuat nama profil perilaku dalam Bahasa Indonesia."""
+    t_level = "Tinggi" if row['transportasi'] > thresholds['transportasi'] else "Rendah"
+    e_level = "Tinggi" if row['elektronik'] > thresholds['elektronik'] else "Rendah"
+    f_level = "Tinggi" if row['sampah_makanan'] > thresholds['sampah_makanan'] else "Rendah"
     
-    if len(emissions) == 0:
-        return 0
-    
-    # Sort emissions
-    sorted_emissions = np.sort(emissions)
-    n = len(sorted_emissions)
-    
-    # Calculate Gini coefficient
-    index = np.arange(1, n + 1)
-    gini = (2 * np.sum(index * sorted_emissions)) / (n * np.sum(sorted_emissions)) - (n + 1) / n
-    
-    time.sleep(0.05)
-    return gini
-
-
-@loading_decorator()
-def perform_kmeans_clustering(df_unified):
-    """
-    Perform K-means clustering on emission patterns.
-    Revised to use 3 clusters and exclude total_emisi from features.
-    """
-    if df_unified.empty or len(df_unified) < 3:
-        # Tidak cukup data untuk clustering
-        return pd.DataFrame(), 0, pd.DataFrame()
-    
-    # Fitur yang digunakan untuk clustering
-    features = ['transportasi', 'elektronik', 'sampah_makanan']
-    X = df_unified[features].fillna(0)
-    
-    # Selalu coba 3 klaster jika data mencukupi
-    n_clusters = 3
-    
-    # Standarisasi data
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
-    
-    # Lakukan K-Means clustering
-    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
-    
-    # Buat salinan DataFrame untuk menambahkan label klaster
-    df_clustered = df_unified.copy()
-    df_clustered['kmeans_cluster'] = kmeans.fit_predict(X_scaled)
-    
-    # Hitung pusat klaster dalam skala asli
-    cluster_centers = scaler.inverse_transform(kmeans.cluster_centers_)
-    centers_df = pd.DataFrame(cluster_centers, columns=features)
-    
-    # Tambahkan total emisi untuk sorting
-    centers_df['total_emisi'] = centers_df.sum(axis=1)
-    
-    return df_clustered, n_clusters, centers_df
-
-@loading_decorator()
-def perform_kmeans_clustering(df_unified):
-    """
-    Perform K-means clustering on emission patterns.
-    Revised to use 3 clusters and exclude total_emisi from features.
-    """
-    # Butuh setidaknya 3 data untuk 3 klaster, jika kurang, jangan lakukan clustering
-    if df_unified.empty or len(df_unified) < 3:
-        return df_unified, 0, pd.DataFrame()
-    
-    # Fitur untuk clustering, total_emisi dihilangkan agar tidak bias
-    features = ['transportasi', 'elektronik', 'sampah_makanan']
-    X = df_unified[features].fillna(0)
-    
-    # Tetapkan jumlah klaster menjadi 3 untuk analisis yang jelas
-    # Atau 2 jika data sangat sedikit
-    n_clusters = 3 if len(df_unified) >= 3 else 2
-
-    # Lakukan standarisasi dan clustering
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
-    
-    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
-    
-    df_unified_copy = df_unified.copy()
-    df_unified_copy['kmeans_cluster'] = kmeans.fit_predict(X_scaled)
-    
-    # Hitung pusat klaster dan kembalikan ke skala asli
-    cluster_centers = scaler.inverse_transform(kmeans.cluster_centers_)
-    centers_df = pd.DataFrame(cluster_centers, columns=features)
-    
-    # Hitung total emisi rata-rata per klaster untuk analisis
-    centers_df['total_emisi'] = centers_df.sum(axis=1)
-    
-    return df_unified_copy, n_clusters, centers_df
-
-@loading_decorator()
-def perform_hierarchical_clustering(df_unified):
-    """Perform Hierarchical clustering on emission patterns"""
-    if df_unified.empty or len(df_unified) < 4:
-        return df_unified, 0, []
-    
-    # Prepare data for clustering
-    features = ['transportasi', 'elektronik', 'sampah_makanan', 'total_emisi']
-    X = df_unified[features].fillna(0)
-    
-    # Standardize features
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
-    
-    # Determine optimal number of clusters (2-4)
-    n_clusters = min(4, max(2, len(df_unified) // 4))
-    
-    # Perform hierarchical clustering
-    hierarchical = AgglomerativeClustering(n_clusters=n_clusters, linkage='ward')
-    df_unified_copy = df_unified.copy()
-    df_unified_copy['hierarchical_cluster'] = hierarchical.fit_predict(X_scaled)
-    
-    # Calculate cluster centers manually
-    cluster_centers = []
-    for i in range(n_clusters):
-        cluster_data = X[df_unified_copy['hierarchical_cluster'] == i]
-        center = cluster_data.mean()
-        cluster_centers.append(center)
-    
-    centers_df = pd.DataFrame(cluster_centers, columns=features)
-    
-    time.sleep(0.1)
-    return df_unified_copy, n_clusters, centers_df
-
-@loading_decorator()
-def categorize_emission_level(total_emisi):
-    """Categorize respondents by emission level"""
-    if total_emisi <= 5:
-        return 'Emisi Rendah'
-    elif total_emisi <= 15:
-        return 'Emisi Sedang'
-    elif total_emisi <= 30:
-        return 'Emisi Tinggi'
+    if t_level == "Tinggi" and e_level == "Tinggi" and f_level == "Tinggi":
+        return "Kontributor Utama"
+    elif t_level == "Rendah" and e_level == "Rendah" and f_level == "Rendah":
+        return "Sangat Sadar Lingkungan"
+    elif t_level == "Tinggi" and e_level == "Tinggi":
+        return "Komuter & Digital"
+    elif t_level == "Tinggi" and f_level == "Tinggi":
+        return "Komuter & Boros Pangan"
+    elif e_level == "Tinggi" and f_level == "Tinggi":
+        return "Digital & Boros Pangan"
+    elif t_level == "Tinggi":
+        return "Komuter Berat"
+    elif e_level == "Tinggi":
+        return "Pengguna Elektronik Berat"
+    elif f_level == "Tinggi":
+        return "Boros Pangan"
     else:
-        return 'Emisi Sangat Tinggi'
+        return "Profil Campuran"
 
 @loading_decorator()
 def generate_overview_pdf_report(filtered_df, daily_df, fakultas_stats_full):
@@ -358,19 +228,16 @@ def generate_overview_pdf_report(filtered_df, daily_df, fakultas_stats_full):
     if filtered_df.empty:
         return "<html><body><h1>Tidak ada data untuk dilaporkan</h1><p>Silakan ubah filter Anda dan coba lagi.</p></body></html>"
 
-    # --- 1. Data Preparation & Insight Generation (Bagian lain tetap sama) ---
     total_emisi = filtered_df['total_emisi'].sum()
     avg_emisi = filtered_df['total_emisi'].mean()
     
-    # Komposisi
-    composition_data = {'Transportasi': filtered_df['transportasi'].sum(), 'Elektronik': filtered_df['elektronik'].sum(), 'Sampah Makanan': filtered_df['sampah_makanan'].sum()}
+    composition_data = {'Transportasi': filtered_df['transportasi'].sum(), 'Elektronik': filtered_df['elektronik'].sum(), 'Sampah': filtered_df['sampah_makanan'].sum()}
     dominant_cat = max(composition_data, key=composition_data.get) if total_emisi > 0 else "N/A"
     dominant_pct = (composition_data.get(dominant_cat, 0) / total_emisi * 100) if total_emisi > 0 else 0
     composition_conclusion = f"Sumber emisi utama adalah <strong>{dominant_cat}</strong>, menyumbang <strong>{dominant_pct:.1f}%</strong> dari total jejak karbon yang dianalisis."
-    rec_map_cat = {'Transportasi': "Prioritaskan kebijakan transportasi ramah lingkungan.", 'Elektronik': "Implementasikan kebijakan hemat energi di seluruh kampus.", 'Sampah Makanan': "Luncurkan program komprehensif untuk manajemen limbah makanan."}
+    rec_map_cat = {'Transportasi': "Prioritaskan kebijakan transportasi ramah lingkungan.", 'Elektronik': "Implementasikan kebijakan hemat energi di seluruh kampus.", 'Sampah': "Luncurkan program komprehensif untuk manajemen limbah makanan."}
     composition_recommendation = rec_map_cat.get(dominant_cat, "Analisis lebih lanjut diperlukan.")
 
-    # Tren Harian
     peak_day = "N/A"
     if not daily_df.empty:
         daily_totals = daily_df.set_index('day').sum(axis=1)
@@ -378,7 +245,6 @@ def generate_overview_pdf_report(filtered_df, daily_df, fakultas_stats_full):
     trend_conclusion = f"Aktivitas emisi memuncak pada hari <strong>{peak_day}</strong>."
     trend_recommendation = f"Selidiki aktivitas spesifik pada hari <strong>{peak_day}</strong> yang menyebabkan lonjakan emisi. Pertimbangkan untuk mengadakan kampanye hemat energi pada hari tersebut."
 
-    # Fakultas
     fakultas_report = pd.DataFrame()
     fakultas_conclusion = "Data fakultas tidak cukup untuk dianalisis."
     fakultas_recommendation = ""
@@ -389,54 +255,43 @@ def generate_overview_pdf_report(filtered_df, daily_df, fakultas_stats_full):
         fakultas_conclusion = f"Fakultas <strong>{highest_fakultas_row['fakultas']}</strong> menunjukkan total emisi tertinggi, sementara <strong>{lowest_fakultas_row['fakultas']}</strong> mencatat yang terendah."
         fakultas_recommendation = f"Bentuk tim studi banding antara fakultas <strong>{highest_fakultas_row['fakultas']}</strong> dan <strong>{lowest_fakultas_row['fakultas']}</strong> untuk mengidentifikasi praktik terbaik dan area perbaikan."
 
-    # --- Insight 4: Segmentasi Perilaku (REVISI BESAR DI SINI) ---
-    df_clustered, n_clusters, centers_df = perform_kmeans_clustering(filtered_df.copy())
-    
-    segmentation_table_html = "<tr><td colspan='5'>Data tidak cukup untuk segmentasi (minimal 3 responden).</td></tr>"
-    segmentation_conclusion = "Data tidak mencukupi untuk membuat profil segmen mahasiswa yang bermakna."
+    segmentation_table_html = "<tr><td colspan='2'>Data tidak cukup untuk segmentasi.</td></tr>"
+    segmentation_conclusion = "Tidak dapat membuat profil perilaku mahasiswa karena data terbatas."
     segmentation_recommendation = "Diperlukan lebih banyak data responden untuk analisis segmentasi yang valid."
 
-    if n_clusters == 3:
-        # Menghitung jumlah anggota di setiap klaster
-        cluster_counts = df_clustered['kmeans_cluster'].value_counts()
-        centers_df['count'] = centers_df.index.map(cluster_counts)
-        
-        # Mengurutkan pusat klaster berdasarkan total emisi untuk konsistensi
-        centers_df = centers_df.sort_values('total_emisi', ascending=True)
-        
-        # Mendefinisikan nama profil dan rekomendasi secara eksplisit
-        profile_names = ["Profil 1: Emitor Rendah", "Profil 2: Emitor Sedang", "Profil 3: Emitor Tinggi"]
-        recommendations_map = {
-            "Profil 1: Emitor Rendah": "Kelompok ini adalah contoh baik. Berikan apresiasi atau gamifikasi untuk mempertahankan perilaku rendah karbon mereka.",
-            "Profil 2: Emitor Sedang": "Fokus pada edukasi mengenai area emisi dominan mereka (misalnya, transportasi atau elektronik) untuk membantu mereka mengurangi jejak karbon.",
-            "Profil 3: Emitor Tinggi": "Klaster ini adalah prioritas utama. Intervensi harus intensif dan mungkin personal untuk mendorong perubahan perilaku yang signifikan."
+    if len(filtered_df) > 1:
+        thresholds = {
+            'transportasi': filtered_df['transportasi'].median(),
+            'elektronik': filtered_df['elektronik'].median(),
+            'sampah_makanan': filtered_df['sampah_makanan'].median()
         }
+        df_with_profile = filtered_df.copy()
+        df_with_profile['profil_perilaku'] = df_with_profile.apply(lambda row: create_behavior_profile(row, thresholds), axis=1)
         
-        # Membuat tabel HTML dari data yang sudah diurutkan
-        table_rows = []
-        for i, (original_idx, row) in enumerate(centers_df.iterrows()):
-            table_rows.append(f"""
-            <tr>
-                <td><strong>{profile_names[i]}</strong></td>
-                <td style='text-align:center;'>{int(row.get('count', 0))}</td>
-                <td style='text-align:right;'>{row['transportasi']:.1f}</td>
-                <td style='text-align:right;'>{row['elektronik']:.1f}</td>
-                <td style='text-align:right;'>{row['sampah_makanan']:.1f}</td>
-                <td style='text-align:right;'><strong>{row['total_emisi']:.1f}</strong></td>
-            </tr>""")
-        segmentation_table_html = "".join(table_rows)
-        
-        # Membuat Kesimpulan & Rekomendasi
-        segmentation_conclusion = (
-            f"Analisis berhasil mengidentifikasi <strong>3 segmen perilaku</strong> yang berbeda. "
-            f"Segmen 'Emitor Tinggi' ({int(centers_df.iloc[2].get('count', 0))} mahasiswa) memiliki dampak emisi terbesar, "
-            f"sementara segmen 'Emitor Rendah' ({int(centers_df.iloc[0].get('count', 0))} mahasiswa) menunjukkan perilaku paling ideal."
-        )
-        
-        recs_list = [f"<li><strong>{name}:</strong> {recommendations_map[name]}</li>" for name in profile_names]
-        segmentation_recommendation = f"Alih-alih pendekatan 'satu untuk semua', alokasikan sumber daya sesuai profil segmen: <ul>{''.join(recs_list)}</ul>"
+        profile_stats = df_with_profile.groupby('profil_perilaku').agg(
+            jumlah_mahasiswa=('id_responden', 'count'),
+            avg_emisi=('total_emisi', 'mean')
+        ).sort_values('jumlah_mahasiswa', ascending=False).reset_index()
 
-    # --- HTML Generation ---
+        if not profile_stats.empty:
+            segmentation_table_html = "".join([f"<tr><td><strong>{row['profil_perilaku']}</strong></td><td style='text-align:center;'>{row['jumlah_mahasiswa']}</td><td style='text-align:right;'>{row['avg_emisi']:.2f}</td></tr>" for _, row in profile_stats.iterrows()])
+            
+            dominant_profile = profile_stats.iloc[0]['profil_perilaku']
+            dominant_count = profile_stats.iloc[0]['jumlah_mahasiswa']
+            
+            segmentation_conclusion = f"Segmentasi berbasis perilaku menunjukkan bahwa profil dominan di antara mahasiswa adalah '<strong>{dominant_profile}</strong>', yang mencakup <strong>{dominant_count}</strong> orang. Mengidentifikasi profil dominan adalah kunci untuk intervensi yang efektif."
+            
+            rec_map = {
+                "Kontributor Utama": "Kelompok ini adalah prioritas tertinggi. Intervensi harus bersifat holistik mencakup transportasi, energi, dan pangan.",
+                "Komuter Berat": "Fokus pada kebijakan 'mode shifting' seperti peningkatan layanan shuttle atau insentif untuk carpooling.",
+                "Pengguna Elektronik Berat": "Targetkan kampanye hemat energi dan audit penggunaan fasilitas di gedung-gedung yang sering mereka gunakan.",
+                "Boros Pangan": "Kolaborasi dengan vendor kantin untuk program reduksi sisa makanan adalah langkah yang paling berdampak.",
+                "Sangat Sadar Lingkungan": "Jadikan kelompok ini sebagai 'champion' atau duta lingkungan. Wawancara mereka untuk mendapatkan insight praktik terbaik.",
+                "Profil Campuran": "Edukasi umum mengenai sumber-sumber emisi utama di kampus akan efektif untuk kelompok ini."
+            }
+            rekomendasi_utama = rec_map.get(dominant_profile, rec_map["Profil Campuran"])
+            segmentation_recommendation = f"Kebijakan kampus harus diprioritaskan untuk menargetkan profil '<strong>{dominant_profile}</strong>'. Rekomendasi: {rekomendasi_utama}"
+
     html_content = f"""
     <!DOCTYPE html><html><head><title>Laporan Overview</title><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
@@ -498,7 +353,6 @@ def generate_overview_pdf_report(filtered_df, daily_df, fakultas_stats_full):
     return html_content
 
 def show():
-    # Header with loading
     with loading():
         st.markdown("""
         <div class="wow-header">
@@ -521,9 +375,7 @@ def show():
         st.error("Satu atau lebih sumber data tidak tersedia.")
         return
 
-    # 2. Pra-pemrosesan data untuk setiap kategori
     with loading():
-        # --- Transformasi Data Transportasi ---
         df_transport = df_transport_raw.copy()
         df_transport['emisi_transportasi'] = pd.to_numeric(df_transport['emisi_transportasi'], errors='coerce').fillna(0)
         df_transport['hari_datang'] = df_transport['hari_datang'].astype(str).fillna('')
@@ -534,7 +386,6 @@ def show():
             col_name = f'emisi_transportasi_{day}'
             df_transport[col_name] = np.where(df_transport['hari_datang'].str.contains(day.capitalize(), na=False), df_transport['emisi_transportasi'], 0)
 
-        # --- Transformasi Data Elektronik ---
         df_electronic = df_electronic_raw.copy()
         if 'emisi_elektronik' in df_electronic.columns:
             df_electronic = df_electronic.rename(columns={'emisi_elektronik': 'emisi_elektronik_mingguan'})
@@ -546,10 +397,8 @@ def show():
             col_name = f'emisi_elektronik_{day}'
             df_electronic[col_name] = np.where(df_electronic['hari_datang'].str.contains(day.capitalize(), na=False), df_electronic['emisi_harian'], 0)
 
-        # --- Transformasi Data Makanan (dari aktivitas harian) ---
         df_food = parse_food_activities(df_activities_raw)
         
-        # 3. Buat dataset terpadu
         df_unified = create_unified_dataset(df_transport, df_electronic, df_food, df_responden)
         time.sleep(0.2)
     
@@ -561,7 +410,7 @@ def show():
     with filter_col1:
         selected_days = st.multiselect("Hari:", ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'], placeholder="Pilih Opsi", key='overview_day_filter')
     with filter_col2:
-        selected_categories = st.multiselect("Jenis:", ['Transportasi', 'Elektronik', 'Sampah Makanan'], placeholder="Pilih Opsi", key='overview_category_filter')
+        selected_categories = st.multiselect("Jenis:", ['Transportasi', 'Elektronik', 'Sampah'], placeholder="Pilih Opsi", key='overview_category_filter')
     with filter_col3:
         available_fakultas = sorted(df_unified['fakultas'].unique())
         selected_fakultas = st.multiselect("Fakultas:", available_fakultas, placeholder="Pilih Opsi", key='overview_fakultas_filter')
@@ -586,9 +435,7 @@ def show():
         row['sampah_makanan'] = df_food.loc[(df_food['id_responden'].isin(ids)) & (df_food['day'] == day), 'emisi_makanan'].sum() if not df_food.empty else 0
         daily_data.append(row)
     daily_df = pd.DataFrame(daily_data)
-    # --- AKHIR DARI BLOK KALKULASI DATA ---
 
-    # 5. Tampilkan tombol Export
     with export_col1:
         st.download_button(
             "Raw Data",
@@ -614,28 +461,22 @@ def show():
 
     col1, col2, col3 = st.columns([1, 1, 1.5], gap="small")
 
-# Ganti blok kode di dalam with col1:
-
     with col1:
-        # --- KOLOM 1: KPI & FAKULTAS ---
+        # KPI
         total_emisi = filtered_df['total_emisi'].sum()
         avg_emisi = filtered_df['total_emisi'].mean()
         st.markdown(f'<div class="kpi-card primary" style="margin-bottom: 1rem;"><div class="kpi-value">{total_emisi:.1f}</div><div class="kpi-label">Total Emisi (kg CO₂)</div></div>', unsafe_allow_html=True)
         st.markdown(f'<div class="kpi-card secondary" style="margin-bottom: 1.5rem;"><div class="kpi-value">{avg_emisi:.2f}</div><div class="kpi-label">Rata-rata/Mahasiswa</div></div>', unsafe_allow_html=True)
         
-        # --- PERUBAHAN UTAMA DI SINI ---
         fakultas_stats = filtered_df.groupby('fakultas')['total_emisi'].agg(['sum', 'count']).reset_index()
         fakultas_stats.columns = ['fakultas', 'total_emisi', 'count']
         fakultas_stats = fakultas_stats.sort_values('total_emisi', ascending=False)
         
-        # Ambil top 13 untuk menjaga chart tetap rapi
         fakultas_stats_display = fakultas_stats.head(13).sort_values('total_emisi', ascending=True)
 
         fig_fakultas = go.Figure()
 
-        # Gunakan loop untuk membuat bar, sama seperti di halaman lain
         for _, row in fakultas_stats_display.iterrows():
-            # Logika pewarnaan bisa disederhanakan jika mau, atau tetap seperti ini
             max_emisi = fakultas_stats_display['total_emisi'].max()
             min_emisi = fakultas_stats_display['total_emisi'].min()
             if max_emisi > min_emisi:
@@ -670,14 +511,12 @@ def show():
             plot_bgcolor='rgba(0,0,0,0)',
             xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)'),
             yaxis=dict(showgrid=False)
-        )
-        # --- AKHIR PERUBAHAN ---
-        
+        )        
         st.plotly_chart(fig_fakultas, config=MODEBAR_CONFIG, use_container_width=True)
         
 
     with col2:
-        # --- KOLOM 2: TREN & KOMPOSISI ---
+        # Tren Emisi Harian dan Komposisi Emisi
         ids = filtered_df['id_responden']
         daily_data = []
         days_order = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
@@ -703,88 +542,93 @@ def show():
         st.plotly_chart(fig_trend, config=MODEBAR_CONFIG, use_container_width=True)
 
         
-        categories_data = {'Transportasi': filtered_df['transportasi'].sum(), 'Elektronik': filtered_df['elektronik'].sum(), 'Sampah Makanan': filtered_df['sampah_makanan'].sum()}
+        categories_data = {'Transportasi': filtered_df['transportasi'].sum(), 'Elektronik': filtered_df['elektronik'].sum(), 'Sampah': filtered_df['sampah_makanan'].sum()}
         data_pie = {k: v for k, v in categories_data.items() if v > 0}
         
         if data_pie:
             fig_composition = go.Figure(go.Pie(
                 labels=list(data_pie.keys()), 
                 values=list(data_pie.values()), 
-                hole=0.45, # Samakan ukuran lubang
+                hole=0.45, 
                 marker=dict(
                     colors=[CATEGORY_COLORS.get(cat) for cat in data_pie.keys()],
-                    line=dict(color='#FFFFFF', width=2) # Tambahkan garis putih pemisah
+                    line=dict(color='#FFFFFF', width=2) 
                 ),
-                textposition='outside', # Pindahkan label ke luar
-                textinfo='label+percent', # Tampilkan label dan persen
+                textposition='outside', 
+                textinfo='label+percent', 
                 textfont=dict(size=10, family="Poppins"),
-                hovertemplate='<b>%{label}</b><br>Emisi: %{value:.1f} kg CO₂ (%{percent})<extra></extra>' # Hover template kustom
+                hovertemplate='<b>%{label}</b><br>Emisi: %{value:.1f} kg CO₂ (%{percent})<extra></extra>' 
             ))
 
             total_emisi_pie = sum(data_pie.values())
             center_text = f"<b style='font-size:14px'>{total_emisi_pie:.1f}</b><br><span style='font-size:8px'>kg CO₂</span>"
             fig_composition.add_annotation(text=center_text, x=0.5, y=0.5, font_size=10, showarrow=False)
             
-            # Sesuaikan layout agar konsisten
             fig_composition.update_layout(
                 height=280, 
                 title_text="<b>Komposisi Emisi</b>", 
                 title_x=0.32, 
                 title_y=0.95,
-                margin=dict(t=65, b=30, l=0, r=0), # Margin minimal karena tidak ada legenda
-                showlegend=False # Matikan legenda
+                margin=dict(t=65, b=30, l=0, r=0), 
+                showlegend=False 
             )
-            # --- AKHIR PERBAIKAN ---
 
             st.plotly_chart(fig_composition, config=MODEBAR_CONFIG, use_container_width=True)
     
     with col3:
-        # --- KOLOM 3: CLUSTERING 3D (REVISED FOR 3 PROFILES) ---
-        if len(filtered_df) >= 3:
-            df_clustered, n_clusters, centers_df = perform_kmeans_clustering(filtered_df.copy())
+        # Segmentasi Profil Perilaku        
+        if len(filtered_df) > 1:
+            thresholds = {
+                'transportasi': filtered_df['transportasi'].median(),
+                'elektronik': filtered_df['elektronik'].median(),
+                'sampah_makanan': filtered_df['sampah_makanan'].median()
+            }
             
-            fig_3d = go.Figure()
-
-            if n_clusters == 3:
-                centers_df = centers_df.sort_values('total_emisi')
-                profile_names = ["Profil 1: Emitor Rendah", "Profil 2: Emitor Sedang", "Profil 3: Emitor Tinggi"]
-                profile_colors = ['#4daf4a', '#ff7f00', '#e41a1c'] 
-
-                # 3. Buat pemetaan dari ID klaster asli ke profil baru
-                name_map = {original_idx: name for original_idx, name in zip(centers_df.index, profile_names)}
-                color_map = {original_idx: color for original_idx, color in zip(centers_df.index, profile_colors)}
-                
-                # 4. Tambahkan trace ke plot dengan urutan yang benar (Rendah -> Sedang -> Tinggi)
-                for original_idx in centers_df.index:
-                    cluster_data = df_clustered[df_clustered['kmeans_cluster'] == original_idx]
-                    fig_3d.add_trace(go.Scatter3d(
-                        x=cluster_data['transportasi'],
-                        y=cluster_data['elektronik'],
-                        z=cluster_data['sampah_makanan'],
-                        mode='markers', 
-                        name=name_map.get(original_idx),
-                        marker=dict(size=5, color=color_map.get(original_idx))
-                    ))
+            filtered_df['profil_perilaku'] = filtered_df.apply(lambda row: create_behavior_profile(row, thresholds), axis=1)
             
-            # Update layout figur
-            fig_3d.update_layout(
-                height=570, 
-                title_text="<b>Segmentasi Perilaku Emisi</b>", 
-                title_x=0.5,
-                margin=dict(l=0, r=0, b=0, t=40),
-                scene=dict(
-                    xaxis_title='Transportasi', yaxis_title='Elektronik', zaxis_title='Sampah',
-                    xaxis_title_font=dict(size=9), yaxis_title_font=dict(size=9), zaxis_title_font=dict(size=9),
-                    aspectratio=dict(x=1, y=1, z=0.8)),
-                legend=dict(
-                    orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5, 
-                    font_size=9, itemsizing='constant'
-                )
+            profile_counts = filtered_df['profil_perilaku'].value_counts().reset_index()
+            profile_counts.columns = ['profil', 'jumlah']
+
+            profile_color_map = {
+                "Kontributor Utama": "#9e0142",       
+                "Komuter & Digital": "#d53e4f",       
+                "Komuter & Boros Pangan": "#f46d43",   
+                "Digital & Boros Pangan": "#fdae61",   
+                "Komuter Berat": "#fee08b",         
+                "Pengguna Elektronik Berat": "#e6f598",
+                "Boros Pangan": "#abdda4",            
+                "Sangat Sadar Lingkungan": "#66c2a5", 
+                "Profil Campuran": "#3288bd"          
+            }
+
+            fig_treemap = px.treemap(
+                profile_counts,
+                path=[px.Constant("Semua Profil"), 'profil'],
+                values='jumlah',
+                color='profil',
+                color_discrete_map=profile_color_map,
+                custom_data=['jumlah']
             )
-            st.plotly_chart(fig_3d, use_container_width=True, config=MODEBAR_CONFIG)
-        else:
-            st.info("Data tidak cukup untuk clustering (minimal 3 data).")
+            
+            fig_treemap.update_traces(
+                texttemplate="<b>%{label}</b><br>%{value} Mahasiswa",
+                hovertemplate="<b>%{label}</b><br>Jumlah: %{customdata[0]} mahasiswa<extra></extra>",
+                textfont=dict(size=14),
+                insidetextfont=dict(size=16, color='black'), 
+                marker=dict(line=dict(width=2, color='white'))
+            )
+            
+            fig_treemap.update_layout(
+                height=570,
+                title_text="<b>Segmentasi Profil Perilaku</b>",
+                title_x=0.33,
+                margin = dict(t=30, l=5, r=5, b=10)
+            )
+            
+            st.plotly_chart(fig_treemap, use_container_width=True, config=MODEBAR_CONFIG)
 
+        else:
+            st.info("Data tidak cukup untuk membuat segmentasi perilaku.")
             
         time.sleep(0.15)
 
