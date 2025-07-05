@@ -499,7 +499,7 @@ def show():
                         
                         fig_fakultas.update_layout(
                             height=270, margin=dict(t=30, b=0, l=0, r=20),
-                            title=dict(text="<b>Emisi per Fakultas</b>", x=0.35, y=0.95,
+                            title=dict(text="<b>Emisi per Fakultas</b>", x=0.39, y=0.95,
                                       font=dict(size=12, color="#000000")),
                             paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                             xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=10), title=dict(text="Rata-Rata Emisi (kg CO₂)", font=dict(size=10))),
@@ -538,7 +538,7 @@ def show():
             fig_period.update_layout(
                 height=270, margin=dict(t=30, b=5, l=5, r=5), showlegend=False,
                 paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                title=dict(text="<b>Distribusi Periode Waktu</b>", x=0.27, y=0.95, 
+                title=dict(text="<b>Distribusi Periode Waktu</b>", x=0.33, y=0.95, 
                           font=dict(size=12, color="#000000"))
             )
             
@@ -578,7 +578,7 @@ def show():
                 
                 fig_heatmap.update_layout(
                     height=270, margin=dict(t=30, b=20, l=20, r=40),
-                    title=dict(text="<b>Heatmap Lokasi vs Waktu</b>", x=0.15, y=0.95, 
+                    title=dict(text="<b>Heatmap Lokasi vs Waktu</b>", x=0.37, y=0.95, 
                             font=dict(size=12, color="#000000")),
                     xaxis=dict(tickfont=dict(size=10), title=dict(text="Lokasi", font=dict(size=10))),
                     yaxis=dict(tickfont=dict(size=10)),
@@ -679,7 +679,7 @@ def show():
                         fig_canteen.update_layout(
                             height=270,
                             margin=dict(t=30, b=0, l=0, r=0),
-                            title=dict(text=f"<b>{canteen_title}</b>", x=0.35, y=0.95,
+                            title=dict(text=f"<b>{canteen_title}</b>", x=0.45, y=0.95,
                                       font=dict(size=12, color="#000000")),
                             paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                             xaxis=dict(

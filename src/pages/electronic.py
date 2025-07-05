@@ -538,7 +538,7 @@ def show():
                         xaxis_title="", yaxis_title="Emisi (kg CO₂)",
                         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                         title=dict(text="<b>Tren Emisi Harian</b>", x=0.38, y=0.95, 
-                                  font=dict(size=11, color="#000000")),
+                                  font=dict(size=12, color="#000000")),
                         xaxis=dict(showgrid=False, tickfont=dict(size=8), title=dict(text="Hari", font=dict(size=10))),
                         yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=8), title=dict(text="Emisi (Kg CO₂)", font=dict(size=10)))
                     )
@@ -586,8 +586,8 @@ def show():
                         
                         fig_fakultas.update_layout(
                             height=270, margin=dict(t=25, b=0, l=0, r=20),
-                            title=dict(text="<b>Emisi per Fakultas</b>", x=0.35, y=0.95,
-                                      font=dict(size=11, color="#000000")),
+                            title=dict(text="<b>Emisi per Fakultas</b>", x=0.4, y=0.95,
+                                      font=dict(size=12, color="#000000")),
                             paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                             xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)', tickfont=dict(size=8), title=dict(text="Total Emisi (kg CO₂)", font=dict(size=10))),
                             yaxis=dict(tickfont=dict(size=8), title=dict(text="Fakultas/Sekolah", font=dict(size=10)))
@@ -629,10 +629,10 @@ def show():
                     fig_devices.add_annotation(text=center_text, x=0.5, y=0.5, font_size=10, showarrow=False)
                     
                     fig_devices.update_layout(
-                        height=270, margin=dict(t=30, b=10, l=0, r=0), showlegend=False,
+                        height=270, margin=dict(t=40, b=10, l=0, r=0), showlegend=False,
                         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                        title=dict(text="<b>Proporsi Emisi per Perangkat</b>", x=0.27, y=0.95, 
-                                  font=dict(size=11, color="#000000"))
+                        title=dict(text="<b>Proporsi Emisi per Perangkat</b>", x=0.32, y=0.95, 
+                                  font=dict(size=12, color="#000000"))
                     )  
                     st.plotly_chart(fig_devices, config=MODEBAR_CONFIG, use_container_width=True)
 
@@ -686,8 +686,8 @@ def show():
                         
                         fig_heatmap.update_layout(
                             height=270, margin=dict(t=30, b=0, l=0, r=0),
-                            title=dict(text="<b>Heatmap Hari dan Jam</b>", x=0.32, y=0.95, 
-                                    font=dict(size=11, color="#000000")),
+                            title=dict(text="<b>Heatmap Emisi Harian Per Jam</b>", x=0.4, y=0.95, 
+                                    font=dict(size=12, color="#000000")),
                             xaxis=dict(tickfont=dict(size=8), tickangle=-25, title=dict(text="Jam", font=dict(size=10))),
                             yaxis=dict(tickfont=dict(size=8), title=dict(text="Hari", font=dict(size=10))),
                             paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
@@ -775,8 +775,8 @@ def show():
                     fig_location.update_layout(
                         height=270,
                         margin=dict(t=25, b=0, l=0, r=0),
-                        title=dict(text="<b>Gedung Kelas Terpopuler</b>", x=0.35, y=0.95,
-                                  font=dict(size=11, color="#000000")),
+                        title=dict(text="<b>Emisi Per Lokasi</b>", x=0.45, y=0.95,
+                                  font=dict(size=12, color="#000000")),
                         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                         xaxis=dict(
                             showgrid=False, 
