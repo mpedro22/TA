@@ -1,4 +1,6 @@
-﻿import streamlit as st
+﻿# src/pages/overview.py
+
+import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -7,28 +9,25 @@ from src.components.loading import loading, loading_decorator
 import time
 import warnings
 warnings.filterwarnings('ignore')
-from src.utils.db_connector import run_query
+from src.utils.db_connector import run_sql
 
+# =============================================================================
+# KONFIGURASI DAN PALET WARNA
+# =============================================================================
 
-# color pallete
-MAIN_PALETTE = ['#9e0142', '#d53e4f', '#f46d43', '#fdae61', '#fee08b', 
-                '#e6f598', '#abdda4', '#66c2a5', '#3288bd', '#5e4fa2']
 CATEGORY_COLORS = {'Transportasi': '#d53e4f', 'Elektronik': '#3288bd', 'Sampah': '#66c2a5'}
-CLUSTER_COLORS = ['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00']
-FACULTY_PALETTE = ['#9e0142', '#d53e4f', '#f46d43', '#fdae61', '#fee08b', '#e6f598', '#abdda4', '#66c2a5']
-
-
+PROFILE_COLOR_MAP = {
+    "Kontributor Utama": "#9e0142", "Komuter & Digital": "#d53e4f", "Komuter & Boros Pangan": "#f46d43",
+    "Digital & Boros Pangan": "#fdae61", "Komuter Berat": "#fee08b", "Pengguna Elektronik Berat": "#e6f598",
+    "Boros Pangan": "#abdda4", "Sangat Sadar Lingkungan": "#66c2a5", "Profil Campuran": "#3288bd"
+}
 MODEBAR_CONFIG = {
     'displayModeBar': True,
-    'displaylogo': False,  
+    'displaylogo': False,
     'modeBarButtonsToRemove': [
-        'pan2d', 'pan3d',
-        'select2d', 'lasso2d', 
-        'zoom2d', 'zoom3d', 'zoomIn2d', 'zoomOut2d', 
-        'autoScale2d', 'resetScale2d', 'resetScale3d',
-        'hoverClosestCartesian', 'hoverCompareCartesian',
-        'toggleSpikelines', 'hoverClosest3d',
-        'orbitRotation', 'tableRotation',
+        'pan2d', 'pan3d', 'select2d', 'lasso2d', 'zoom2d', 'zoom3d', 'zoomIn2d', 'zoomOut2d',
+        'autoScale2d', 'resetScale2d', 'resetScale3d', 'hoverClosestCartesian', 'hoverCompareCartesian',
+        'toggleSpikelines', 'hoverClosest3d', 'orbitRotation', 'tableRotation',
         'resetCameraDefault3d', 'resetCameraLastSave3d'
     ],
     'toImageButtonOptions': {
@@ -39,259 +38,221 @@ MODEBAR_CONFIG = {
         'scale': 2
     }
 }
+DAY_ORDER = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
+
+# =============================================================================
+# FUNGSI-FUNGSI QUERY SQL (Utama)
+# =============================================================================
 
 @st.cache_data(ttl=3600)
-@loading_decorator()
-def load_all_data():
-    """Load all data sources for overview dashboard from Supabase"""
-    try:
-        time.sleep(0.4) 
-        df_transport_raw = run_query("transportasi")
-        df_electronic_raw = run_query("elektronik")
-        df_activities_raw = run_query("aktivitas_harian")
-        df_responden_raw = run_query("informasi_responden")
+def get_aggregated_daily_data():
+    """
+    Mengambil dan mengagregasi semua data emisi (transportasi, elektronik, sampah)
+    per responden, per hari, beserta informasi fakultas langsung dari database.
+    Ini menjadi single source of truth yang telah diagregasi.
+    """
+    daily_query = """
+    WITH DailyEmissions AS (
+        -- Emisi Transportasi per hari
+        SELECT
+            t.id_responden,
+            TRIM(UNNEST(STRING_TO_ARRAY(t.hari_datang, ','))) AS hari,
+            'transportasi' AS kategori,
+            t.emisi_transportasi AS emisi
+        FROM transportasi t
+        WHERE t.emisi_transportasi > 0 AND t.hari_datang IS NOT NULL AND t.hari_datang <> ''
         
-        return df_transport_raw, df_electronic_raw, df_activities_raw, df_responden_raw
-    except Exception as e:
-        st.error(f"Error loading data from Supabase: {e}")
-        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+        UNION ALL
+        
+        -- Emisi Elektronik Total per hari (dibagi rata dari total emisi di tabel elektronik)
+        SELECT
+            e.id_responden,
+            TRIM(UNNEST(STRING_TO_ARRAY(e.hari_datang, ','))) AS hari,
+            'elektronik' AS kategori,
+            (e.emisi_elektronik / (LENGTH(e.hari_datang) - LENGTH(REPLACE(e.hari_datang, ',', '')) + 1)::float) AS emisi
+        FROM elektronik e
+        WHERE e.emisi_elektronik > 0 AND e.hari_datang IS NOT NULL AND e.hari_datang <> ''
+        
+        UNION ALL
+        
+        -- Emisi Sampah per hari
+        SELECT
+            ah.id_responden,
+            ah.hari,
+            'sampah' AS kategori,
+            ah.emisi_makanminum AS emisi
+        FROM aktivitas_harian ah
+        WHERE ah.emisi_makanminum > 0
+          AND ah.hari IS NOT NULL
+          AND ah.hari <> ''
+          AND TRIM(LOWER(ah.kegiatan)) = 'makan/minum'
+    )
+    SELECT
+        de.id_responden,
+        COALESCE(r.fakultas, 'Unknown') AS fakultas,
+        de.hari,
+        de.kategori,
+        SUM(de.emisi) AS emisi
+    FROM DailyEmissions de
+    LEFT JOIN v_informasi_responden_dengan_fakultas r ON de.id_responden = r.id_responden
+    GROUP BY de.id_responden, r.fakultas, de.hari, de.kategori
+    """
+    return run_sql(daily_query)
 
-def get_fakultas_mapping():
-    """Mapping program_studi ke fakultas ITB"""
-    return {
-        'Meteorologi': 'FITB', 'Oseanografi': 'FITB', 'Teknik Geodesi dan Geomatika': 'FITB', 'Teknik Geologi': 'FITB',
-        'Aktuaria': 'FMIPA', 'Astronomi': 'FMIPA', 'Fisika': 'FMIPA', 'Kimia': 'FMIPA', 'Matematika': 'FMIPA',
-        'Desain Interior': 'FSRD', 'Desain Komunikasi Visual': 'FSRD', 'Desain Produk': 'FSRD', 'Kriya': 'FSRD', 'Seni Rupa': 'FSRD',
-        'Manajemen Rekayasa Industri': 'FTI', 'Teknik Fisika': 'FTI', 'Teknik Industri': 'FTI', 'Teknik Kimia': 'FTI',
-        'Teknik Geofisika': 'FTTM', 'Teknik Metalurgi': 'FTTM', 'Teknik Perminyakan': 'FTTM', 'Teknik Pertambangan': 'FTTM',
-        'Teknik Dirgantara': 'FTMD', 'Teknik Material': 'FTMD', 'Teknik Mesin': 'FTMD',
-        'Teknik Kelautan': 'FTSL', 'Teknik Lingkungan': 'FTSL', 'Teknik Sipil': 'FTSL',
-        'Arsitektur': 'SAPPK', 'Perencanaan Wilayah dan Kota': 'SAPPK',
-        'Kewirausahaan': 'SBM', 'Manajemen': 'SBM',
-        'Farmasi Klinik dan Komunitas': 'SF', 'Sains dan Teknologi Farmasi': 'SF',
-        'Biologi': 'SITH', 'Mikrobiologi': 'SITH',
-        'Sistem dan Teknologi Informasi': 'STEI', 'Teknik Biomedis': 'STEI', 'Teknik Elektro': 'STEI', 
-        'Teknik Informatika': 'STEI', 'Teknik Telekomunikasi': 'STEI', 'Teknik Tenaga Listrik': 'STEI'
-    }
 
-@loading_decorator()
-def parse_food_activities(df_activities):
-    """Parse food waste activities from Supabase daily activities data"""
-    food_activities = []
-    if df_activities.empty:
-        return pd.DataFrame()
+# =============================================================================
+# FUNGSI-FUNGSI BANTU & LAPORAN
+# =============================================================================
 
-    meal_df = df_activities[
-        df_activities['kegiatan'].str.contains('Makan|Minum', case=False, na=False) &
-        (pd.to_numeric(df_activities['emisi_makanminum'], errors='coerce').fillna(0) > 0)
-    ].copy()
-
-    if meal_df.empty:
-        return pd.DataFrame()
-
-    for _, row in meal_df.iterrows():
-        day_name = str(row.get('hari', '')).capitalize()
-        if day_name:
-            food_activities.append({
-                'id_responden': row.get('id_responden', ''),
-                'day': day_name,
-                'emisi_makanan': pd.to_numeric(row.get('emisi_makanminum', 0), errors='coerce'),
-                'kategori': 'Sampah'
-            })
-            
-    time.sleep(0.1)
-    return pd.DataFrame(food_activities)
-
-@loading_decorator()
-def create_unified_dataset(df_transport, df_electronic, df_food, df_responden):
-    """Create unified dataset for overview analysis"""
-    unified_data = []
-    
-    fakultas_mapping = get_fakultas_mapping()
-    if not df_responden.empty and 'program_studi' in df_responden.columns:
-        df_responden['fakultas'] = df_responden['program_studi'].map(fakultas_mapping).fillna('Lainnya')
-    
-    all_respondents = set(df_responden['id_responden'].dropna())
-
-    for resp_id in all_respondents:
-        if pd.isna(resp_id) or resp_id == '':
-            continue
-            
-        resp_info = df_responden[df_responden['id_responden'] == resp_id]
-        fakultas = resp_info.iloc[0].get('fakultas', 'Unknown') if not resp_info.empty else 'Unknown'
-        
-        # Ambil emisi mingguan yang sudah dihitung sebelumnya
-        transport_emisi = df_transport.loc[df_transport['id_responden'] == resp_id, 'emisi_mingguan'].sum()
-        electronic_emisi = df_electronic.loc[df_electronic['id_responden'] == resp_id, 'emisi_elektronik_mingguan'].sum()
-        
-        # Emisi makanan adalah total dari semua aktivitas makan per responden
-        food_emisi = df_food.loc[df_food['id_responden'] == resp_id, 'emisi_makanan'].sum()
-        
-        total_emisi = transport_emisi + electronic_emisi + food_emisi
-        
-        if total_emisi > 0:  
-            unified_data.append({
-                'id_responden': resp_id, 'fakultas': fakultas,
-                'transportasi': transport_emisi, 'elektronik': electronic_emisi,
-                'sampah_makanan': food_emisi, 'total_emisi': total_emisi
-            })
-    
-    time.sleep(0.15)
-    return pd.DataFrame(unified_data)
-
-@loading_decorator()
-def apply_overview_filters(df_unified, df_transport, df_electronic, df_food, selected_days, selected_categories, selected_fakultas):
-    """Apply filters to all datasets - FIXED to work with all filters"""
-    filtered_unified = df_unified.copy()
-    
-    if selected_fakultas:
-        filtered_unified = filtered_unified[filtered_unified['fakultas'].isin(selected_fakultas)]
-    
-    if selected_categories:
-        if 'Transportasi' not in selected_categories:
-            filtered_unified['transportasi'] = 0
-        if 'Elektronik' not in selected_categories:
-            filtered_unified['elektronik'] = 0
-        if 'Sampah' not in selected_categories:
-            filtered_unified['sampah_makanan'] = 0
-        
-        filtered_unified['total_emisi'] = (
-            filtered_unified['transportasi'] + 
-            filtered_unified['elektronik'] + 
-            filtered_unified['sampah_makanan']
-        )
-        
-        filtered_unified = filtered_unified[filtered_unified['total_emisi'] > 0]
-    
-    if selected_days:
-        valid_respondents = set(filtered_unified['id_responden'])
-        day_filtered_respondents = set()
-        
-        if not df_transport.empty and 'Transportasi' in (selected_categories or ['Transportasi', 'Elektronik', 'Sampah']):
-            for day in selected_days:
-                day_col = f'emisi_transportasi_{day.lower()}'
-                if day_col in df_transport.columns:
-                    day_users = df_transport[df_transport[day_col] > 0]['id_responden'].dropna()
-                    day_filtered_respondents.update(day_users)
-        
-        if not df_food.empty and 'Sampah' in (selected_categories or ['Transportasi', 'Elektronik', 'Sampah']):
-            day_food_users = df_food[df_food['day'].isin(selected_days)]['id_responden'].dropna()
-            day_filtered_respondents.update(day_food_users)
-        
-        if 'Elektronik' in (selected_categories or ['Transportasi', 'Elektronik', 'Sampah']):
-            if not df_electronic.empty:
-                electronic_users = df_electronic['id_responden'].dropna()
-                day_filtered_respondents.update(electronic_users)
-        
-        if day_filtered_respondents:
-            valid_respondents = valid_respondents.intersection(day_filtered_respondents)
-            filtered_unified = filtered_unified[filtered_unified['id_responden'].isin(valid_respondents)]
-    
-    time.sleep(0.1)
-    return filtered_unified
-
-# Menentukan profil perilaku mahasiswa berdasarkan emisi
 def create_behavior_profile(row, thresholds):
-    """Membuat nama profil perilaku dalam Bahasa Indonesia."""
     t_level = "Tinggi" if row['transportasi'] > thresholds['transportasi'] else "Rendah"
     e_level = "Tinggi" if row['elektronik'] > thresholds['elektronik'] else "Rendah"
-    f_level = "Tinggi" if row['sampah_makanan'] > thresholds['sampah_makanan'] else "Rendah"
+    f_level = "Tinggi" if row['sampah'] > thresholds['sampah'] else "Rendah"
     
-    if t_level == "Tinggi" and e_level == "Tinggi" and f_level == "Tinggi":
-        return "Kontributor Utama"
-    elif t_level == "Rendah" and e_level == "Rendah" and f_level == "Rendah":
-        return "Sangat Sadar Lingkungan"
-    elif t_level == "Tinggi" and e_level == "Tinggi":
-        return "Komuter & Digital"
-    elif t_level == "Tinggi" and f_level == "Tinggi":
-        return "Komuter & Boros Pangan"
-    elif e_level == "Tinggi" and f_level == "Tinggi":
-        return "Digital & Boros Pangan"
-    elif t_level == "Tinggi":
-        return "Komuter Berat"
-    elif e_level == "Tinggi":
-        return "Pengguna Elektronik Berat"
-    elif f_level == "Tinggi":
-        return "Boros Pangan"
-    else:
-        return "Profil Campuran"
+    if t_level == "Tinggi" and e_level == "Tinggi" and f_level == "Tinggi": return "Kontributor Utama"
+    if t_level == "Rendah" and e_level == "Rendah" and f_level == "Rendah": return "Sangat Sadar Lingkungan"
+    if t_level == "Tinggi" and e_level == "Tinggi": return "Komuter & Digital"
+    if t_level == "Tinggi" and f_level == "Tinggi": return "Komuter & Boros Pangan"
+    if e_level == "Tinggi" and f_level == "Tinggi": return "Digital & Boros Pangan"
+    if t_level == "Tinggi": return "Komuter Berat"
+    if e_level == "Tinggi": return "Pengguna Elektronik Berat"
+    if f_level == "Tinggi": return "Boros Pangan"
+    return "Profil Campuran"
 
 @loading_decorator()
-def generate_overview_pdf_report(filtered_df, daily_df, fakultas_stats_full):
+def generate_overview_pdf_report(agg_df_for_report, daily_pivot_for_report, fakultas_stats_for_report):
     """
     Generate comprehensive and insightful overview PDF report.
-    REVISED with detailed clustering analysis, table, and recommendations.
     """
     from datetime import datetime
     time.sleep(0.6)
 
-    if filtered_df.empty:
+    if agg_df_for_report.empty:
         return "<html><body><h1>Tidak ada data untuk dilaporkan</h1><p>Silakan ubah filter Anda dan coba lagi.</p></body></html>"
 
-    total_emisi = filtered_df['total_emisi'].sum()
-    avg_emisi = filtered_df['total_emisi'].mean()
+    total_emisi = agg_df_for_report['total_emisi'].sum()
+    avg_emisi = agg_df_for_report['total_emisi'].mean()
+    num_responden = agg_df_for_report['id_responden'].nunique()
     
-    composition_data = {'Transportasi': filtered_df['transportasi'].sum(), 'Elektronik': filtered_df['elektronik'].sum(), 'Sampah': filtered_df['sampah_makanan'].sum()}
-    dominant_cat = max(composition_data, key=composition_data.get) if total_emisi > 0 else "N/A"
-    dominant_pct = (composition_data.get(dominant_cat, 0) / total_emisi * 100) if total_emisi > 0 else 0
-    composition_conclusion = f"Sumber emisi utama adalah <strong>{dominant_cat}</strong>, menyumbang <strong>{dominant_pct:.1f}%</strong> dari total jejak karbon yang dianalisis."
-    rec_map_cat = {'Transportasi': "Prioritaskan kebijakan transportasi ramah lingkungan.", 'Elektronik': "Implementasikan kebijakan hemat energi di seluruh kampus.", 'Sampah': "Luncurkan program komprehensif untuk manajemen limbah makanan."}
-    composition_recommendation = rec_map_cat.get(dominant_cat, "Analisis lebih lanjut diperlukan.")
+    composition_data = {'Transportasi': agg_df_for_report['transportasi'].sum(), 'Elektronik': agg_df_for_report['elektronik'].sum(), 'Sampah': agg_df_for_report['sampah'].sum()}
+    
+    # Filter out categories with zero value for conclusions (unless only one category is selected and it's zero)
+    composition_data_filtered = {k: v for k, v in composition_data.items() if v > 0}
+    
+    dominant_cat = "Tidak Tersedia"
+    dominant_pct = 0
+    secondary_cat = "Tidak Tersedia"
+    secondary_pct = 0
 
-    peak_day = "N/A"
-    if not daily_df.empty:
-        daily_totals = daily_df.set_index('day').sum(axis=1)
-        peak_day = daily_totals.idxmax() if not daily_totals.empty else "N/A"
-    trend_conclusion = f"Aktivitas emisi memuncak pada hari <strong>{peak_day}</strong>."
-    trend_recommendation = f"Selidiki aktivitas spesifik pada hari <strong>{peak_day}</strong> yang menyebabkan lonjakan emisi. Pertimbangkan untuk mengadakan kampanye hemat energi pada hari tersebut."
+    if total_emisi > 0 and composition_data_filtered:
+        sorted_comp = sorted(composition_data_filtered.items(), key=lambda item: item[1], reverse=True)
+        dominant_cat = sorted_comp[0][0]
+        dominant_pct = (sorted_comp[0][1] / total_emisi * 100)
+        
+        if len(sorted_comp) > 1:
+            secondary_cat = sorted_comp[1][0]
+            secondary_pct = (sorted_comp[1][1] / total_emisi * 100)
+
+        composition_conclusion = f"Sumber emisi utama adalah <strong>{dominant_cat}</strong>, menyumbang <strong>{dominant_pct:.1f}%</strong> dari total emisi ({total_emisi:.1f} kg CO₂). {f'Kategori kedua terbesar adalah {secondary_cat} sebesar {secondary_pct:.1f}%.' if secondary_cat != 'Tidak Tersedia' else ''} Ini menunjukkan area mana yang paling perlu diperhatikan untuk pengurangan emisi."
+        
+    else:
+        composition_conclusion = "Data komposisi emisi tidak tersedia atau semua kategori memiliki emisi nol."
+
+    rec_map_cat = {
+        'Transportasi': "Dorong penggunaan transportasi publik, sepeda, atau jalan kaki dengan menyediakan fasilitas yang memadai. Pertimbangkan insentif untuk carpooling dan evaluasi kebijakan parkir untuk mengurangi penggunaan kendaraan pribadi di kampus.",
+        'Elektronik': "Tingkatkan efisiensi energi di fasilitas kampus (misal: ganti lampu LED, optimalkan AC dengan sensor). Edukasi mahasiswa dan staf untuk mematikan perangkat elektronik yang tidak digunakan dan memanfaatkan mode hemat daya.",
+        'Sampah': "Galakkan kampanye pengurangan limbah makanan yang konkret, seperti 'Jangan Sisakan Makanan'. Dukung program komposting dan kerja sama dengan kantin untuk manajemen porsi yang lebih baik serta penanganan sisa makanan yang bisa dimanfaatkan kembali."
+    }
+    composition_recommendation = rec_map_cat.get(dominant_cat, "Rekomendasi spesifik berdasarkan komposisi emisi belum dapat diberikan.")
+
+    peak_day = "Tidak Tersedia"
+    peak_emisi = 0
+    if not daily_pivot_for_report.empty:
+        daily_totals = daily_pivot_for_report[['transportasi', 'elektronik', 'sampah']].sum(axis=1)
+        if not daily_totals.empty and daily_totals.max() > 0:
+            peak_day = daily_totals.idxmax()
+            peak_emisi = daily_totals.max()
+            trend_conclusion = f"Emisi harian tertinggi terjadi pada hari <strong>{peak_day}</strong>, dengan total <strong>{peak_emisi:.1f} kg CO₂</strong>. Puncak ini mungkin terkait dengan aktivitas kampus yang padat pada hari tersebut."
+            trend_recommendation = f"Selidiki aktivitas apa saja yang paling banyak terjadi pada hari <strong>{peak_day}</strong> yang menyebabkan emisi tinggi. Pertimbangkan program penghematan energi atau pengingat digital pada hari-hari tersebut untuk mengurangi konsumsi yang tidak perlu."
+        else:
+            trend_conclusion = "Tidak ada pola emisi harian yang menonjol atau emisi sangat rendah. Emisi cenderung tersebar merata antar hari."
+            trend_recommendation = "Lanjutkan memantau tren harian. Jika emisi mulai meningkat, identifikasi pemicunya. Dorong partisipasi lebih banyak dalam pengisian data aktivitas untuk gambaran tren yang lebih jelas."
+    else:
+        trend_conclusion = "Data tren harian tidak tersedia untuk analisis."
+        trend_recommendation = "Pastikan data aktivitas harian dikumpulkan secara konsisten untuk memungkinkan analisis tren yang bermanfaat."
 
     fakultas_report = pd.DataFrame()
-    fakultas_conclusion = "Data fakultas tidak cukup untuk dianalisis."
-    fakultas_recommendation = ""
-    if not fakultas_stats_full.empty and len(fakultas_stats_full) > 1:
-        fakultas_report = fakultas_stats_full.sort_values('total_emisi', ascending=False)
+    fakultas_conclusion = "Data fakultas tidak cukup untuk dianalisis (minimal 2 fakultas dengan data emisi diperlukan)."
+    fakultas_recommendation = "Dorong partisipasi lebih banyak mahasiswa dari berbagai fakultas untuk mendapatkan perbandingan yang lebih komprehensif."
+    
+    if not fakultas_stats_for_report.empty and len(fakultas_stats_for_report) > 1:
+        fakultas_report = fakultas_stats_for_report.sort_values('total_emisi', ascending=False)
         highest_fakultas_row = fakultas_report.iloc[0]
         lowest_fakultas_row = fakultas_report.iloc[-1]
-        fakultas_conclusion = f"Fakultas <strong>{highest_fakultas_row['fakultas']}</strong> menunjukkan total emisi tertinggi, sementara <strong>{lowest_fakultas_row['fakultas']}</strong> mencatat yang terendah."
-        fakultas_recommendation = f"Bentuk tim studi banding antara fakultas <strong>{highest_fakultas_row['fakultas']}</strong> dan <strong>{lowest_fakultas_row['fakultas']}</strong> untuk mengidentifikasi praktik terbaik dan area perbaikan."
+        
+        conclusion_detail = ""
+        if lowest_fakultas_row['total_emisi'] > 0:
+            emission_ratio = highest_fakultas_row['total_emisi'] / lowest_fakultas_row['total_emisi']
+            conclusion_detail = f"Fakultas <strong>{highest_fakultas_row['fakultas']}</strong> memiliki emisi <strong>{highest_fakultas_row['total_emisi']:.1f} kg CO₂</strong>, sekitar {emission_ratio:.1f} kali lebih tinggi dari fakultas <strong>{lowest_fakultas_row['fakultas']} ({lowest_fakultas_row['total_emisi']:.1f} kg CO₂)</strong>."
+        else:
+            conclusion_detail = f"Fakultas <strong>{highest_fakultas_row['fakultas']}</strong> memiliki emisi tertinggi sebesar <strong>{highest_fakultas_row['total_emisi']:.1f} kg CO₂</strong>, sementara <strong>{lowest_fakultas_row['fakultas']}</strong> memiliki emisi terendah sebesar <strong>{lowest_fakultas_row['total_emisi']:.1f} kg CO₂</strong>."
 
-    segmentation_table_html = "<tr><td colspan='2'>Data tidak cukup untuk segmentasi.</td></tr>"
-    segmentation_conclusion = "Tidak dapat membuat profil perilaku mahasiswa karena data terbatas."
-    segmentation_recommendation = "Diperlukan lebih banyak data responden untuk analisis segmentasi yang valid."
+        fakultas_conclusion = f"Terdapat perbedaan emisi yang jelas antar fakultas. {conclusion_detail} Ini menunjukkan variasi dalam kebiasaan penggunaan energi atau jumlah aktivitas yang menghasilkan emisi di tiap fakultas."
+        fakultas_recommendation = f"Fasilitasi program pertukaran informasi atau 'benchmarking' antara fakultas beremisi rendah (misal <strong>{lowest_fakultas_row['fakultas']}</strong>) dan beremisi tinggi (misal <strong>{highest_fakultas_row['fakultas']}</strong>). Lakukan audit energi dan limbah yang lebih spesifik untuk fakultas dengan emisi tinggi guna menemukan sumber emisi terbesar dan cara menguranginya."
 
-    if len(filtered_df) > 1:
+    segmentation_table_html = "<tr><td colspan='5'>Data tidak cukup untuk segmentasi.</td></tr>"
+    segmentation_conclusion = "Tidak dapat membuat profil perilaku mahasiswa karena data terbatas (diperlukan minimal 6 responden unik untuk analisis ini)."
+    segmentation_recommendation = "Tingkatkan jumlah responden yang mengisi data untuk mendapatkan gambaran profil perilaku yang lebih akurat dan dapat digunakan untuk kebijakan yang lebih bertarget."
+
+    if len(agg_df_for_report['id_responden'].unique()) > 5:
         thresholds = {
-            'transportasi': filtered_df['transportasi'].median(),
-            'elektronik': filtered_df['elektronik'].median(),
-            'sampah_makanan': filtered_df['sampah_makanan'].median()
+            'transportasi': agg_df_for_report['transportasi'].median(),
+            'elektronik': agg_df_for_report['elektronik'].median(),
+            'sampah': agg_df_for_report['sampah'].median()
         }
-        df_with_profile = filtered_df.copy()
+        df_with_profile = agg_df_for_report.copy()
         df_with_profile['profil_perilaku'] = df_with_profile.apply(lambda row: create_behavior_profile(row, thresholds), axis=1)
         
         profile_stats = df_with_profile.groupby('profil_perilaku').agg(
             jumlah_mahasiswa=('id_responden', 'count'),
-            avg_emisi=('total_emisi', 'mean')
+            avg_transportasi=('transportasi', 'mean'),
+            avg_elektronik=('elektronik', 'mean'),
+            avg_sampah=('sampah', 'mean')
         ).sort_values('jumlah_mahasiswa', ascending=False).reset_index()
 
         if not profile_stats.empty:
-            segmentation_table_html = "".join([f"<tr><td><strong>{row['profil_perilaku']}</strong></td><td style='text-align:center;'>{row['jumlah_mahasiswa']}</td><td style='text-align:right;'>{row['avg_emisi']:.2f}</td></tr>" for _, row in profile_stats.iterrows()])
+            segmentation_table_html = "".join([
+                f"<tr><td><strong>{row['profil_perilaku']}</strong></td>"
+                f"<td style='text-align:center;'>{row['jumlah_mahasiswa']}</td>"
+                f"<td style='text-align:right;'>{row['avg_transportasi']:.2f}</td>"
+                f"<td style='text-align:right;'>{row['avg_elektronik']:.2f}</td>"
+                f"<td style='text-align:right;'>{row['avg_sampah']:.2f}</td></tr>"
+                for _, row in profile_stats.iterrows()])
             
             dominant_profile = profile_stats.iloc[0]['profil_perilaku']
             dominant_count = profile_stats.iloc[0]['jumlah_mahasiswa']
+            avg_transport_dom = profile_stats.iloc[0]['avg_transportasi']
+            avg_elektronik_dom = profile_stats.iloc[0]['avg_elektronik']
+            avg_sampah_dom = profile_stats.iloc[0]['avg_sampah']
             
-            segmentation_conclusion = f"Segmentasi berbasis perilaku menunjukkan bahwa profil dominan di antara mahasiswa adalah '<strong>{dominant_profile}</strong>', yang mencakup <strong>{dominant_count}</strong> orang. Mengidentifikasi profil dominan adalah kunci untuk intervensi yang efektif."
+            segmentation_conclusion = f"Analisis perilaku mengidentifikasi '<strong>{dominant_profile}</strong>' sebagai kelompok terbesar dengan <strong>{dominant_count}</strong> mahasiswa. Kelompok ini memiliki rata-rata emisi transportasi {avg_transport_dom:.2f} kg CO₂, elektronik {avg_elektronik_dom:.2f} kg CO₂, dan sampah {avg_sampah_dom:.2f} kg CO₂. Memahami profil ini membantu menentukan strategi pengurangan emisi yang tepat sasaran."
             
-            rec_map = {
-                "Kontributor Utama": "Kelompok ini adalah prioritas tertinggi. Intervensi harus bersifat holistik mencakup transportasi, energi, dan pangan.",
-                "Komuter Berat": "Fokus pada kebijakan 'mode shifting' seperti peningkatan layanan shuttle atau insentif untuk carpooling.",
-                "Pengguna Elektronik Berat": "Targetkan kampanye hemat energi dan audit penggunaan fasilitas di gedung-gedung yang sering mereka gunakan.",
-                "Boros Pangan": "Kolaborasi dengan vendor kantin untuk program reduksi sisa makanan adalah langkah yang paling berdampak.",
-                "Sangat Sadar Lingkungan": "Jadikan kelompok ini sebagai 'champion' atau duta lingkungan. Wawancara mereka untuk mendapatkan insight praktik terbaik.",
-                "Profil Campuran": "Edukasi umum mengenai sumber-sumber emisi utama di kampus akan efektif untuk kelompok ini."
+            rec_map_behavior = {
+                "Kontributor Utama": "Prioritaskan kelompok ini dengan program edukasi dan insentif yang menyeluruh. Contoh: 'Green Campus Challenge' dengan hadiah, panduan personal tentang efisiensi energi, dan promosi gaya hidup minim emisi.",
+                "Komuter & Digital": "Fokus pada transportasi berkelanjutan (misal: promo tiket bus/kereta, diskon sewa sepeda) dan kampanye penghematan energi perangkat elektronik (misal: 'Cabut Chargermu!').",
+                "Komuter & Boros Pangan": "Kombinasikan program transportasi berkelanjutan dengan inisiatif pengurangan limbah makanan. Contoh: workshop masak minim sisa, kerja sama dengan kantin untuk opsi porsi kecil atau program makanan sisa.",
+                "Digital & Boros Pangan": "Targetkan dengan kampanye 'Hemat Energi Layar' untuk perangkat dan 'Habiskan Porsi Makananmu' di area makan. Pertimbangkan aplikasi pelacak emisi yang menyoroti dampak dari kebiasaan digital dan pangan.",
+                "Komuter Berat": "Perluas pilihan transportasi alternatif. Contoh: sediakan lebih banyak shuttle bus kampus, hari 'Tanpa Kendaraan Pribadi' dengan hadiah, atau dukung komunitas carpooling mahasiswa.",
+                "Pengguna Elektronik Berat": "Edukasi mendalam tentang konsumsi daya perangkat. Promosikan penggunaan mode hemat daya, berikan daftar perangkat elektronik efisien, atau tawarkan audit energi kecil untuk ruang kerja/belajar.",
+                "Boros Pangan": "Fokus pada edukasi tentang dampak limbah makanan. Contoh: kampanye 'Piring Bersih', program donasi makanan berlebih ke komunitas, atau kerja sama dengan katering kampus untuk mengurangi sisa produksi.",
+                "Sangat Sadar Lingkungan": "Libatkan mereka sebagai 'Duta Lingkungan' atau mentor bagi mahasiswa lain. Berikan platform untuk berbagi praktik terbaik dan ide-ide inovatif untuk keberlanjutan kampus.",
+                "Profil Campuran": "Sediakan materi edukasi umum yang mudah diakses (infografis, video singkat) tentang sumber emisi utama dan tips sederhana untuk mengurangi jejak karbon dalam kehidupan kampus sehari-hari."
             }
-            rekomendasi_utama = rec_map.get(dominant_profile, rec_map["Profil Campuran"])
-            segmentation_recommendation = f"Kebijakan kampus harus diprioritaskan untuk menargetkan profil '<strong>{dominant_profile}</strong>'. Rekomendasi: {rekomendasi_utama}"
+            rekomendasi_utama = rec_map_behavior.get(dominant_profile, rec_map_behavior["Profil Campuran"])
+            segmentation_recommendation = f"Kebijakan kampus perlu disesuaikan untuk profil '<strong>{dominant_profile}</strong>'. {rekomendasi_utama}"
 
+    composition_table_html = ''.join([f"<tr><td>{cat}</td><td style='text-align:right;'>{val:.1f}</td><td style='text-align:right;'>{(val/total_emisi*100 if total_emisi>0 else 0):.1f}%</td></tr>" for cat, val in composition_data.items()])
+    
     html_content = f"""
     <!DOCTYPE html><html><head><title>Laporan Overview</title><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
@@ -328,7 +289,7 @@ def generate_overview_pdf_report(filtered_df, daily_df, fakultas_stats_full):
 
         <h2>2. Tren Emisi Harian</h2>
         <table><thead><tr><th>Hari</th><th>Total Emisi (kg CO₂)</th></tr></thead><tbody>
-        {''.join([f"<tr><td>{row['day']}</td><td style='text-align:right;'>{row.drop('day').sum():.1f}</td></tr>" for idx, row in daily_df.iterrows()]) if not daily_df.empty else "<tr><td colspan='2'>Data tidak tersedia.</td></tr>"}
+        {''.join([f"<tr><td>{day}</td><td style='text-align:right;'>{daily_pivot_for_report.loc[day].sum():.1f}</td></tr>" for day in daily_pivot_for_report.index]) if not daily_pivot_for_report.empty else "<tr><td colspan='2'>Data tidak tersedia.</td></tr>"}
         </tbody></table>
         <div class="conclusion"><strong>Insight:</strong> {trend_conclusion}</div>
         <div class="recommendation"><strong>Rekomendasi:</strong> {trend_recommendation}</div>
@@ -353,260 +314,229 @@ def generate_overview_pdf_report(filtered_df, daily_df, fakultas_stats_full):
     return html_content
 
 def show():
-    with loading():
-        st.markdown("""
-        <div class="wow-header">
-            <div class="header-bg-pattern"></div>
-            <div class="header-float-1"></div>
-            <div class="header-float-2"></div>
-            <div class="header-float-3"></div>
-            <div class="header-float-4"></div>  
-            <div class="header-float-5"></div>              
-            <div class="header-content">
-                <h1 class="header-title">Dashboard Utama</h1>
-            </div>
-        </div>
+    st.markdown("""
+        <style>.kpi-card{padding:1rem;border-radius:8px;text-align:center;background-color:#f8f9fa}.kpi-value{font-size:2em;font-weight:600}.kpi-label{font-size:0.9em;color:#555}.primary{border-left:4px solid #10b981}.primary .kpi-value{color:#059669}.secondary{border-left:4px solid #3b82f6}.secondary .kpi-value{color:#3b82f6}</style>
+        <div class="wow-header"><div class="header-bg-pattern"></div><div class="header-float-1"></div><div class="header-float-2"></div><div class="header-float-3"></div><div class="header-float-4"></div><div class="header-float-5"></div><div class="header-content"><h1 class="header-title">Dashboard Utama</h1></div></div>
         """, unsafe_allow_html=True)
-        time.sleep(0.25)
-
-    df_transport_raw, df_electronic_raw, df_activities_raw, df_responden = load_all_data()
-    
-    if df_transport_raw.empty or df_electronic_raw.empty or df_activities_raw.empty:
-        st.error("Satu atau lebih sumber data tidak tersedia.")
-        return
+    time.sleep(0.25)
 
     with loading():
-        df_transport = df_transport_raw.copy()
-        df_transport['emisi_transportasi'] = pd.to_numeric(df_transport['emisi_transportasi'], errors='coerce').fillna(0)
-        df_transport['hari_datang'] = df_transport['hari_datang'].astype(str).fillna('')
-        df_transport['jumlah_hari_datang'] = df_transport['hari_datang'].str.split(',').str.len()
-        df_transport['emisi_mingguan'] = df_transport['emisi_transportasi'] * df_transport['jumlah_hari_datang']
-        days_of_week = ['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'minggu']
-        for day in days_of_week:
-            col_name = f'emisi_transportasi_{day}'
-            df_transport[col_name] = np.where(df_transport['hari_datang'].str.contains(day.capitalize(), na=False), df_transport['emisi_transportasi'], 0)
+        base_daily_aggregated_data = get_aggregated_daily_data()
+        if base_daily_aggregated_data.empty:
+            st.warning("Tidak ada data yang tersedia dari database. Pastikan koneksi dan data ada.")
+            return
 
-        df_electronic = df_electronic_raw.copy()
-        if 'emisi_elektronik' in df_electronic.columns:
-            df_electronic = df_electronic.rename(columns={'emisi_elektronik': 'emisi_elektronik_mingguan'})
-        df_electronic['emisi_elektronik_mingguan'] = pd.to_numeric(df_electronic['emisi_elektronik_mingguan'], errors='coerce').fillna(0)
-        df_electronic['hari_datang'] = df_electronic['hari_datang'].astype(str).fillna('')
-        df_electronic['jumlah_hari_datang'] = df_electronic['hari_datang'].str.split(',').str.len()
-        df_electronic['emisi_harian'] = df_electronic['emisi_elektronik_mingguan'] / (df_electronic['jumlah_hari_datang'] + 1e-9)
-        for day in days_of_week:
-            col_name = f'emisi_elektronik_{day}'
-            df_electronic[col_name] = np.where(df_electronic['hari_datang'].str.contains(day.capitalize(), na=False), df_electronic['emisi_harian'], 0)
-
-        df_food = parse_food_activities(df_activities_raw)
-        
-        df_unified = create_unified_dataset(df_transport, df_electronic, df_food, df_responden)
-        time.sleep(0.2)
+        available_fakultas = sorted(base_daily_aggregated_data['fakultas'].unique())
     
-    if df_unified.empty:
-        st.warning("Tidak ada data gabungan yang dapat ditampilkan. Periksa sumber data.")
-        return
-
     filter_col1, filter_col2, filter_col3, export_col1, export_col2 = st.columns([1.8, 1.8, 1.8, 1, 1])
     with filter_col1:
-        selected_days = st.multiselect("Hari:", ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'], placeholder="Pilih Opsi", key='overview_day_filter')
+        selected_days = st.multiselect("Hari:", DAY_ORDER, placeholder="Pilih Opsi", key='overview_day_filter')
     with filter_col2:
         selected_categories = st.multiselect("Jenis:", ['Transportasi', 'Elektronik', 'Sampah'], placeholder="Pilih Opsi", key='overview_category_filter')
     with filter_col3:
-        available_fakultas = sorted(df_unified['fakultas'].unique())
         selected_fakultas = st.multiselect("Fakultas:", available_fakultas, placeholder="Pilih Opsi", key='overview_fakultas_filter')
 
-    # 3. Terapkan filter ke data
-    filtered_df = apply_overview_filters(df_unified, df_transport, df_electronic, df_food, selected_days, selected_categories, selected_fakultas)
-    if filtered_df.empty:
-        st.warning("Tidak ada data yang sesuai dengan filter."); return
+    with loading():
+        filtered_daily_data = base_daily_aggregated_data.copy()
 
-    # Data untuk chart Fakultas
-    fakultas_stats = filtered_df.groupby('fakultas')['total_emisi'].sum().reset_index()
-    
-    # Data untuk chart Tren Harian
-    ids = filtered_df['id_responden']
-    days_order = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
-    daily_data = []
-    for day in days_order:
-        row = {'day': day}
-        for cat, df_source, col_prefix in [('transportasi', df_transport, 'emisi_transportasi_'), ('elektronik', df_electronic, 'emisi_elektronik_')]:
-            col = f"{col_prefix}{day.lower()}"
-            row[cat] = df_source.loc[df_source['id_responden'].isin(ids), col].sum() if not df_source.empty and col in df_source.columns else 0
-        row['sampah_makanan'] = df_food.loc[(df_food['id_responden'].isin(ids)) & (df_food['day'] == day), 'emisi_makanan'].sum() if not df_food.empty else 0
-        daily_data.append(row)
-    daily_df = pd.DataFrame(daily_data)
+        if selected_fakultas:
+            filtered_daily_data = filtered_daily_data[filtered_daily_data['fakultas'].isin(selected_fakultas)]
+        if selected_days:
+            filtered_daily_data = filtered_daily_data[filtered_daily_data['hari'].isin(selected_days)]
+        
+        cat_map_display_to_db = {'Transportasi': 'transportasi', 'Elektronik': 'elektronik', 'Sampah': 'sampah'}
+        if selected_categories:
+            filtered_db_categories = [cat_map_display_to_db[cat] for cat in selected_categories]
+            filtered_daily_data = filtered_daily_data[filtered_daily_data['kategori'].isin(filtered_db_categories)]
+        
+        if filtered_daily_data.empty:
+            st.warning("Tidak ada data yang sesuai dengan filter yang dipilih."); return
+
+        agg_df = filtered_daily_data.pivot_table(
+            index=['id_responden', 'fakultas'],
+            columns='kategori',
+            values='emisi',
+            aggfunc='sum'
+        ).reset_index().fillna(0)
+
+        for col in ['transportasi', 'elektronik', 'sampah']:
+            if col not in agg_df.columns:
+                agg_df[col] = 0
+        agg_df['total_emisi'] = agg_df[['transportasi', 'elektronik', 'sampah']].sum(axis=1)
+        
+        daily_pivot = filtered_daily_data.pivot_table(
+            index='hari',
+            columns='kategori',
+            values='emisi',
+            aggfunc='sum'
+        ).reindex(DAY_ORDER).fillna(0)
+
+        for col in ['transportasi', 'elektronik', 'sampah']:
+            if col not in daily_pivot.columns:
+                daily_pivot[col] = 0
+        
+        fakultas_stats = agg_df.groupby('fakultas').agg(
+            total_emisi=('total_emisi', 'sum'),
+            count=('id_responden', 'nunique')
+        ).reset_index()
+
 
     with export_col1:
         st.download_button(
             "Raw Data",
-            filtered_df.to_csv(index=False),
-            f"overview_filtered_{len(filtered_df)}.csv",
+            agg_df.to_csv(index=False),
+            f"overview_filtered_data.csv",
             "text/csv",
             use_container_width=True,
             key="overview_export_csv"
         )
     with export_col2:
         try:
-            pdf_content = generate_overview_pdf_report(filtered_df, daily_df, fakultas_stats)
+            pdf_content = generate_overview_pdf_report(agg_df, daily_pivot, fakultas_stats)
             st.download_button(
                 "Laporan",
                 pdf_content,
-                f"overview_report_{len(filtered_df)}.html",
+                f"overview_report.html",
                 "text/html",
                 use_container_width=True,
                 key="overview_export_pdf_final"
             )
         except Exception as e:
-            st.error(f"Error generating PDF report: {e}")
+            st.error(f"Gagal membuat laporan: {e}")
 
     col1, col2, col3 = st.columns([1, 1, 1.5], gap="small")
 
     with col1:
-        # KPI
-        total_emisi = filtered_df['total_emisi'].sum()
-        avg_emisi = filtered_df['total_emisi'].mean()
-        st.markdown(f'<div class="kpi-card primary" style="margin-bottom: 1rem;"><div class="kpi-value">{total_emisi:.1f}</div><div class="kpi-label">Total Emisi (kg CO₂)</div></div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="kpi-card secondary" style="margin-bottom: 1.5rem;"><div class="kpi-value">{avg_emisi:.2f}</div><div class="kpi-label">Rata-rata/Mahasiswa</div></div>', unsafe_allow_html=True)
+        total_emisi_kpi = agg_df['total_emisi'].sum()
+        avg_emisi_kpi = agg_df['total_emisi'].mean() if not agg_df.empty else 0
+        st.markdown(f'<div class="kpi-card primary" style="margin-bottom: 1rem;"><div class="kpi-value">{total_emisi_kpi:.1f}</div><div class="kpi-label">Total Emisi (kg CO₂)</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="kpi-card secondary" style="margin-bottom: 1.5rem;"><div class="kpi-value">{avg_emisi_kpi:.2f}</div><div class="kpi-label">Rata-rata/Mahasiswa</div></div>', unsafe_allow_html=True)
         
-        fakultas_stats = filtered_df.groupby('fakultas')['total_emisi'].agg(['sum', 'count']).reset_index()
-        fakultas_stats.columns = ['fakultas', 'total_emisi', 'count']
-        fakultas_stats = fakultas_stats.sort_values('total_emisi', ascending=False)
-        
-        fakultas_stats_display = fakultas_stats.head(13).sort_values('total_emisi', ascending=True)
+        fakultas_stats_display = fakultas_stats.sort_values('total_emisi', ascending=True).head(13)
 
         fig_fakultas = go.Figure()
-
         for _, row in fakultas_stats_display.iterrows():
             max_emisi = fakultas_stats_display['total_emisi'].max()
             min_emisi = fakultas_stats_display['total_emisi'].min()
+            
             if max_emisi > min_emisi:
                 ratio = (row['total_emisi'] - min_emisi) / (max_emisi - min_emisi)
                 color_palette = ['#66c2a5', '#abdda4', '#fdae61', '#f46d43', '#d53e4f', '#9e0142']
                 color_idx = int(ratio * (len(color_palette) - 1))
                 color = color_palette[color_idx]
             else:
-                color = MAIN_PALETTE[0]
+                color = CATEGORY_COLORS['Sampah']
 
             fig_fakultas.add_trace(go.Bar(
-                x=[row['total_emisi']], 
-                y=[row['fakultas']], 
+                x=[row['total_emisi']],
+                y=[row['fakultas']],
                 orientation='h',
-                marker=dict(color=color), 
+                marker=dict(color=color),
                 showlegend=False,
-                text=[f"{row['total_emisi']:.1f}"], 
+                text=[f"{row['total_emisi']:.1f}"],
                 textposition='inside',
                 textfont=dict(color='white', size=10, weight='bold'),
                 hovertemplate=f'<b>{row["fakultas"]}</b><br>Total Emisi: {row["total_emisi"]:.1f} kg CO₂<br>Jumlah Mahasiswa: {row["count"]}<extra></extra>'
             ))
 
         fig_fakultas.update_layout(
-            height=382, 
-            title_text="<b>Emisi per Fakultas</b>", 
+            height=382,
+            title_text="<b>Emisi per Fakultas</b>",
             title_x=0.32,
-            margin=dict(t=40, b=0, l=0, r=20), 
-            xaxis_title="Total Emisi (kg CO₂)", 
-            yaxis_title=None, 
+            margin=dict(t=40, b=0, l=0, r=20),
+            xaxis_title="Total Emisi (kg CO₂)",
+            yaxis_title=None,
             showlegend=False,
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
             xaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.1)'),
             yaxis=dict(showgrid=False)
-        )        
+        )
         st.plotly_chart(fig_fakultas, config=MODEBAR_CONFIG, use_container_width=True)
-        
 
     with col2:
-        # Tren Emisi Harian dan Komposisi Emisi
-        ids = filtered_df['id_responden']
-        daily_data = []
-        days_order = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
-        for day in days_order:
-            day_data_row = {'day': day, 'transportasi': 0, 'elektronik': 0, 'sampah_makanan': 0}
-            transport_col = f'emisi_transportasi_{day.lower()}'
-            day_data_row['transportasi'] = df_transport[df_transport['id_responden'].isin(ids)][transport_col].sum() if not df_transport.empty and transport_col in df_transport.columns else 0
-            electronic_col = f'emisi_elektronik_{day.lower()}'
-            day_data_row['elektronik'] = df_electronic[df_electronic['id_responden'].isin(ids)][electronic_col].sum() if not df_electronic.empty and electronic_col in df_electronic.columns else 0
-            day_data_row['sampah_makanan'] = df_food[(df_food['id_responden'].isin(ids)) & (df_food['day'] == day)]['emisi_makanan'].sum() if not df_food.empty else 0
-            daily_data.append(day_data_row)
-        daily_df = pd.DataFrame(daily_data)
-        
         fig_trend = go.Figure()
-        for cat in (selected_categories or list(CATEGORY_COLORS.keys())):
-            col_name = cat.lower().replace(' ', '_')
-            if col_name in daily_df.columns:
-                fig_trend.add_trace(go.Scatter(x=daily_df['day'], y=daily_df[col_name], name=cat, mode='lines+markers', line=dict(color=CATEGORY_COLORS[cat])))
+        
+        cats_to_show = selected_categories or list(CATEGORY_COLORS.keys())
+        
+        for cat in cats_to_show:
+            col_name = cat.lower()
+            if col_name in daily_pivot.columns:
+                fig_trend.add_trace(go.Scatter(x=daily_pivot.index, y=daily_pivot[col_name], name=cat, mode='lines+markers', line=dict(color=CATEGORY_COLORS[cat])))
         
         fig_trend.update_layout(height=265, title_text="<b>Tren Emisi Harian</b>", title_x=0.32,
             margin=dict(t=40, b=0, l=0, r=0), legend_title_text='', yaxis_title="Emisi (kg CO₂)", xaxis_title=None,
             legend=dict(orientation="h", yanchor="bottom", y=-0.4, xanchor="center", x=0.5, font_size=9))
         st.plotly_chart(fig_trend, config=MODEBAR_CONFIG, use_container_width=True)
 
+        categories_data = {
+            'Transportasi': agg_df['transportasi'].sum(),
+            'Elektronik': agg_df['elektronik'].sum(),
+            'Sampah': agg_df['sampah'].sum()
+        }
         
-        categories_data = {'Transportasi': filtered_df['transportasi'].sum(), 'Elektronik': filtered_df['elektronik'].sum(), 'Sampah': filtered_df['sampah_makanan'].sum()}
-        data_pie = {k: v for k, v in categories_data.items() if v > 0}
+        final_pie_labels = []
+        final_pie_values = []
         
-        if data_pie:
+        if len(selected_categories) == 1 and categories_data[selected_categories[0]] == 0:
+            final_pie_labels.append(selected_categories[0])
+            final_pie_values.append(0)
+        else:
+            for label, value in categories_data.items():
+                if value > 0 and (not selected_categories or label in selected_categories):
+                    final_pie_labels.append(label)
+                    final_pie_values.append(value)
+        
+        if final_pie_values:
             fig_composition = go.Figure(go.Pie(
-                labels=list(data_pie.keys()), 
-                values=list(data_pie.values()), 
-                hole=0.45, 
+                labels=final_pie_labels,
+                values=final_pie_values,
+                hole=0.45,
                 marker=dict(
-                    colors=[CATEGORY_COLORS.get(cat) for cat in data_pie.keys()],
-                    line=dict(color='#FFFFFF', width=2) 
+                    colors=[CATEGORY_COLORS.get(cat) for cat in final_pie_labels],
+                    line=dict(color='#FFFFFF', width=2)
                 ),
-                textposition='outside', 
-                textinfo='label+percent', 
+                textposition='outside',
+                textinfo='label+percent',
                 textfont=dict(size=10, family="Poppins"),
-                hovertemplate='<b>%{label}</b><br>Emisi: %{value:.1f} kg CO₂ (%{percent})<extra></extra>' 
+                hovertemplate='<b>%{label}</b><br>Emisi: %{value:.1f} kg CO₂ (%{percent})<extra></extra>'
             ))
 
-            total_emisi_pie = sum(data_pie.values())
+            total_emisi_pie = sum(final_pie_values)
             center_text = f"<b style='font-size:14px'>{total_emisi_pie:.1f}</b><br><span style='font-size:8px'>kg CO₂</span>"
             fig_composition.add_annotation(text=center_text, x=0.5, y=0.5, font_size=10, showarrow=False)
             
             fig_composition.update_layout(
-                height=280, 
-                title_text="<b>Komposisi Emisi</b>", 
-                title_x=0.32, 
+                height=280,
+                title_text="<b>Komposisi Emisi</b>",
+                title_x=0.32,
                 title_y=0.95,
-                margin=dict(t=65, b=30, l=0, r=0), 
-                showlegend=False 
+                margin=dict(t=65, b=30, l=0, r=0),
+                showlegend=False
             )
-
             st.plotly_chart(fig_composition, config=MODEBAR_CONFIG, use_container_width=True)
+        else:
+            st.info("Tidak ada data emisi yang ditemukan untuk kategori yang dipilih.")
     
     with col3:
-        # Segmentasi Profil Perilaku        
-        if len(filtered_df) > 1:
+        if len(agg_df['id_responden'].unique()) > 5:
             thresholds = {
-                'transportasi': filtered_df['transportasi'].median(),
-                'elektronik': filtered_df['elektronik'].median(),
-                'sampah_makanan': filtered_df['sampah_makanan'].median()
+                'transportasi': agg_df['transportasi'].median(),
+                'elektronik': agg_df['elektronik'].median(),
+                'sampah': agg_df['sampah'].median()
             }
             
-            filtered_df['profil_perilaku'] = filtered_df.apply(lambda row: create_behavior_profile(row, thresholds), axis=1)
+            agg_df['profil_perilaku'] = agg_df.apply(lambda row: create_behavior_profile(row, thresholds), axis=1)
             
-            profile_counts = filtered_df['profil_perilaku'].value_counts().reset_index()
+            profile_counts = agg_df['profil_perilaku'].value_counts().reset_index()
             profile_counts.columns = ['profil', 'jumlah']
-
-            profile_color_map = {
-                "Kontributor Utama": "#9e0142",       
-                "Komuter & Digital": "#d53e4f",       
-                "Komuter & Boros Pangan": "#f46d43",   
-                "Digital & Boros Pangan": "#fdae61",   
-                "Komuter Berat": "#fee08b",         
-                "Pengguna Elektronik Berat": "#e6f598",
-                "Boros Pangan": "#abdda4",            
-                "Sangat Sadar Lingkungan": "#66c2a5", 
-                "Profil Campuran": "#3288bd"          
-            }
 
             fig_treemap = px.treemap(
                 profile_counts,
                 path=[px.Constant("Semua Profil"), 'profil'],
                 values='jumlah',
                 color='profil',
-                color_discrete_map=profile_color_map,
+                color_discrete_map=PROFILE_COLOR_MAP,
                 custom_data=['jumlah']
             )
             
@@ -614,7 +544,7 @@ def show():
                 texttemplate="<b>%{label}</b><br>%{value} Mahasiswa",
                 hovertemplate="<b>%{label}</b><br>Jumlah: %{customdata[0]} mahasiswa<extra></extra>",
                 textfont=dict(size=14),
-                insidetextfont=dict(size=16, color='black'), 
+                insidetextfont=dict(size=16, color='black'),
                 marker=dict(line=dict(width=2, color='white'))
             )
             
@@ -628,7 +558,7 @@ def show():
             st.plotly_chart(fig_treemap, use_container_width=True, config=MODEBAR_CONFIG)
 
         else:
-            st.info("Data tidak cukup untuk membuat segmentasi perilaku.")
+            st.info("Data tidak cukup untuk membuat segmentasi perilaku (minimal 6 responden unik diperlukan).")
             
         time.sleep(0.15)
 
