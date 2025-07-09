@@ -1,10 +1,12 @@
-# login.py
 import streamlit as st
-from src.auth.auth import authenticate
+from src.auth.auth import authenticate, supabase 
 import time
 
 def show():
-    # HIDE SIDEBAR COMPLETELY ON LOGIN PAGE
+    if supabase is None:
+        st.error("Dashboard tidak dapat beroperasi. Gagal menginisialisasi koneksi ke Supabase.")
+        return
+
     st.markdown("""
     <style>
     /* Hide sidebar completely on login page */
@@ -151,13 +153,11 @@ def show():
     </style>
     """, unsafe_allow_html=True)
 
-    # Menggunakan st.columns untuk memusatkan seluruh konten secara horizontal
     _, center_col, _ = st.columns([1, 1.5, 1])
 
     with center_col:
         st.markdown('<div class="login-content">', unsafe_allow_html=True)
         
-        # 1. Logo
         st.markdown("""
         <div class="login-logo">
             <div class="logo-circle">
@@ -169,34 +169,31 @@ def show():
         </div>
         """, unsafe_allow_html=True)
         
-        # 2. Teks Sambutan
         st.markdown("""
         <div class="welcome-text">
             <div class="welcome-title">Selamat Datang, Silahkan Isi Untuk Memasuki Dashboard</div>
         </div>
         """, unsafe_allow_html=True)
 
-        # 3. Form Login
         with st.form("login_form"):
-            username = st.text_input("Username atau Email", placeholder="Masukkan username atau email")
-            password = st.text_input("Password", type="password", placeholder="Masukkan password")
+            email = st.text_input("Email", placeholder="Masukkan email Anda") 
+            password = st.text_input("Password", type="password", placeholder="Masukkan password Anda")
 
             st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
             submit = st.form_submit_button("Masuk", use_container_width=True)
 
         if submit:
-            if username and password:
-                user = authenticate(username, password)
-                if user:
-                    st.session_state.user = user
-                    st.query_params["logged_in"] = "true"
-                    st.query_params["user"] = user["username"]
-                    st.query_params["page"] = "overview"
+            if email and password:
+                user_metadata = authenticate(email, password) 
+                if user_metadata:
+                    st.query_params["logged_in"] = "true" 
+                    st.query_params["user_email"] = email 
+                    st.query_params["page"] = "overview" 
                     st.success("Login berhasil! Mengalihkan...")
                     time.sleep(1)
                     st.rerun()
                 else:
-                    st.error("Username/email atau password salah!")
+                    st.error("Login gagal. Periksa kembali email dan password Anda.")
             else:
                 st.error("Mohon isi semua field!")
 

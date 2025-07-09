@@ -1,106 +1,115 @@
 import streamlit as st
-import hashlib
-import json
+from supabase import create_client, Client
 import os
 from typing import Dict, Optional
+from dotenv import load_dotenv
 
-# File untuk menyimpan data user
-USERS_FILE = "data/users.json"
+load_dotenv()
 
-def hash_password(password: str) -> str:
-    """Hash password using SHA256"""
-    return hashlib.sha256(password.encode()).hexdigest()
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-def load_users() -> Dict:
-    """Load users from JSON file"""
-    if not os.path.exists(USERS_FILE):
-        # Create default admin user
-        default_users = {
-            "admin": {
-                "email": "admin@gmail.com",
-                "username": "admin",
-                "password": hash_password("admin123"),
-                "is_admin": True
-            }
-        }
-        save_users(default_users)
-        return default_users
-    
+if not SUPABASE_URL or not SUPABASE_KEY:
+    supabase: Optional[Client] = None
+    print("ERROR: SUPABASE_URL atau SUPABASE_KEY tidak ditemukan di environment variables. Pastikan file .env ada dan terisi.")
+else:
     try:
-        with open(USERS_FILE, 'r') as f:
-            return json.load(f)
-    except:
-        return {}
+        supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    except Exception as e:
+        supabase: Optional[Client] = None
+        print(f"ERROR: Gagal menginisialisasi klien Supabase: {e}. Pastikan URL dan KEY benar.")
 
-def save_users(users: Dict):
-    """Save users to JSON file"""
-    with open(USERS_FILE, 'w') as f:
-        json.dump(users, f, indent=2)
+def authenticate(email: str, password: str) -> Optional[Dict]:
+    """
+    Mengautentikasi pengguna menggunakan Supabase Auth (email/password).
+    Menyimpan sesi dan objek pengguna Supabase di st.session_state.
+    Mengembalikan metadata pengguna jika autentikasi berhasil.
+    """
+    if not supabase:
+        st.error("Sistem tidak terhubung ke Supabase. Periksa konfigurasi.")
+        return None
+    try:
+        response = supabase.auth.sign_in_with_password({
+            "email": email,
+            "password": password,
+        })
+        
+        if response.user and response.session:
+            st.session_state.supabase_session = response.session 
+            st.session_state.supabase_user = response.user      
+            st.session_state.user_metadata = response.user.user_metadata 
+            return response.user.user_metadata
+        else:
+            st.error("Autentikasi gagal: Respons Supabase tidak lengkap atau user/sesi tidak ditemukan.")
+            return None
+    except Exception as e:
+        error_message = e.message if hasattr(e, 'message') else str(e)
+        st.error(f"Autentikasi gagal: {error_message}")
+        st.session_state.pop("supabase_session", None)
+        st.session_state.pop("supabase_user", None)
+        st.session_state.pop("user_metadata", None)
+        return None
 
-def authenticate(username: str, password: str) -> Optional[Dict]:
-    """Authenticate user"""
-    users = load_users()
-    hashed_password = hash_password(password)
-    
-    # Check by username
-    if username in users and users[username]["password"] == hashed_password:
-        return users[username]
-    
-    # Check by email
-    for user_data in users.values():
-        if user_data["email"] == username and user_data["password"] == hashed_password:
-            return user_data
-    
-    return None
-
-def create_user(email: str, username: str, password: str) -> bool:
-    """Create new user (only admin can do this)"""
-    users = load_users()
-    
-    # Check if username or email already exists
-    if username in users:
+def create_user(email: str, password: str, is_admin: bool = False, username: Optional[str] = None) -> bool:
+    """
+    Mendaftarkan pengguna baru via Supabase Auth.
+    Peran admin dan username (opsional) disimpan di user_metadata.
+    """
+    if not supabase:
+        st.error("Sistem tidak terhubung ke Supabase. Pendaftaran gagal.")
         return False
-    
-    for user_data in users.values():
-        if user_data["email"] == email:
-            return False
-    
-    # Add new user
-    users[username] = {
-        "email": email,
-        "username": username,
-        "password": hash_password(password),
-        "is_admin": False
-    }
-    
-    save_users(users)
-    return True
+    try:
+        user_metadata = {"is_admin": is_admin}
+        if username:
+            user_metadata["username"] = username
+        
+        response = supabase.auth.sign_up({
+            "email": email,
+            "password": password,
+            "options": {
+                "data": user_metadata 
+            }
+        })
+        
+        if response.user:
+            print(f"Pengguna '{email}' berhasil didaftarkan di Supabase. User ID: {response.user.id}")
+            return True
+        return False
+    except Exception as e:
+        error_message = e.message if hasattr(e, 'message') else str(e)
+        st.error(f"Gagal mendaftarkan pengguna: {error_message}")
+        return False
 
 def is_logged_in() -> bool:
-    """Check if user is logged in"""
-    return "user" in st.session_state and st.session_state.user is not None
+    """Mengecek apakah pengguna sedang login berdasarkan sesi Supabase di st.session_state."""
+    return st.session_state.get("supabase_session") is not None
 
 def is_admin() -> bool:
-    """Check if current user is admin"""
+    """Mengecek apakah pengguna yang sedang login memiliki peran admin dari metadata."""
     if not is_logged_in():
         return False
-    return st.session_state.user.get("is_admin", False)
+    user_metadata = st.session_state.get("user_metadata", {}) 
+    return user_metadata.get("is_admin", False)
 
 def get_current_user() -> Optional[Dict]:
-    """Get current logged in user"""
+    """Mengembalikan metadata pengguna yang sedang login."""
     if is_logged_in():
-        return st.session_state.user
+        return st.session_state.get("user_metadata")
     return None
 
-# auth.py
-
 def logout():
-    """Logout current user and clear all related state."""
-    # Hapus semua kunci yang relevan dari session_state
-    keys_to_delete = ["user", "current_page"]
-    for key in keys_to_delete:
-        if key in st.session_state:
-            del st.session_state[key]
-    
-    # Hapus semua parameter dari URL
-    st.query_params.clear()
+    """Melakukan logout pengguna dari Supabase dan membersihkan state terkait."""
+    if not supabase:
+        st.error("Sistem tidak terhubung ke Supabase. Logout gagal.")
+        return
+    try:
+        supabase.auth.sign_out()
+        keys_to_clear = ["supabase_session", "supabase_user", "user_metadata"]
+        for key in keys_to_clear:
+            if key in st.session_state:
+                del st.session_state[key]
+        st.query_params.clear() 
+        print("Logout berhasil dari Supabase.")
+    except Exception as e:
+        error_message = e.message if hasattr(e, 'message') else str(e)
+        st.error(f"Gagal logout: {error_message}")

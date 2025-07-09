@@ -1,22 +1,17 @@
-# src/auth/register.py
-
 import streamlit as st
 from src.auth.auth import create_user, is_admin
 import time
 
-# Asumsi `loading` diimpor dari src.components.loading
 from src.components.loading import loading
 
 def show():
-    # Perlindungan halaman
     if not is_admin():
         st.error("Akses ditolak! Hanya admin yang dapat menambah akun baru.")
-        st.query_params["page"] = "overview"
+        st.query_params["page"] = "overview" 
         time.sleep(1.5)
         st.rerun()
         return
 
-    # Header dengan loading
     with loading():
         st.markdown("""
         <div class="wow-header">
@@ -48,7 +43,7 @@ def show():
             background: white !important;
             border-radius: 20px;
             box-shadow: 0 15px 40px rgba(0, 0, 0, 0.08);
-            border: 1px solid rgba(0, 0, 0, 0.06);
+            border: 1px solid rgba(0,0,0,0.06);
             padding: 2.5rem;
             margin: 0 auto;
         }
@@ -91,10 +86,13 @@ def show():
                 unsafe_allow_html=True
             )
             
-            username = st.text_input("Username", placeholder="Masukkan username baru")
-            email = st.text_input("Email", placeholder="Masukkan email pengguna")
+            username = st.text_input("Username (opsional)", placeholder="Contoh: koped")
+            email = st.text_input("Email", placeholder="Contoh: nama@example.com")
             password = st.text_input("Password", type="password", placeholder="Minimal 6 karakter")
             confirm_password = st.text_input("Konfirmasi Password", type="password", placeholder="Ulangi password")
+            
+            is_new_admin = st.checkbox("Jadikan akun ini Admin?", value=False, key="make_admin_checkbox")
+
 
             st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
 
@@ -104,28 +102,24 @@ def show():
             with btn_col2:
                 submit_clicked = st.form_submit_button("Tambahkan", use_container_width=True, type="primary")
 
-    # LOGIKA FORM
     if back_clicked:
         st.query_params["page"] = "overview"
         st.rerun()
 
     if submit_clicked:
-        if not all([username, email, password, confirm_password]):
-            st.error("Mohon isi semua field yang tersedia!")
+        if not all([email, password, confirm_password]): 
+            st.error("Mohon isi Email, Password, dan Konfirmasi Password!")
         elif password != confirm_password:
             st.error("Password dan konfirmasi password tidak cocok!")
         elif len(password) < 6:
             st.error("Password minimal harus 6 karakter!")
         else:
-            success = create_user(email, username, password)
+            success = create_user(email, password, is_admin=is_new_admin, username=username if username.strip() else None)
             if success:
-                st.success(f"Akun '{username}' berhasil dibuat! Mengalihkan...")
+                st.success(f"Akun '{email}' berhasil dibuat! Mengalihkan...")
                 time.sleep(2)
                 st.query_params["page"] = "overview"
-                st.rerun()
+                st.rerun() 
             else:
-                st.error("Gagal membuat akun. Username atau email mungkin sudah terdaftar.")
+                pass
         time.sleep(0.15)
-
-if __name__ == "__main__":
-    show()
