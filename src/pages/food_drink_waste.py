@@ -1,4 +1,4 @@
-# src/pages/sampah.py
+# src/pages/food_drink_waste.py
 
 import streamlit as st
 import pandas as pd
@@ -10,7 +10,7 @@ import time
 from src.utils.db_connector import run_sql
 
 # =============================================================================
-# KONFIGURASI DAN PALET WARNA
+# KONFIGURASI DAN PALET WARNA (tidak ada perubahan)
 # =============================================================================
 
 MAIN_PALETTE = ['#9e0142', '#d53e4f', '#f46d43', '#fdae61', '#fee08b', '#e6f598', '#abdda4', '#66c2a5', '#3288bd', '#5e4fa2']
@@ -26,8 +26,23 @@ OFFICIAL_CANTEENS = [
     'Kantin Labtek III', 'Koperasi'
 ]
 
+# NEW: Definisikan mapping untuk nama tampilan kantin agar unik dan rapi di grafik
+CANTEEN_DISPLAY_NAMES = {
+    'Kantin SBM': 'Kantin SBM',
+    'Pratama Corner': 'Pratama Corner',
+    'Kantin GKU Barat': 'Kantin GKU Barat', # Cukup panjang, tapi biarkan dulu. Akan dipotong otomatis jika >15.
+    'Kantin Tunnel': 'Kantin Tunnel',
+    'Kantin Borju': 'Kantin Borju',
+    'Kantin Barrac': 'Kantin Barrac',
+    'Cafetaria Sejoli CC Barat': 'Cafetaria Sejoli', # Dipersingkat agar unik dan rapi
+    'Kantin CC Timur': 'Kantin CC Timur',
+    'Cafetaria Tunas Padi (Ex ITB Press)': 'Cafetaria Tunas', # Dipersingkat agar unik dan rapi
+    'Kantin Labtek III': 'Kantin Labtek III',
+    'Koperasi': 'Koperasi',
+}
+
 # =============================================================================
-# FUNGSI-FUNGSI QUERY SQL
+# FUNGSI-FUNGSI QUERY SQL (tidak ada perubahan)
 # =============================================================================
 
 @st.cache_data(ttl=3600)
@@ -225,7 +240,7 @@ def generate_pdf_report(where_clause, join_needed):
 
 
 # =============================================================================
-# FUNGSI UTAMA (SHOW) - Tidak ada perubahan di sini
+# FUNGSI UTAMA (SHOW)
 # =============================================================================
 def show():
     st.markdown("""
@@ -326,7 +341,7 @@ def show():
     with loading():
         col1, col2 = st.columns([1, 1])
 
-        with col1: # Heatmap Lokasi vs Waktu
+        with col1: # Heatmap Lokasi vs Waktu (PERBAIKAN DIMULAI DI SINI)
             heatmap_df = get_heatmap_data(where_clause, join_needed)
             if not heatmap_df.empty:
                 pivot_df = heatmap_df.pivot_table(index='lokasi', columns='time_slot', values='total_emisi', fill_value=0)
@@ -335,19 +350,49 @@ def show():
                         sorted_columns = sorted(pivot_df.columns, key=lambda x: int(x.split(':')[0].split('-')[0]))
                         pivot_df = pivot_df[sorted_columns]
                     except (ValueError, IndexError): pass
-                    fig_heatmap = go.Figure(data=go.Heatmap(z=pivot_df.values, x=pivot_df.columns, y=pivot_df.index, colorscale=[[0, '#fee08b'], [0.25, '#fdae61'], [0.5, '#f46d43'], [0.75, '#d53e4f'], [1, '#9e0142']], hoverongaps=False, hovertemplate='<b>%{y}</b><br>Jam: %{x}<br>Emisi: %{z:.2f} kg CO₂<extra></extra>', xgap=1, ygap=1, colorbar=dict(title=dict(text="Emisi", font=dict(size=9)), thickness=15, len=0.7)))
-                    fig_heatmap.update_layout(height=270, margin=dict(t=30, b=20, l=20, r=20), title=dict(text="<b>Heatmap Emisi Kantin</b>", x=0.37, y=0.95, font=dict(size=12)))
+                    
+                    # --- NEW: Siapkan label Y-axis yang dipotong/di-map ---
+                    original_locations = pivot_df.index.tolist()
+                    display_locations_truncated = [CANTEEN_DISPLAY_NAMES.get(loc, loc) for loc in original_locations]
+                    # Fallback truncation for any unmapped or still too long names
+                    display_locations_truncated = [name if len(name) <= 15 else name[:13] + '..' for name in display_locations_truncated]
+
+                    fig_heatmap = go.Figure(data=go.Heatmap(
+                        z=pivot_df.values,
+                        x=pivot_df.columns,
+                        y=original_locations, # Use original locations as tickvals for correct hover mapping
+                        colorscale=[[0, '#fee08b'], [0.25, '#fdae61'], [0.5, '#f46d43'], [0.75, '#d53e4f'], [1, '#9e0142']],
+                        hoverongaps=False,
+                        hovertemplate='<b>%{y}</b><br>Jam: %{x}<br>Emisi: %{z:.2f} kg CO₂<extra></extra>',
+                        xgap=1, ygap=1,
+                        colorbar=dict(title=dict(text="Emisi", font=dict(size=9)), thickness=15, len=0.7)
+                    ))
+                    
+                    fig_heatmap.update_layout(
+                        height=270, 
+                        margin=dict(t=30, b=20, l=20, r=20), 
+                        title=dict(text="<b>Heatmap Emisi Kantin</b>", x=0.37, y=0.95, font=dict(size=12)),
+                        xaxis=dict(tickangle=25),
+                        # --- NEW: Konfigurasi Y-axis untuk menampilkan label yang dipotong ---
+                        yaxis=dict(
+                            tickvals=original_locations, # Nilai sebenarnya di sumbu Y
+                            ticktext=display_locations_truncated, # Label yang akan ditampilkan
+                            automargin=True, # Memastikan label terlihat
+                        )
+                    )
+                    
                     st.plotly_chart(fig_heatmap, config=MODEBAR_CONFIG, use_container_width=True)
                 else:
                     st.info("Tidak ada data heatmap untuk pivot.")
             else:
                 st.info("Tidak ada data heatmap untuk kantin yang dipilih.")
 
-        with col2: # Emisi per Kantin
+        with col2: # Emisi per Kantin (tidak ada perubahan dari perbaikan sebelumnya)
             canteen_df = get_canteen_data(where_clause, join_needed)
             if not canteen_df.empty:
                 canteen_df = canteen_df.sort_values('total_emisi', ascending=False)
                 fig_canteen = go.Figure()
+                
                 max_emisi, min_emisi = canteen_df['total_emisi'].max(), canteen_df['total_emisi'].min()
                 colors = []
                 for _, row in canteen_df.iterrows():
@@ -358,13 +403,33 @@ def show():
                     elif ratio < 0.8: colors.append('#f46d43')
                     else: colors.append('#d53e4f')
                 
-                for i, (_, row) in enumerate(canteen_df.iterrows()):
-                    display_name = row['lokasi'] if len(row['lokasi']) <= 12 else row['lokasi'][:10] + '..'
-                    fig_canteen.add_trace(go.Bar(x=[display_name], y=[row['total_emisi']], marker=dict(color=colors[i], line=dict(color='white', width=1.5), opacity=0.85), showlegend=False, text=[f"{row['total_emisi']:.1f}"], textposition='outside', textfont=dict(size=10, color='#2d3748', weight='bold'), hovertemplate=f'<b>{row["lokasi"]}</b><br>Total Emisi: {row["total_emisi"]:.2f} kg CO₂<br>Rata-rata: {row["avg_emisi"]:.2f} kg CO₂<br>Aktivitas: {row["activity_count"]}<extra></extra>', name=row['lokasi']))
+                display_names = canteen_df['lokasi'].apply(lambda x: CANTEEN_DISPLAY_NAMES.get(x, x)) # Apply display name mapping first
+                display_names = display_names.apply(lambda x: x if len(x) <= 12 else x[:10] + '..') # Then apply truncation fallback
+                
+                custom_data = canteen_df[['avg_emisi', 'activity_count', 'lokasi']].values
+                
+                fig_canteen.add_trace(go.Bar(
+                    x=display_names,
+                    y=canteen_df['total_emisi'],
+                    marker=dict(color=colors, line=dict(color='white', width=1.5), opacity=0.85),
+                    showlegend=False, 
+                    text=[f"{val:.1f}" for val in canteen_df['total_emisi']], 
+                    textposition='outside', 
+                    textfont=dict(size=10, color='#2d3748', weight='bold'),
+                    hovertemplate='<b>%{customdata[2]}</b><br>Total Emisi: %{y:.2f} kg CO₂<br>Rata-rata: %{customdata[0]:.2f} kg CO₂<br>Aktivitas: %{customdata[1]}<extra></extra>',
+                    customdata=custom_data 
+                ))
                 
                 avg_emisi_canteen = canteen_df['total_emisi'].mean()
                 fig_canteen.add_hline(y=avg_emisi_canteen, line_dash="dash", line_color="#5e4fa2", line_width=2, annotation_text=f"Rata-rata: {avg_emisi_canteen:.1f}")
-                fig_canteen.update_layout(height=270, margin=dict(t=30, b=0, l=0, r=0), title=dict(text="<b>Emisi per Kantin</b>", x=0.45, y=0.95, font=dict(size=12)), yaxis_title="Total Emisi (kg CO2)")
+                
+                fig_canteen.update_layout(
+                    height=270, 
+                    margin=dict(t=30, b=0, l=0, r=0), 
+                    title=dict(text="<b>Emisi per Kantin</b>", x=0.45, y=0.95, font=dict(size=12)), 
+                    yaxis_title="Total Emisi (kg CO2)",
+                    xaxis=dict(tickangle=-45) 
+                )
                 st.plotly_chart(fig_canteen, config=MODEBAR_CONFIG, use_container_width=True)
             else:
                 st.info("Tidak ada data kantin untuk filter ini.")
