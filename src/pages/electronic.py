@@ -8,6 +8,8 @@ import numpy as np
 from src.components.loading import loading, loading_decorator
 import time
 from src.utils.db_connector import run_sql
+from io import BytesIO
+from xhtml2pdf import pisa
 
 # =============================================================================
 # KONFIGURASI DAN PALET WARNA
@@ -144,10 +146,6 @@ def get_classroom_data(where_aktivitas, join_needed, selected_devices):
     else: df['avg_emisi_per_session'] = 0
     return df
 
-# =============================================================================
-# FUNGSI LAPORAN PDF (HTML) - DIPERBARUI DENGAN INSIGHT DINAMIS
-# =============================================================================
-
 @st.cache_data(ttl=3600)
 @loading_decorator()
 def generate_pdf_report(where_elektronik, where_aktivitas, join_needed, selected_days, selected_devices):
@@ -165,25 +163,30 @@ def generate_pdf_report(where_elektronik, where_aktivitas, join_needed, selected
     df_devices_filtered = df_devices_raw[df_devices_raw['device'].isin(selected_devices)] if selected_devices else df_devices_raw
     df_devices = df_devices_filtered[df_devices_filtered['emisi'].notna() & (df_devices_filtered['emisi'] > 0)]
 
-    if df_devices.empty or df_devices['emisi'].sum() == 0:
-        return "<html><body><h1>Tidak ada data untuk dilaporkan</h1><p>Silakan sesuaikan filter Anda dan coba lagi.</p></body></html>"
-
-    # --- Bagian Kalkulasi Metrik ---
-    total_emisi = df_devices['emisi'].sum()
+    # Inisialisasi metrik utama dan default HTML untuk tabel/kesimpulan
+    total_emisi = df_devices['emisi'].sum() if not df_devices.empty else 0
     avg_emisi = 0
     try:
-        total_responden_unique = run_sql("SELECT COUNT(DISTINCT id_responden) as count FROM v_informasi_responden_dengan_fakultas")['count'].iloc[0]
-        if total_responden_unique > 0:
-            avg_emisi = total_emisi / total_responden_unique
+        total_responden_unique_df = run_sql("SELECT COUNT(DISTINCT id_responden) as count FROM v_informasi_responden_dengan_fakultas")
+        if not total_responden_unique_df.empty and 'count' in total_responden_unique_df.columns:
+            total_responden_unique = total_responden_unique_df['count'].iloc[0]
+            if total_responden_unique > 0:
+                avg_emisi = total_emisi / total_responden_unique
+        else:
+            total_responden_unique = 0
     except (IndexError, KeyError):
         total_responden_unique = 0
 
-    # --- Default Text ---
-    daily_trend_table_html, trend_conclusion, trend_recommendation = ("<tr><td colspan='2'>N/A</td></tr>", "Pola emisi harian tidak dapat diidentifikasi.", "Data tidak cukup untuk analisis tren.")
-    fakultas_table_html, fakultas_conclusion, fakultas_recommendation = ("<tr><td colspan='3'>N/A</td></tr>", "Profil emisi per fakultas tidak dapat dibuat.", "Data tidak cukup untuk analisis fakultas.")
-    device_table_html, device_conclusion, device_recommendation = ("<tr><td colspan='3'>N/A</td></tr>", "Proporsi emisi perangkat tidak dapat dianalisis.", "Data tidak cukup untuk analisis perangkat.")
-    heatmap_header_html, heatmap_body_html, heatmap_conclusion, heatmap_recommendation = ("<tr><th>-</th></tr>", "<tr><td>N/A</td></tr>", "Pola penggunaan fasilitas tidak teridentifikasi.", "Data tidak cukup untuk analisis heatmap.")
-    location_table_html, location_conclusion, location_recommendation = ("<tr><td colspan='3'>N/A</td></tr>", "Lokasi dengan konsumsi energi tertinggi tidak dapat ditentukan.", "Data tidak cukup untuk analisis lokasi.")
+    # Fallback HTML jika tidak ada data sama sekali
+    if df_devices.empty or df_devices['emisi'].sum() == 0:
+        return b"<html><body><h1>Tidak ada data untuk dilaporkan</h1><p>Silakan sesuaikan filter Anda dan coba lagi.</p></body></html>"
+
+    # --- Default Text & HTML for Sections ---
+    daily_trend_table_html, trend_conclusion, trend_recommendation = ("<tr><td colspan='2'>Data tidak tersedia.</td></tr>", "Pola emisi harian tidak dapat diidentifikasi.", "Data tidak cukup untuk analisis tren.")
+    fakultas_table_html, fakultas_conclusion, fakultas_recommendation = ("<tr><td colspan='3'>Data tidak tersedia.</td></tr>", "Profil emisi per fakultas tidak dapat dibuat.", "Data tidak cukup untuk analisis fakultas.")
+    device_table_html, device_conclusion, device_recommendation = ("<tr><td colspan='3'>Data tidak tersedia.</td></tr>", "Proporsi emisi perangkat tidak dapat dianalisis.", "Data tidak cukup untuk analisis perangkat.")
+    heatmap_header_html, heatmap_body_html, heatmap_conclusion, heatmap_recommendation = ("<tr><th>-</th></tr>", "<tr><td>Data tidak tersedia.</td></tr>", "Pola penggunaan fasilitas tidak teridentifikasi.", "Data tidak cukup untuk analisis heatmap.")
+    location_table_html, location_conclusion, location_recommendation = ("<tr><td colspan='3'>Data tidak tersedia.</td></tr>", "Lokasi dengan konsumsi energi tertinggi tidak dapat ditentukan.", "Data tidak cukup untuk analisis lokasi.")
 
     # --- Pembuatan Insight Dinamis ---
     
@@ -198,7 +201,7 @@ def generate_pdf_report(where_elektronik, where_aktivitas, join_needed, selected
             peak_day = daily_df_sorted.loc[daily_df_sorted['total_emisi'].idxmax()]
             low_day = daily_df_sorted.loc[daily_df_sorted['total_emisi'].idxmin()]
             if low_day['total_emisi'] > 0 and (peak_day['total_emisi'] / low_day['total_emisi']) > 1.5:
-                trend_conclusion = f"Terdapat variasi signifikan dalam penggunaan energi harian, dengan puncak emisi terjadi pada hari <strong>{peak_day['hari']}</strong> ({peak_day['total_emisi']:.1f} kg CO₂) dan titik terendah pada hari <strong>{low_day['hari']}</strong> ({low_day['total_emisi']:.1f} kg CO₂)."
+                trend_conclusion = f"Terdapat variasi signifikan dalam penggunaan energi harian, dengan puncak emisi terjadi pada hari <strong>{peak_day['hari']}</strong> ({peak_day['total_emisi']:.1f} kg CO<sub>2</sub>) dan titik terendah pada hari <strong>{low_day['hari']}</strong> ({low_day['total_emisi']:.1f} kg CO<sub>2</sub>)."
                 trend_recommendation = f"Fokuskan program efisiensi dan kampanye kesadaran pada hari <strong>{peak_day['hari']}</strong> untuk mendapatkan dampak maksimal. Analisis aktivitas spesifik pada hari tersebut dapat memberikan petunjuk lebih lanjut."
             else:
                 trend_conclusion = "Penggunaan energi cenderung konsisten sepanjang hari-hari yang dipilih, tanpa adanya lonjakan yang ekstrem."
@@ -206,37 +209,37 @@ def generate_pdf_report(where_elektronik, where_aktivitas, join_needed, selected
         elif len(daily_df_sorted) == 1:
             day_name = daily_df_sorted.iloc[0]['hari']
             day_emisi = daily_df_sorted.iloc[0]['total_emisi']
-            trend_conclusion = f"Data hanya tersedia untuk hari <strong>{day_name}</strong>, dengan total emisi tercatat sebesar {day_emisi:.1f} kg CO₂."
+            trend_conclusion = f"Data hanya tersedia untuk hari <strong>{day_name}</strong>, dengan total emisi tercatat sebesar {day_emisi:.1f} kg CO<sub>2</sub>."
             trend_recommendation = "Untuk melihat tren, perluas rentang hari pada filter. Analisis untuk hari ini dapat difokuskan pada komposisi perangkat dan lokasi."
 
     # 2. Emisi per Fakultas
     if not df_faculty.empty and df_faculty['total_emisi'].sum() > 0:
-        fakultas_stats = df_faculty.sort_values('total_emisi', ascending=False)
-        fakultas_table_html = "".join([f"<tr><td>{row['fakultas']}</td><td style='text-align:right;'>{row['total_emisi']:.2f}</td><td style='text-align:center;'>{int(row.get('total_count', 0))}</td></tr>" for _, row in fakultas_stats.head(10).iterrows()])
+        fakultas_stats_sorted = df_faculty.sort_values('total_emisi', ascending=False)
+        fakultas_table_html = "".join([f"<tr><td>{row['fakultas']}</td><td style='text-align:right;'>{row['total_emisi']:.2f}</td><td style='text-align:center;'>{int(row.get('total_count', 0))}</td></tr>" for _, row in fakultas_stats_sorted.head(10).iterrows()])
         
-        if len(fakultas_stats) > 1:
-            highest_fakultas = fakultas_stats.iloc[0]
-            avg_emisi_fak = fakultas_stats['total_emisi'].mean()
-            percent_above_avg = ((highest_fakultas['total_emisi'] / avg_emisi_fak) - 1) * 100
-            fakultas_conclusion = f"Fakultas <strong>{highest_fakultas['fakultas']}</strong> menunjukkan kontribusi emisi tertinggi, yaitu sebesar {highest_fakultas['total_emisi']:.1f} kg CO₂, atau sekitar <strong>{percent_above_avg:.0f}% di atas rata-rata</strong> emisi per fakultas."
+        if len(fakultas_stats_sorted) > 1:
+            highest_fakultas = fakultas_stats_sorted.iloc[0]
+            avg_emisi_fak = fakultas_stats_sorted['total_emisi'].mean()
+            percent_above_avg = ((highest_fakultas['total_emisi'] / avg_emisi_fak) - 1) * 100 if avg_emisi_fak > 0 else 0
+            fakultas_conclusion = f"Fakultas <strong>{highest_fakultas['fakultas']}</strong> menunjukkan kontribusi emisi tertinggi, yaitu sebesar {highest_fakultas['total_emisi']:.1f} kg CO<sub>2</sub>, atau sekitar <strong>{percent_above_avg:.0f}% di atas rata-rata</strong> emisi per fakultas."
             fakultas_recommendation = f"Data ini mengindikasikan bahwa intervensi yang ditargetkan pada Fakultas <strong>{highest_fakultas['fakultas']}</strong> kemungkinan akan memberikan dampak terbesar. Pertimbangkan untuk menganalisis komposisi perangkat yang digunakan atau melakukan audit energi sederhana di gedung-gedung utama fakultas tersebut."
         else:
-            fakultas_conclusion = f"Data hanya mencakup Fakultas <strong>{fakultas_stats.iloc[0]['fakultas']}</strong>."
+            fakultas_conclusion = f"Data hanya mencakup Fakultas <strong>{fakultas_stats_sorted.iloc[0]['fakultas']}</strong>."
             fakultas_recommendation = "Perluas filter untuk membandingkan dengan fakultas lain."
 
     # 3. Proporsi Perangkat
-    if not df_devices.empty:
-        df_devices = df_devices.sort_values('emisi', ascending=False)
-        total_device_emission = df_devices['emisi'].sum()
-        device_table_html = "".join([f"<tr><td>{row['device']}</td><td style='text-align:right;'>{row['emisi']:.2f}</td><td style='text-align:right;'>{(row['emisi']/total_device_emission*100 if total_device_emission > 0 else 0):.1f}%</td></tr>" for _, row in df_devices.iterrows()])
+    if not df_devices.empty and df_devices['emisi'].sum() > 0:
+        df_devices_sorted = df_devices.sort_values('emisi', ascending=False)
+        total_device_emission = df_devices_sorted['emisi'].sum()
+        device_table_html = "".join([f"<tr><td>{row['device']}</td><td style='text-align:right;'>{row['emisi']:.2f}</td><td style='text-align:right;'>{(row['emisi']/total_device_emission*100 if total_device_emission > 0 else 0):.1f}%</td></tr>" for _, row in df_devices_sorted.iterrows()])
         
-        dominant_device = df_devices.iloc[0]
+        dominant_device = df_devices_sorted.iloc[0]
         dominant_percentage = (dominant_device['emisi'] / total_device_emission) * 100
         
         if dominant_percentage > 50:
             device_conclusion = f"<strong>{dominant_device['device']}</strong> adalah kontributor utama yang dominan, menyumbang <strong>{dominant_percentage:.0f}%</strong> dari total emisi perangkat yang dipilih."
-        elif len(df_devices) > 1:
-            second_device = df_devices.iloc[1]
+        elif len(df_devices_sorted) > 1:
+            second_device = df_devices_sorted.iloc[1]
             device_conclusion = f"Emisi terbagi antara beberapa perangkat, dengan <strong>{dominant_device['device']}</strong> sebagai yang tertinggi, diikuti oleh <strong>{second_device['device']}</strong>."
         else:
             device_conclusion = f"Seluruh emisi berasal dari <strong>{dominant_device['device']}</strong> berdasarkan filter saat ini."
@@ -254,11 +257,12 @@ def generate_pdf_report(where_elektronik, where_aktivitas, join_needed, selected
             pivot_df = pivot_df[sorted_columns]
         except (ValueError, IndexError): pass
         pivot_df = pivot_df.reindex(index=DAY_ORDER, fill_value=0).dropna(how='all')
-        if selected_days: pivot_df = pivot_df.loc[selected_days]
+        if selected_days: pivot_df = pivot_df.loc[selected_days] # Filter by selected days
+        
         if not pivot_df.empty and pivot_df.sum().sum() > 0:
             peak_usage_idx = pivot_df.stack().idxmax()
             peak_day, peak_time = peak_usage_idx[0], peak_usage_idx[1]
-            heatmap_header_html = "<tr><th>Hari</th>" + "".join([f"<th>{time}</th>" for time in pivot_df.columns]) + "</tr>"
+            heatmap_header_html = "<tr><th>Hari</th>" + "".join([f"<th>{time_slot}</th>" for time_slot in pivot_df.columns]) + "</tr>"
             body_rows_list = [f"<tr><td><strong>{day}</strong></td>" + "".join([f"<td style='text-align:center;'>{val:.2f}</td>" for val in row]) + "</tr>" for day, row in pivot_df.iterrows()]
             heatmap_body_html = "".join(body_rows_list)
             heatmap_conclusion = f"Puncak penggunaan fasilitas teridentifikasi pada hari <strong>{peak_day}</strong> di sekitar jam <strong>{peak_time}</strong>. Ini menunjukkan waktu paling intensif energi untuk AC dan/atau Lampu."
@@ -266,17 +270,50 @@ def generate_pdf_report(where_elektronik, where_aktivitas, join_needed, selected
 
     # 5. Lokasi Kelas
     if not df_classrooms.empty and df_classrooms['total_emisi'].sum() > 0:
-        location_stats = df_classrooms.sort_values('total_emisi', ascending=False)
-        location_table_html = "".join([f"<tr><td>{row['lokasi']}</td><td style='text-align:center;'>{int(row['session_count'])}</td><td style='text-align:right;'>{row['total_emisi']:.1f}</td></tr>" for _, row in location_stats.head(10).iterrows()])
-        highest_emission_loc = location_stats.iloc[0]
-        location_conclusion = f"Gedung/Ruang <strong>{highest_emission_loc['lokasi']}</strong> tercatat sebagai lokasi dengan konsumsi energi tertinggi untuk kegiatan kelas, dengan total emisi <strong>{highest_emission_loc['total_emisi']:.1f} kg CO₂</strong> dari {highest_emission_loc['session_count']} sesi."
+        location_stats_sorted = df_classrooms.sort_values('total_emisi', ascending=False)
+        location_table_html = "".join([f"<tr><td>{row['lokasi']}</td><td style='text-align:center;'>{int(row['session_count'])}</td><td style='text-align:right;'>{row['total_emisi']:.1f}</td></tr>" for _, row in location_stats_sorted.head(10).iterrows()])
+        highest_emission_loc = location_stats_sorted.iloc[0]
+        location_conclusion = f"Gedung/Ruang <strong>{highest_emission_loc['lokasi']}</strong> tercatat sebagai lokasi dengan konsumsi energi tertinggi untuk kegiatan kelas, dengan total emisi <strong>{highest_emission_loc['total_emisi']:.1f} kg CO<sub>2</sub></strong> dari {highest_emission_loc['session_count']} sesi."
         location_recommendation = f"Lokasi ini adalah kandidat utama untuk proyek percontohan efisiensi energi. Audit sederhana pada perangkat AC dan sistem pencahayaan di <strong>{highest_emission_loc['lokasi']}</strong> dapat memberikan insight cepat untuk potensi penghematan."
 
     # --- Penggabungan HTML Final ---
     html_content = f"""
-    <!DOCTYPE html><html><head><title>Laporan Emisi Elektronik</title><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet"><style>body{{font-family:'Poppins',sans-serif;color:#333;line-height:1.6;font-size:11px}}.page{{padding:25px;max-width:800px;margin:auto}}.header{{text-align:center;border-bottom:2px solid #059669;padding-bottom:15px;margin-bottom:25px}}h1{{color:#059669;margin:0}}h2{{color:#065f46;border-bottom:1px solid #d1fae5;padding-bottom:8px;margin-top:30px;margin-bottom:15px}}.grid{{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:25px}}.card{{background:#f8f9fa;padding:15px;border-radius:8px;text-align:center}}.card.primary{{border-left:4px solid #10b981}}.card.primary strong{{color:#059669}}.card.secondary{{border-left:4px solid #3b82f6}}.card.secondary strong{{color:#3b82f6}}.card strong{{font-size:1.5em;display:block}}.conclusion,.recommendation{{padding:12px 15px;margin-top:10px;border-radius:6px}}.conclusion{{background:#f0fdf4;border-left:4px solid #10b981}}.recommendation{{background:#fffbeb;border-left:4px solid #f59e0b}}table{{width:100%;border-collapse:collapse;margin-top:15px}}th,td{{padding:8px;text-align:left;border:1px solid #e5e7eb}}th{{background-color:#f3f4f6;font-weight:600;text-align:center}}td:first-child{{font-weight:500}}</style></head><body><div class="page"><div class="header"><h1>Laporan Emisi Elektronik</h1><p>Institut Teknologi Bandung | Dibuat pada: {datetime.now().strftime('%d %B %Y')}</p></div><div class="grid"><div class="card primary"><strong>{total_emisi:.1f} kg CO₂</strong>Total Emisi (sesuai filter)</div><div class="card secondary"><strong>{avg_emisi:.2f} kg CO₂</strong>Rata-rata/Total Mahasiswa</div></div><h2>1. Tren Emisi Harian</h2><table><thead><tr><th>Hari</th><th>Total Emisi (kg CO₂)</th></tr></thead><tbody>{daily_trend_table_html}</tbody></table><div class="conclusion"><strong>Insight:</strong> {trend_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {trend_recommendation}</div><h2>2. Emisi per Fakultas</h2><table><thead><tr><th>Fakultas</th><th>Total Emisi (kg CO₂)</th><th>Jumlah Responden</th></tr></thead><tbody>{fakultas_table_html}</tbody></table><div class="conclusion"><strong>Insight:</strong> {fakultas_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {fakultas_recommendation}</div><h2>3. Proporsi Emisi per Perangkat</h2><table><thead><tr><th>Perangkat</th><th>Total Emisi (kg CO₂)</th><th>Persentase</th></tr></thead><tbody>{device_table_html}</tbody></table><div class="conclusion"><strong>Insight:</strong> {device_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {device_recommendation}</div><h2>4. Pola Penggunaan Fasilitas Kampus</h2><table><thead>{heatmap_header_html}</thead><tbody>{heatmap_body_html}</tbody></table><div class="conclusion"><strong>Insight:</strong> {heatmap_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {heatmap_recommendation}</div><h2>5. Lokasi Kelas Paling Intensif Energi</h2><table><thead><tr><th>Gedung</th><th>Jumlah Sesi</th><th>Total Emisi (kg CO₂)</th></tr></thead><tbody>{location_table_html}</tbody></table><div class="conclusion"><strong>Insight:</strong> {location_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {location_recommendation}</div></div></body></html>
+    <!DOCTYPE html><html><head><title>Laporan Emisi Elektronik</title><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet"><style>
+        body {{ font-family: 'Poppins', sans-serif; color: #333; line-height: 1.6; font-size: 11px; }}
+        .page {{ padding: 25px; max-width: 800px; margin: auto; }}
+        .header {{ text-align: center; border-bottom: 2px solid #059669; padding-bottom: 15px; margin-bottom: 25px; }}
+        h1 {{ color: #059669; margin: 0; }} h2 {{ color: #065f46; border-bottom: 1px solid #d1fae5; padding-bottom: 8px; margin-top: 30px; margin-bottom: 15px;}}
+        .grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 25px; }}
+        .card {{ background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; }}
+        .card.primary {{ border-left: 4px solid #10b981; }} .card.primary strong {{ color: #059669; }}
+        .card.secondary {{ border-left: 4px solid #3b82f6; }} .card.secondary strong {{ color: #3b82f6; }}
+        .card strong {{ font-size: 1.5em; display: block; }}
+        .conclusion, .recommendation {{ padding: 12px 15px; margin-top: 10px; border-radius: 6px; }}
+        .conclusion {{ background: #f0fdf4; border-left: 4px solid #10b981; }}
+        .recommendation {{ background: #fffbeb; border-left: 4px solid #f59e0b; }}
+        ul {{ padding-left: 20px; margin-top: 8px; margin-bottom: 0; }} li {{ margin-bottom: 5px; }}
+        table {{ width: 100%; border-collapse: collapse; margin-top: 15px; }} th, td {{ padding: 8px; text-align: left; border: 1px solid #e5e7eb; }}
+        th {{ background-color: #f3f4f6; font-weight: 600; text-align: center; }}
+        td:first-child {{ font-weight: 500; }}
+    </style></head><body><div class="page"><div class="header"><h1>Laporan Emisi Elektronik</h1><p>Institut Teknologi Bandung | Dibuat pada: {datetime.now().strftime('%d %B %Y')}</p></div><div class="grid"><div class="card primary"><strong>{total_emisi:.1f} kg CO<sub>2</sub></strong>Total Emisi (sesuai filter)</div><div class="card secondary"><strong>{avg_emisi:.2f} kg CO<sub>2</sub></strong>Rata-rata/Total Mahasiswa</div></div><h2>1. Tren Emisi Harian</h2><table><thead><tr><th>Hari</th><th>Total Emisi (kg CO<sub>2</sub>)</th></tr></thead><tbody>{daily_trend_table_html}</tbody></table><div class="conclusion"><strong>Insight:</strong> {trend_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {trend_recommendation}</div><h2>2. Emisi per Fakultas</h2><table><thead><tr><th>Fakultas</th><th>Total Emisi (kg CO<sub>2</sub>)</th><th>Jumlah Responden</th></tr></thead><tbody>{fakultas_table_html}</tbody></table><div class="conclusion"><strong>Insight:</strong> {fakultas_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {fakultas_recommendation}</div><h2>3. Proporsi Emisi per Perangkat</h2><table><thead><tr><th>Perangkat</th><th>Total Emisi (kg CO<sub>2</sub>)</th><th>Persentase</th></tr></thead><tbody>{device_table_html}</tbody></table><div class="conclusion"><strong>Insight:</strong> {device_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {device_recommendation}</div><h2>4. Pola Penggunaan Fasilitas Kampus</h2><table><thead>{heatmap_header_html}</thead><tbody>{heatmap_body_html}</tbody></table><div class="conclusion"><strong>Insight:</strong> {heatmap_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {heatmap_recommendation}</div><h2>5. Lokasi Kelas Paling Intensif Energi</h2><table><thead><tr><th>Gedung</th><th>Jumlah Sesi</th><th>Total Emisi (kg CO<sub>2</sub>)</th></tr></thead><tbody>{location_table_html}</tbody></table><div class="conclusion"><strong>Insight:</strong> {location_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {location_recommendation}</div></div></body></html>
     """
-    return html_content
+    
+    # --- BAGIAN KONVERSI KE PDF ---
+    pdf_buffer = BytesIO()
+
+    pisa_status = pisa.CreatePDF(
+        src=html_content,    # String HTML Anda
+        dest=pdf_buffer)     # Tujuan output adalah buffer bytes
+
+    if pisa_status.err:
+        st.error(f"Error during PDF conversion: {pisa_status.err}. Check HTML format or xhtml2pdf installation.")
+        return None # Mengembalikan None jika ada error
+
+    pdf_bytes = pdf_buffer.getvalue()
+    pdf_buffer.close()
+
+    # Mengembalikan bytes PDF
+    return pdf_bytes
 
 
 # =============================================================================
@@ -311,14 +348,19 @@ def show():
         st.download_button("Raw Data", "Fitur dinonaktifkan.", "raw_data.csv", disabled=True, use_container_width=True)
     with export_col2:
         try:
-            st.download_button(
-                label="Laporan",
-                data=generate_pdf_report(where_elektronik, where_aktivitas, join_needed, selected_days, selected_devices),
-                file_name=f"electronic_report_{pd.Timestamp.now().strftime('%Y%m%d')}.html",
-                mime="text/html",
-                use_container_width=True,
-                key="electronic_export_pdf"
-            )
+            pdf_data = generate_pdf_report(where_elektronik, where_aktivitas, join_needed, selected_days, selected_devices)
+            
+            if pdf_data: 
+                st.download_button(
+                    label="Laporan",
+                    data=pdf_data,
+                    file_name=f"electronic_report_{pd.Timestamp.now().strftime('%Y%m%d')}.pdf", # Ubah ekstensi menjadi .pdf
+                    mime="application/pdf", 
+                    use_container_width=True,
+                    key="electronic_export_pdf"
+                )
+            else: 
+                st.error("Gagal menyiapkan laporan PDF.")
         except Exception as e:
             st.error(f"Gagal membuat laporan: {e}")
 
