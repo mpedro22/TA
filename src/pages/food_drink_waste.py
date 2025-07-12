@@ -67,7 +67,7 @@ def build_food_where_clause(selected_days, selected_periods, selected_fakultas):
 def get_daily_trend_data(where_clause, join_needed):
     join_sql = "JOIN v_informasi_responden_dengan_fakultas r ON m.id_responden = r.id_responden" if join_needed else ""
     query = f"""
-    SELECT m.hari, SUM(m.emisi_makanminum) as total_emisi, COUNT(m.id_responden) as activity_count
+    SELECT m.hari, SUM(m.emisi_sampah_makanan_per_waktu) as total_emisi, COUNT(m.id_responden) as activity_count
     FROM v_aktivitas_makanan m {join_sql} {where_clause}
     GROUP BY m.hari
     """
@@ -76,7 +76,7 @@ def get_daily_trend_data(where_clause, join_needed):
 @st.cache_data(ttl=3600)
 def get_faculty_data(where_clause):
     query = f"""
-    SELECT r.fakultas, SUM(m.emisi_makanminum) as total_emisi, COUNT(m.id_responden) as activity_count
+    SELECT r.fakultas, SUM(m.emisi_sampah_makanan_per_waktu) as total_emisi, COUNT(m.id_responden) as activity_count
     FROM v_aktivitas_makanan m
     JOIN v_informasi_responden_dengan_fakultas r ON m.id_responden = r.id_responden
     {where_clause}
@@ -89,7 +89,7 @@ def get_faculty_data(where_clause):
 def get_period_data(where_clause, join_needed):
     join_sql = "JOIN v_informasi_responden_dengan_fakultas r ON m.id_responden = r.id_responden" if join_needed else ""
     query = f"""
-    SELECT m.meal_period, COUNT(m.id_responden) as activity_count, SUM(m.emisi_makanminum) as total_emisi
+    SELECT m.meal_period, COUNT(m.id_responden) as activity_count, SUM(m.emisi_sampah_makanan_per_waktu) as total_emisi
     FROM v_aktivitas_makanan m {join_sql} {where_clause}
     GROUP BY m.meal_period
     """
@@ -107,7 +107,7 @@ def get_heatmap_data(where_clause, join_needed):
     final_where_clause = f"{where_clause} AND {location_filter}" if where_clause else f"WHERE {location_filter}"
 
     query = f"""
-    SELECT m.lokasi, m.time_slot, SUM(m.emisi_makanminum) as total_emisi
+    SELECT m.lokasi, m.time_slot, SUM(m.emisi_sampah_makanan_per_waktu) as total_emisi
     FROM v_aktivitas_makanan m {join_sql} {final_where_clause}
     GROUP BY m.lokasi, m.time_slot
     """
@@ -125,7 +125,7 @@ def get_canteen_data(where_clause, join_needed):
     final_where_clause = f"{where_clause} AND {location_filter}" if where_clause else f"WHERE {location_filter}"
 
     query = f"""
-    SELECT m.lokasi, SUM(m.emisi_makanminum) as total_emisi, AVG(m.emisi_makanminum) as avg_emisi, COUNT(m.id_responden) as activity_count
+    SELECT m.lokasi, SUM(m.emisi_sampah_makanan_per_waktu) as total_emisi, AVG(m.emisi_sampah_makanan_per_waktu) as avg_emisi, COUNT(m.id_responden) as activity_count
     FROM v_aktivitas_makanan m {join_sql} {final_where_clause}
     GROUP BY m.lokasi
     ORDER BY total_emisi DESC
@@ -441,7 +441,7 @@ def show():
                 center_text = f"<b style='font-size:14px'>{total_emisi_chart:.1f}</b><br><span style='font-size:8px'>kg CO₂</span>"
                 
                 fig_period.add_annotation(text=center_text, x=0.5, y=0.5, font_size=10, showarrow=False)
-                fig_period.update_layout(height=270, margin=dict(t=30, b=5, l=5, r=5), showlegend=False, title=dict(text="<b>Distribusi Periode Waktu</b>", x=0.33, y=0.95, font=dict(size=12)))
+                fig_period.update_layout(height=270, margin=dict(t=30, b=35, l=5, r=5), showlegend=False, title=dict(text="<b>Distribusi Periode Waktu</b>", x=0.33, y=0.95, font=dict(size=12)))
                 st.plotly_chart(fig_period, config=MODEBAR_CONFIG, use_container_width=True)
             else:
                 st.info("Tidak ada data periode untuk filter ini.")
@@ -512,8 +512,8 @@ def show():
                     elif ratio < 0.8: colors.append('#f46d43')
                     else: colors.append('#d53e4f')
                 
-                display_names = canteen_df['lokasi'].apply(lambda x: CANTEEN_DISPLAY_NAMES.get(x, x)) # Apply display name mapping first
-                display_names = display_names.apply(lambda x: x if len(x) <= 12 else x[:10] + '..') # Then apply truncation fallback
+                display_names = canteen_df['lokasi'].apply(lambda x: CANTEEN_DISPLAY_NAMES.get(x, x)) 
+                display_names = display_names.apply(lambda x: x if len(x) <= 12 else x[:12] + '..') 
                 
                 custom_data = canteen_df[['avg_emisi', 'activity_count', 'lokasi']].values
                 
@@ -523,7 +523,7 @@ def show():
                     marker=dict(color=colors, line=dict(color='white', width=1.5), opacity=0.85),
                     showlegend=False, 
                     text=[f"{val:.1f}" for val in canteen_df['total_emisi']], 
-                    textposition='outside', 
+                    textposition='inside', 
                     textfont=dict(size=10, color='#2d3748', weight='bold'),
                     hovertemplate='<b>%{customdata[2]}</b><br>Total Emisi: %{y:.2f} kg CO₂<br>Rata-rata: %{customdata[0]:.2f} kg CO₂<br>Aktivitas: %{customdata[1]}<extra></extra>',
                     customdata=custom_data 

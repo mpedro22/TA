@@ -82,9 +82,9 @@ def get_aggregated_daily_data():
             ah.id_responden,
             ah.hari,
             'sampah' AS kategori,
-            ah.emisi_makanminum AS emisi
+            ah.emisi_sampah_makanan_per_waktu AS emisi
         FROM aktivitas_harian ah
-        WHERE ah.emisi_makanminum > 0
+        WHERE ah.emisi_sampah_makanan_per_waktu > 0
           AND ah.hari IS NOT NULL
           AND ah.hari <> ''
           AND TRIM(LOWER(ah.kegiatan)) = 'makan/minum'
