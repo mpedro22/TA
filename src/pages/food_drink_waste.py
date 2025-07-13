@@ -65,9 +65,9 @@ def build_food_where_clause(selected_days, selected_periods, selected_fakultas):
 
 @st.cache_data(ttl=3600)
 def get_daily_trend_data(where_clause, join_needed):
-    join_sql = "JOIN v_informasi_responden_dengan_fakultas r ON m.id_responden = r.id_responden" if join_needed else ""
+    join_sql = "JOIN v_informasi_fakultas_mahasiswa r ON m.id_mahasiswa = r.id_mahasiswa" if join_needed else ""
     query = f"""
-    SELECT m.hari, SUM(m.emisi_sampah_makanan_per_waktu) as total_emisi, COUNT(m.id_responden) as activity_count
+    SELECT m.hari, SUM(m.emisi_sampah_makanan_per_waktu) as total_emisi, COUNT(m.id_mahasiswa) as activity_count
     FROM v_aktivitas_makanan m {join_sql} {where_clause}
     GROUP BY m.hari
     """
@@ -76,9 +76,9 @@ def get_daily_trend_data(where_clause, join_needed):
 @st.cache_data(ttl=3600)
 def get_faculty_data(where_clause):
     query = f"""
-    SELECT r.fakultas, SUM(m.emisi_sampah_makanan_per_waktu) as total_emisi, COUNT(m.id_responden) as activity_count
+    SELECT r.fakultas, SUM(m.emisi_sampah_makanan_per_waktu) as total_emisi, COUNT(m.id_mahasiswa) as activity_count
     FROM v_aktivitas_makanan m
-    JOIN v_informasi_responden_dengan_fakultas r ON m.id_responden = r.id_responden
+    JOIN v_informasi_fakultas_mahasiswa r ON m.id_mahasiswa = r.id_mahasiswa
     {where_clause}
     GROUP BY r.fakultas
     ORDER BY total_emisi ASC
@@ -87,9 +87,9 @@ def get_faculty_data(where_clause):
 
 @st.cache_data(ttl=3600)
 def get_period_data(where_clause, join_needed):
-    join_sql = "JOIN v_informasi_responden_dengan_fakultas r ON m.id_responden = r.id_responden" if join_needed else ""
+    join_sql = "JOIN v_informasi_fakultas_mahasiswa r ON m.id_mahasiswa = r.id_mahasiswa" if join_needed else ""
     query = f"""
-    SELECT m.meal_period, COUNT(m.id_responden) as activity_count, SUM(m.emisi_sampah_makanan_per_waktu) as total_emisi
+    SELECT m.meal_period, COUNT(m.id_mahasiswa) as activity_count, SUM(m.emisi_sampah_makanan_per_waktu) as total_emisi
     FROM v_aktivitas_makanan m {join_sql} {where_clause}
     GROUP BY m.meal_period
     """
@@ -97,7 +97,7 @@ def get_period_data(where_clause, join_needed):
 
 @st.cache_data(ttl=3600)
 def get_heatmap_data(where_clause, join_needed):
-    join_sql = "JOIN v_informasi_responden_dengan_fakultas r ON m.id_responden = r.id_responden" if join_needed else ""
+    join_sql = "JOIN v_informasi_fakultas_mahasiswa r ON m.id_mahasiswa = r.id_mahasiswa" if join_needed else ""
     
     # PERBAIKAN: Tambahkan filter untuk lokasi kantin resmi
     canteens_str = "','".join(OFFICIAL_CANTEENS)
@@ -115,7 +115,7 @@ def get_heatmap_data(where_clause, join_needed):
 
 @st.cache_data(ttl=3600)
 def get_canteen_data(where_clause, join_needed):
-    join_sql = "JOIN v_informasi_responden_dengan_fakultas r ON m.id_responden = r.id_responden" if join_needed else ""
+    join_sql = "JOIN v_informasi_fakultas_mahasiswa r ON m.id_mahasiswa = r.id_mahasiswa" if join_needed else ""
 
     # PERBAIKAN: Tambahkan filter untuk lokasi kantin resmi
     canteens_str = "','".join(OFFICIAL_CANTEENS)
@@ -125,7 +125,7 @@ def get_canteen_data(where_clause, join_needed):
     final_where_clause = f"{where_clause} AND {location_filter}" if where_clause else f"WHERE {location_filter}"
 
     query = f"""
-    SELECT m.lokasi, SUM(m.emisi_sampah_makanan_per_waktu) as total_emisi, AVG(m.emisi_sampah_makanan_per_waktu) as avg_emisi, COUNT(m.id_responden) as activity_count
+    SELECT m.lokasi, SUM(m.emisi_sampah_makanan_per_waktu) as total_emisi, AVG(m.emisi_sampah_makanan_per_waktu) as avg_emisi, COUNT(m.id_mahasiswa) as activity_count
     FROM v_aktivitas_makanan m {join_sql} {final_where_clause}
     GROUP BY m.lokasi
     ORDER BY total_emisi DESC
@@ -359,7 +359,7 @@ def show():
         selected_periods = st.multiselect("Periode:", options=period_options, placeholder="Pilih Opsi", key='food_period_filter')
     
     with filter_col3:
-        fakultas_df = run_sql("SELECT DISTINCT fakultas FROM v_informasi_responden_dengan_fakultas WHERE fakultas IS NOT NULL AND fakultas <> '' ORDER BY fakultas")
+        fakultas_df = run_sql("SELECT DISTINCT fakultas FROM v_informasi_fakultas_mahasiswa WHERE fakultas IS NOT NULL AND fakultas <> '' ORDER BY fakultas")
         available_fakultas = fakultas_df['fakultas'].tolist() if not fakultas_df.empty else []
         selected_fakultas = st.multiselect("Fakultas:", options=available_fakultas, placeholder="Pilih Opsi", key='food_fakultas_filter')
 

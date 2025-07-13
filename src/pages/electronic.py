@@ -65,8 +65,8 @@ def _get_dynamic_emission_clauses(selected_devices):
 def get_daily_trend_data(where_elektronik, where_aktivitas, join_needed, selected_devices):
     personal_sum, facility_sum, include_personal, include_facility = _get_dynamic_emission_clauses(selected_devices)
     if not include_personal and not include_facility: return pd.DataFrame(columns=['hari', 'total_emisi'])
-    join_elektronik_sql = "JOIN v_informasi_responden_dengan_fakultas r ON t.id_responden = r.id_responden" if join_needed else ""
-    join_aktivitas_sql = "JOIN v_informasi_responden_dengan_fakultas r ON a.id_responden = r.id_responden" if join_needed else ""
+    join_elektronik_sql = "JOIN v_informasi_fakultas_mahasiswa r ON t.id_mahasiswa = r.id_mahasiswa" if join_needed else ""
+    join_aktivitas_sql = "JOIN v_informasi_fakultas_mahasiswa r ON a.id_mahasiswa = r.id_mahasiswa" if join_needed else ""
     personal_cte = f"SELECT TRIM(unnest(string_to_array(t.hari_datang, ','))) AS hari, SUM({personal_sum}) as emisi FROM elektronik t {join_elektronik_sql} {where_elektronik} GROUP BY hari"
     facility_cte = f"SELECT a.hari, SUM({facility_sum}) as emisi FROM aktivitas_harian a {join_aktivitas_sql} {where_aktivitas} GROUP BY a.hari"
     if include_personal and include_facility:
@@ -82,9 +82,9 @@ def get_faculty_data(where_elektronik, where_aktivitas, selected_devices):
     personal_sum, facility_sum, include_personal, include_facility = _get_dynamic_emission_clauses(selected_devices)
     if not include_personal and not include_facility: return pd.DataFrame(columns=['fakultas', 'total_emisi', 'total_count'])
     personal_sum_weekly = f"{personal_sum} * COALESCE(array_length(string_to_array(t.hari_datang, ','), 1), 0)"
-    personal_cte = f"SELECT r.fakultas, SUM({personal_sum_weekly}) as emisi FROM elektronik t JOIN v_informasi_responden_dengan_fakultas r ON t.id_responden = r.id_responden {where_elektronik} GROUP BY r.fakultas"
-    facility_cte = f"SELECT r.fakultas, SUM({facility_sum}) as emisi FROM aktivitas_harian a JOIN v_informasi_responden_dengan_fakultas r ON a.id_responden = r.id_responden {where_aktivitas} GROUP BY r.fakultas"
-    responden_count_cte = "responden_count AS (SELECT fakultas, COUNT(DISTINCT id_responden) as total_count FROM v_informasi_responden_dengan_fakultas GROUP BY fakultas)"
+    personal_cte = f"SELECT r.fakultas, SUM({personal_sum_weekly}) as emisi FROM elektronik t JOIN v_informasi_fakultas_mahasiswa r ON t.id_mahasiswa = r.id_mahasiswa {where_elektronik} GROUP BY r.fakultas"
+    facility_cte = f"SELECT r.fakultas, SUM({facility_sum}) as emisi FROM aktivitas_harian a JOIN v_informasi_fakultas_mahasiswa r ON a.id_mahasiswa = r.id_mahasiswa {where_aktivitas} GROUP BY r.fakultas"
+    responden_count_cte = "responden_count AS (SELECT fakultas, COUNT(DISTINCT id_mahasiswa) as total_count FROM v_informasi_fakultas_mahasiswa GROUP BY fakultas)"
     if include_personal and include_facility:
         query = f"WITH personal_agg AS ({personal_cte}), facility_agg AS ({facility_cte}), {responden_count_cte} SELECT COALESCE(p.fakultas, f.fakultas) as fakultas, (COALESCE(p.emisi, 0) + COALESCE(f.emisi, 0)) as total_emisi, rc.total_count FROM personal_agg p FULL OUTER JOIN facility_agg f ON p.fakultas = f.fakultas JOIN responden_count rc ON rc.fakultas = COALESCE(p.fakultas, f.fakultas) ORDER BY total_emisi ASC"
     elif include_personal:
@@ -94,14 +94,14 @@ def get_faculty_data(where_elektronik, where_aktivitas, selected_devices):
     df = run_sql(query)
     if 'total_emisi' in df.columns and not df.empty and 'total_count' not in df.columns:
         fakultas_list_str = "','".join(df['fakultas'].unique())
-        count_df = run_sql(f"SELECT fakultas, COUNT(DISTINCT id_responden) as total_count FROM v_informasi_responden_dengan_fakultas WHERE fakultas IN ('{fakultas_list_str}') GROUP BY fakultas")
+        count_df = run_sql(f"SELECT fakultas, COUNT(DISTINCT id_mahasiswa) as total_count FROM v_informasi_fakultas_mahasiswa WHERE fakultas IN ('{fakultas_list_str}') GROUP BY fakultas")
         if not count_df.empty: df = pd.merge(df, count_df, on='fakultas', how='left')
     return df
 
 @st.cache_data(ttl=3600)
 def get_device_emissions_data(where_elektronik, where_aktivitas, join_needed):
-    join_elektronik_sql = "JOIN v_informasi_responden_dengan_fakultas r ON t.id_responden = r.id_responden" if join_needed else ""
-    join_aktivitas_sql = "JOIN v_informasi_responden_dengan_fakultas r ON a.id_responden = r.id_responden" if join_needed else ""
+    join_elektronik_sql = "JOIN v_informasi_fakultas_mahasiswa r ON t.id_mahasiswa = r.id_mahasiswa" if join_needed else ""
+    join_aktivitas_sql = "JOIN v_informasi_fakultas_mahasiswa r ON a.id_mahasiswa = r.id_mahasiswa" if join_needed else ""
     query = f"""
     WITH personal_devices AS (
         SELECT 'Laptop' as device, SUM((t.durasi_laptop * 50 * 0.829 / 1000) * COALESCE(array_length(string_to_array(t.hari_datang, ','), 1), 0)) as emisi FROM elektronik t {join_elektronik_sql} {where_elektronik} UNION ALL
@@ -119,7 +119,7 @@ def get_device_emissions_data(where_elektronik, where_aktivitas, join_needed):
 def get_heatmap_data(where_aktivitas, join_needed, selected_devices):
     _, facility_sum, _, include_facility = _get_dynamic_emission_clauses(selected_devices)
     if not include_facility: return pd.DataFrame(columns=['hari', 'time_range', 'total_emisi'])
-    join_sql = "JOIN v_informasi_responden_dengan_fakultas r ON a.id_responden = r.id_responden" if join_needed else ""
+    join_sql = "JOIN v_informasi_fakultas_mahasiswa r ON a.id_mahasiswa = r.id_mahasiswa" if join_needed else ""
     query = f"""
     SELECT a.hari, CONCAT(SPLIT_PART(a.waktu, '-', 1), ':00-', SPLIT_PART(a.waktu, '-', 2), ':00') as time_range, SUM({facility_sum}) as total_emisi
     FROM aktivitas_harian a {join_sql} {where_aktivitas}
@@ -131,7 +131,7 @@ def get_heatmap_data(where_aktivitas, join_needed, selected_devices):
 def get_classroom_data(where_aktivitas, join_needed, selected_devices):
     _, facility_sum, _, include_facility = _get_dynamic_emission_clauses(selected_devices)
     if not include_facility: return pd.DataFrame(columns=['lokasi', 'session_count', 'total_emisi'])
-    join_sql = "JOIN v_informasi_responden_dengan_fakultas r ON a.id_responden = r.id_responden" if join_needed else ""
+    join_sql = "JOIN v_informasi_fakultas_mahasiswa r ON a.id_mahasiswa = r.id_mahasiswa" if join_needed else ""
     class_condition = "a.kegiatan ILIKE '%kelas%'"
     final_where_classroom = f"{where_aktivitas} AND {class_condition}" if where_aktivitas else f"WHERE {class_condition}"
     query = f"""
@@ -167,7 +167,7 @@ def generate_pdf_report(where_elektronik, where_aktivitas, join_needed, selected
     total_emisi = df_devices['emisi'].sum() if not df_devices.empty else 0
     avg_emisi = 0
     try:
-        total_responden_unique_df = run_sql("SELECT COUNT(DISTINCT id_responden) as count FROM v_informasi_responden_dengan_fakultas")
+        total_responden_unique_df = run_sql("SELECT COUNT(DISTINCT id_mahasiswa) as count FROM v_informasi_fakultas_mahasiswa")
         if not total_responden_unique_df.empty and 'count' in total_responden_unique_df.columns:
             total_responden_unique = total_responden_unique_df['count'].iloc[0]
             if total_responden_unique > 0:
@@ -338,7 +338,7 @@ def show():
         device_options = list(DEVICE_COLORS.keys())
         selected_devices = st.multiselect("Perangkat:", options=device_options, placeholder="Pilih Opsi", key='electronic_device_filter')
     with filter_col3:
-        fakultas_df = run_sql("SELECT DISTINCT fakultas FROM v_informasi_responden_dengan_fakultas WHERE fakultas IS NOT NULL AND fakultas <> '' ORDER BY fakultas")
+        fakultas_df = run_sql("SELECT DISTINCT fakultas FROM v_informasi_fakultas_mahasiswa WHERE fakultas IS NOT NULL AND fakultas <> '' ORDER BY fakultas")
         available_fakultas = fakultas_df['fakultas'].tolist() if not fakultas_df.empty else []
         selected_fakultas = st.multiselect("Fakultas:", options=available_fakultas, placeholder="Pilih Opsi", key='electronic_fakultas_filter')
 

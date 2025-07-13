@@ -57,7 +57,7 @@ def get_aggregated_daily_data():
     WITH DailyEmissions AS (
         -- Emisi Transportasi per hari
         SELECT
-            t.id_responden,
+            t.id_mahasiswa,
             TRIM(UNNEST(STRING_TO_ARRAY(t.hari_datang, ','))) AS hari,
             'transportasi' AS kategori,
             t.emisi_transportasi AS emisi
@@ -68,7 +68,7 @@ def get_aggregated_daily_data():
         
         -- Emisi Elektronik Total per hari (dibagi rata dari total emisi di tabel elektronik)
         SELECT
-            e.id_responden,
+            e.id_mahasiswa,
             TRIM(UNNEST(STRING_TO_ARRAY(e.hari_datang, ','))) AS hari,
             'elektronik' AS kategori,
             (e.emisi_elektronik / (LENGTH(e.hari_datang) - LENGTH(REPLACE(e.hari_datang, ',', '')) + 1)::float) AS emisi
@@ -79,7 +79,7 @@ def get_aggregated_daily_data():
         
         -- Emisi Sampah per hari
         SELECT
-            ah.id_responden,
+            ah.id_mahasiswa,
             ah.hari,
             'sampah' AS kategori,
             ah.emisi_sampah_makanan_per_waktu AS emisi
@@ -90,14 +90,14 @@ def get_aggregated_daily_data():
           AND TRIM(LOWER(ah.kegiatan)) = 'makan/minum'
     )
     SELECT
-        de.id_responden,
+        de.id_mahasiswa,
         COALESCE(r.fakultas, 'Unknown') AS fakultas,
         de.hari,
         de.kategori,
         SUM(de.emisi) AS emisi
     FROM DailyEmissions de
-    LEFT JOIN v_informasi_responden_dengan_fakultas r ON de.id_responden = r.id_responden
-    GROUP BY de.id_responden, r.fakultas, de.hari, de.kategori
+    LEFT JOIN v_informasi_fakultas_mahasiswa r ON de.id_mahasiswa = r.id_mahasiswa
+    GROUP BY de.id_mahasiswa, r.fakultas, de.hari, de.kategori
     """
     return run_sql(daily_query)
 
@@ -135,7 +135,7 @@ def generate_overview_pdf_report(agg_df_for_report, daily_pivot_for_report, faku
 
     total_emisi = agg_df_for_report['total_emisi'].sum()
     avg_emisi = agg_df_for_report['total_emisi'].mean()
-    num_responden = agg_df_for_report['id_responden'].nunique()
+    num_responden = agg_df_for_report['id_mahasiswa'].nunique()
     
     composition_data = {'Transportasi': agg_df_for_report['transportasi'].sum(), 'Elektronik': agg_df_for_report['elektronik'].sum(), 'Sampah': agg_df_for_report['sampah'].sum()}
     
@@ -206,7 +206,7 @@ def generate_overview_pdf_report(agg_df_for_report, daily_pivot_for_report, faku
     segmentation_conclusion = "Tidak dapat membuat profil perilaku mahasiswa karena data terbatas (diperlukan minimal 6 responden unik untuk analisis ini)."
     segmentation_recommendation = "Tingkatkan jumlah responden yang mengisi data untuk mendapatkan gambaran profil perilaku yang lebih akurat dan dapat digunakan untuk kebijakan yang lebih bertarget."
 
-    if len(agg_df_for_report['id_responden'].unique()) > 5:
+    if len(agg_df_for_report['id_mahasiswa'].unique()) > 5:
         thresholds = {
             'transportasi': agg_df_for_report['transportasi'].median(),
             'elektronik': agg_df_for_report['elektronik'].median(),
@@ -216,7 +216,7 @@ def generate_overview_pdf_report(agg_df_for_report, daily_pivot_for_report, faku
         df_with_profile['profil_perilaku'] = df_with_profile.apply(lambda row: create_behavior_profile(row, thresholds), axis=1)
         
         profile_stats = df_with_profile.groupby('profil_perilaku').agg(
-            jumlah_mahasiswa=('id_responden', 'count'),
+            jumlah_mahasiswa=('id_mahasiswa', 'count'),
             avg_transportasi=('transportasi', 'mean'),
             avg_elektronik=('elektronik', 'mean'),
             avg_sampah=('sampah', 'mean')
@@ -368,7 +368,7 @@ def show():
             st.warning("Tidak ada data yang sesuai dengan filter yang dipilih."); return
 
         agg_df = filtered_daily_data.pivot_table(
-            index=['id_responden', 'fakultas'],
+            index=['id_mahasiswa', 'fakultas'],
             columns='kategori',
             values='emisi',
             aggfunc='sum'
@@ -392,7 +392,7 @@ def show():
         
         fakultas_stats = agg_df.groupby('fakultas').agg(
             total_emisi=('total_emisi', 'sum'),
-            count=('id_responden', 'nunique')
+            count=('id_mahasiswa', 'nunique')
         ).reset_index()
 
 
@@ -538,7 +538,7 @@ def show():
             st.info("Tidak ada data emisi yang ditemukan untuk kategori yang dipilih.")
     
     with col3:
-        if len(agg_df['id_responden'].unique()) > 5:
+        if len(agg_df['id_mahasiswa'].unique()) > 5:
             thresholds = {
                 'transportasi': agg_df['transportasi'].median(),
                 'elektronik': agg_df['elektronik'].median(),

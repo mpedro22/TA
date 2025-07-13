@@ -42,14 +42,14 @@ def build_transport_where_clause(selected_modes, selected_fakultas, selected_day
 @st.cache_data(ttl=3600)
 def get_filtered_raw_data(where_clause, join_needed):
     """Query untuk mengambil data mentah sesuai filter untuk di-download."""
-    join_sql = "JOIN v_informasi_responden_dengan_fakultas r ON t.id_responden = r.id_responden" if join_needed else ""
+    join_sql = "JOIN v_informasi_fakultas_mahasiswa r ON t.id_mahasiswa = r.id_mahasiswa" if join_needed else ""
     query = f"""
     SELECT 
         t.*,
         COALESCE(r.fakultas, 'N/A') as fakultas,
         COALESCE(array_length(string_to_array(t.hari_datang, ','), 1), 0) * t.emisi_transportasi as emisi_mingguan
     FROM transportasi t
-    LEFT JOIN v_informasi_responden_dengan_fakultas r ON t.id_responden = r.id_responden
+    LEFT JOIN v_informasi_fakultas_mahasiswa r ON t.id_mahasiswa = r.id_mahasiswa
     {where_clause}
     """
     return run_sql(query)
@@ -57,7 +57,7 @@ def get_filtered_raw_data(where_clause, join_needed):
 @st.cache_data(ttl=3600)
 def get_daily_trend_data(where_clause, join_needed):
     """Query data untuk chart Tren Emisi Harian."""
-    join_sql = "JOIN v_informasi_responden_dengan_fakultas r ON t.id_responden = r.id_responden" if join_needed else ""
+    join_sql = "JOIN v_informasi_fakultas_mahasiswa r ON t.id_mahasiswa = r.id_mahasiswa" if join_needed else ""
     query = f"""
     SELECT 
         TRIM(unnest(string_to_array(t.hari_datang, ','))) AS hari,
@@ -76,9 +76,9 @@ def get_faculty_data(where_clause):
     SELECT
         r.fakultas,
         SUM(COALESCE(array_length(string_to_array(t.hari_datang, ','), 1), 0) * t.emisi_transportasi) AS total_emisi,
-        COUNT(DISTINCT t.id_responden) as count
+        COUNT(DISTINCT t.id_mahasiswa) as count
     FROM transportasi t
-    JOIN v_informasi_responden_dengan_fakultas r ON t.id_responden = r.id_responden
+    JOIN v_informasi_fakultas_mahasiswa r ON t.id_mahasiswa = r.id_mahasiswa
     {where_clause}
     GROUP BY r.fakultas
     ORDER BY total_emisi ASC
@@ -88,11 +88,11 @@ def get_faculty_data(where_clause):
 @st.cache_data(ttl=3600)
 def get_transport_composition_data(where_clause, join_needed):
     """Query data untuk chart Komposisi Moda."""
-    join_sql = "JOIN v_informasi_responden_dengan_fakultas r ON t.id_responden = r.id_responden" if join_needed else ""
+    join_sql = "JOIN v_informasi_fakultas_mahasiswa r ON t.id_mahasiswa = r.id_mahasiswa" if join_needed else ""
     query = f"""
     SELECT
         t.transportasi,
-        COUNT(DISTINCT t.id_responden) as total_users,
+        COUNT(DISTINCT t.id_mahasiswa) as total_users,
         SUM(COALESCE(array_length(string_to_array(t.hari_datang, ','), 1), 0) * t.emisi_transportasi) as total_emisi
     FROM transportasi t
     {join_sql}
@@ -104,12 +104,12 @@ def get_transport_composition_data(where_clause, join_needed):
 @st.cache_data(ttl=3600)
 def get_heatmap_data(where_clause, join_needed):
     """Query data untuk Heatmap."""
-    join_sql = "JOIN v_informasi_responden_dengan_fakultas r ON t.id_responden = r.id_responden" if join_needed else ""
+    join_sql = "JOIN v_informasi_fakultas_mahasiswa r ON t.id_mahasiswa = r.id_mahasiswa" if join_needed else ""
     query = f"""
     SELECT 
         TRIM(unnest(string_to_array(t.hari_datang, ','))) AS hari,
         t.transportasi,
-        COUNT(t.id_responden) as pengguna
+        COUNT(t.id_mahasiswa) as pengguna
     FROM transportasi t
     {join_sql}
     {where_clause}
@@ -120,12 +120,12 @@ def get_heatmap_data(where_clause, join_needed):
 @st.cache_data(ttl=3600)
 def get_kecamatan_data(where_clause, join_needed):
     """Query data untuk chart Emisi per Kecamatan."""
-    join_sql = "JOIN v_informasi_responden_dengan_fakultas r ON t.id_responden = r.id_responden" if join_needed else ""
+    join_sql = "JOIN v_informasi_fakultas_mahasiswa r ON t.id_mahasiswa = r.id_mahasiswa" if join_needed else ""
     query = f"""
     SELECT
         t.kecamatan,
         AVG(COALESCE(array_length(string_to_array(t.hari_datang, ','), 1), 0) * t.emisi_transportasi) as rata_rata_emisi,
-        COUNT(DISTINCT t.id_responden) as jumlah_mahasiswa,
+        COUNT(DISTINCT t.id_mahasiswa) as jumlah_mahasiswa,
         SUM(COALESCE(array_length(string_to_array(t.hari_datang, ','), 1), 0) * t.emisi_transportasi) as total_emisi
     FROM transportasi t
     {join_sql}
@@ -339,7 +339,7 @@ def show():
         selected_modes = st.multiselect("Moda Transportasi:", options=available_modes, placeholder="Pilih Opsi", key='transport_mode_filter')
     
     with filter_col3:
-        fakultas_df = run_sql("SELECT DISTINCT fakultas FROM v_informasi_responden_dengan_fakultas WHERE fakultas IS NOT NULL AND fakultas <> '' ORDER BY fakultas")
+        fakultas_df = run_sql("SELECT DISTINCT fakultas FROM v_informasi_fakultas_mahasiswa WHERE fakultas IS NOT NULL AND fakultas <> '' ORDER BY fakultas")
         available_fakultas = fakultas_df['fakultas'].tolist() if not fakultas_df.empty else []
         selected_fakultas = st.multiselect("Fakultas:", options=available_fakultas, placeholder="Pilih Opsi", key='transport_fakultas_filter')
 
