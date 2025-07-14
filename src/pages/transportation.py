@@ -460,7 +460,7 @@ def show():
                     height=270, 
                     margin=dict(t=30, b=5, l=5, r=5), 
                     showlegend=False, 
-                    title=dict(text="<b>Komposisi Moda Transportasi</b>", 
+                    title=dict(text="<b>Proporsi Moda Transportasi</b>", 
                                x=0.3, 
                                y=0.95, 
                                font=dict(size=12)))
@@ -496,7 +496,7 @@ def show():
                 fig_heatmap.update_layout(
                     height=270, 
                     margin=dict(t=30, b=0, l=0, r=0), 
-                    title=dict(text="<b>Heatmap Penggunaan Moda</b>", 
+                    title=dict(text="<b>Heatmap Penggunaan Moda per Hari</b>", 
                                x=0.3, 
                                y=0.95, 
                                font=dict(size=12)))

@@ -257,7 +257,7 @@ def generate_pdf_report(where_clause, join_needed):
     canteen_recommendation = "Data tidak cukup untuk analisis lokasi."
     
     if not canteen_stats.empty and canteen_stats['total_emisi'].sum() > 0:
-        hottest_canteen_row = canteen_stats.sort_values('total_emisi', ascending=False).iloc[0] # Ambil baris teratas
+        hottest_canteen_row = canteen_stats.sort_values('total_emisi', ascending=False).iloc[0] 
         
         canteen_table_html = "".join([
             f"<tr><td>{CANTEEN_DISPLAY_NAMES.get(row['lokasi'], row['lokasi'])}</td><td style='text-align:right;'>{row['total_emisi']:.1f}</td><td style='text-align:center;'>{row['activity_count']}</td></tr>" 
@@ -322,8 +322,8 @@ def generate_pdf_report(where_clause, join_needed):
     pdf_buffer = BytesIO()
 
     pisa_status = pisa.CreatePDF(
-        src=html_content,    # String HTML Anda
-        dest=pdf_buffer)     # Tujuan output adalah buffer bytes
+        src=html_content,   
+        dest=pdf_buffer)     
 
     if pisa_status.err:
         st.error(f"Error during PDF conversion: {pisa_status.err}. Check HTML format or xhtml2pdf installation.")
@@ -335,10 +335,6 @@ def generate_pdf_report(where_clause, join_needed):
     # Mengembalikan bytes PDF
     return pdf_bytes
 
-
-# =============================================================================
-# FUNGSI UTAMA (SHOW)
-# =============================================================================
 def show():
     st.markdown("""
         <div class="wow-header">
@@ -356,7 +352,7 @@ def show():
     
     with filter_col2:
         period_options = ['Pagi', 'Siang', 'Sore', 'Malam']
-        selected_periods = st.multiselect("Periode:", options=period_options, placeholder="Pilih Opsi", key='food_period_filter')
+        selected_periods = st.multiselect("Waktu:", options=period_options, placeholder="Pilih Opsi", key='food_period_filter')
     
     with filter_col3:
         fakultas_df = run_sql("SELECT DISTINCT fakultas FROM v_informasi_fakultas_mahasiswa WHERE fakultas IS NOT NULL AND fakultas <> '' ORDER BY fakultas")
@@ -441,7 +437,7 @@ def show():
                 center_text = f"<b style='font-size:14px'>{total_emisi_chart:.1f}</b><br><span style='font-size:8px'>kg CO₂</span>"
                 
                 fig_period.add_annotation(text=center_text, x=0.5, y=0.5, font_size=10, showarrow=False)
-                fig_period.update_layout(height=270, margin=dict(t=30, b=35, l=5, r=5), showlegend=False, title=dict(text="<b>Distribusi Periode Waktu</b>", x=0.33, y=0.95, font=dict(size=12)))
+                fig_period.update_layout(height=270, margin=dict(t=30, b=35, l=5, r=5), showlegend=False, title=dict(text="<b>Proporsi Emisi per Waktu</b>", x=0.33, y=0.95, font=dict(size=12)))
                 st.plotly_chart(fig_period, config=MODEBAR_CONFIG, use_container_width=True)
             else:
                 st.info("Tidak ada data periode untuk filter ini.")
@@ -480,7 +476,7 @@ def show():
                     fig_heatmap.update_layout(
                         height=270, 
                         margin=dict(t=30, b=20, l=20, r=20), 
-                        title=dict(text="<b>Heatmap Emisi Kantin</b>", x=0.37, y=0.95, font=dict(size=12)),
+                        title=dict(text="<b>Heatmap Emisi Lokasi per Jam</b>", x=0.35, y=0.95, font=dict(size=12)),
                         xaxis=dict(tickangle=25),
                         # --- NEW: Konfigurasi Y-axis untuk menampilkan label yang dipotong ---
                         yaxis=dict(

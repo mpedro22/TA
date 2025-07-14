@@ -279,7 +279,7 @@ def generate_overview_pdf_report(agg_df_for_report, daily_pivot_for_report, faku
         <div class="header"><h1>Laporan Overview Emisi Karbon</h1><p>Institut Teknologi Bandung | Dibuat pada: {datetime.now().strftime('%d %B %Y')}</p></div>
         <div class="grid">
             <div class="card primary"><strong>{total_emisi:.1f} kg CO<sub>2</sub></strong>Total Emisi</div>
-            <div class="card secondary"><strong>{avg_emisi:.2f} kg CO<sub>2</sub></strong>Rata-rata/Mahasiswa</div>
+            <div class="card secondary"><strong>{avg_emisi:.2f} kg CO<sub>2</sub></strong>Rata-rata per Mahasiswa</div>
         </div>
         <h2>1. Emisi per Fakultas</h2>
         <table><thead><tr><th>Fakultas</th><th>Total Emisi (kg CO<sub>2</sub>)</th></tr></thead><tbody>
@@ -429,7 +429,7 @@ def show():
         total_emisi_kpi = agg_df['total_emisi'].sum()
         avg_emisi_kpi = agg_df['total_emisi'].mean() if not agg_df.empty else 0
         st.markdown(f'<div class="kpi-card primary" style="margin-bottom: 1rem;"><div class="kpi-value">{total_emisi_kpi:.1f}</div><div class="kpi-label">Total Emisi (kg CO₂)</div></div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="kpi-card secondary" style="margin-bottom: 1.5rem;"><div class="kpi-value">{avg_emisi_kpi:.2f}</div><div class="kpi-label">Rata-rata/Mahasiswa</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="kpi-card secondary" style="margin-bottom: 1.5rem;"><div class="kpi-value">{avg_emisi_kpi:.2f}</div><div class="kpi-label">Rata-rata per Mahasiswa</div></div>', unsafe_allow_html=True)
         
         fakultas_stats_display = fakultas_stats.sort_values('total_emisi', ascending=True).head(13)
 
@@ -569,7 +569,7 @@ def show():
             
             fig_treemap.update_layout(
                 height=570,
-                title_text="<b>Segmentasi Profil Perilaku</b>",
+                title_text="<b>Segmentasi Profil</b>",
                 title_x=0.33,
                 margin = dict(t=30, l=5, r=5, b=10)
             )

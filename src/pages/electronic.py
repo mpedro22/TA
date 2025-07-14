@@ -374,7 +374,7 @@ def show():
                     daily_df['order'] = pd.Categorical(daily_df['hari'], categories=DAY_ORDER, ordered=True)
                     daily_df = daily_df.sort_values('order')
                     fig_trend = go.Figure(go.Scatter(x=daily_df['hari'], y=daily_df['total_emisi'], fill='tonexty', mode='lines+markers', line=dict(color='#3288bd', width=2, shape='spline'), marker=dict(size=6, color='#3288bd'), fillcolor="rgba(102, 194, 165, 0.3)", hovertemplate='<b>%{x}</b><br>%{y:.1f} kg CO₂<extra></extra>', showlegend=False))
-                    fig_trend.update_layout(height=270, margin=dict(t=25, b=0, l=0, r=20), title=dict(text="<b>Tren Emisi Harian</b>", x=0.38, y=0.95, font=dict(size=11)))
+                    fig_trend.update_layout(height=270, margin=dict(t=25, b=0, l=0, r=20), title=dict(text="<b>Tren Emisi Harian</b>", x=0.38, y=0.95, font=dict(size=12)))
                     st.plotly_chart(fig_trend, config=MODEBAR_CONFIG, use_container_width=True)
                 else: st.info("Tidak ada data tren untuk filter ini.")
             else: st.info("Tidak ada data tren untuk filter ini.")
@@ -390,7 +390,7 @@ def show():
                     ratio = (row['total_emisi'] - min_emisi) / (max_emisi - min_emisi) if max_emisi > min_emisi else 0
                     color = color_palette[int(ratio * (len(color_palette) - 1))]
                     fig_fakultas.add_trace(go.Bar(x=[row['total_emisi']], y=[row['fakultas']], orientation='h', marker=dict(color=color), showlegend=False, text=[f"{row['total_emisi']:.1f}"], textposition='inside', textfont=dict(color='white'), hovertemplate=f'<b>{row["fakultas"]}</b><br>Total: {row["total_emisi"]:.1f} kg CO₂<br>Responden: {int(row.get("total_count", 0))}<extra></extra>'))
-                fig_fakultas.update_layout(height=270, margin=dict(t=25, b=0, l=0, r=20), title=dict(text="<b>Emisi per Fakultas</b>", x=0.4, y=0.95, font=dict(size=11)))
+                fig_fakultas.update_layout(height=270, margin=dict(t=25, b=0, l=0, r=20), title=dict(text="<b>Emisi per Fakultas</b>", x=0.4, y=0.95, font=dict(size=12)))
                 st.plotly_chart(fig_fakultas, config=MODEBAR_CONFIG, use_container_width=True)
             else: st.info("Tidak ada data fakultas untuk filter ini.")
             
@@ -425,7 +425,7 @@ def show():
                 if selected_days: pivot_df = pivot_df.loc[selected_days]
                 if not pivot_df.empty and pivot_df.sum().sum() > 0:
                     fig_heatmap = go.Figure(data=go.Heatmap(z=pivot_df.values, x=pivot_df.columns, y=pivot_df.index, colorscale=[[0, '#fee08b'], [0.25, '#fdae61'], [0.5, '#f46d43'], [0.75, '#d53e4f'], [1, '#9e0142']], hoverongaps=False, hovertemplate='<b>%{y}</b><br>Jam: %{x}<br>Emisi: %{z:.2f} kg CO₂<extra></extra>', xgap=1, ygap=1, colorbar=dict(title=dict(text="Emisi", font=dict(size=9)), tickfont=dict(size=10), thickness=15, len=0.7)))
-                    fig_heatmap.update_layout(height=270, margin=dict(t=30, b=0, l=0, r=0), title=dict(text="<b>Heatmap Emisi Fasilitas</b>", x=0.3, y=0.95, font=dict(size=12)))
+                    fig_heatmap.update_layout(height=270, margin=dict(t=30, b=0, l=0, r=0), title=dict(text="<b>Heatmap Emisi Harian per Jam</b>", x=0.3, y=0.95, font=dict(size=12)))
                     st.plotly_chart(fig_heatmap, config=MODEBAR_CONFIG, use_container_width=True)
                 else: st.info("Tidak ada data heatmap untuk filter ini.")
             else: st.info("Tidak ada data heatmap untuk filter ini.")
@@ -444,7 +444,7 @@ def show():
                     fig_location.add_trace(go.Bar(x=[display_name], y=[row['total_emisi']], marker=dict(color=color), showlegend=False, text=[f"{row['total_emisi']:.1f}"], textposition='auto', hovertemplate=f'<b>{row["lokasi"]}</b><br>Total Emisi: {row["total_emisi"]:.2f} kg CO₂<br>Jumlah Sesi: {row["session_count"]}<extra></extra>', name=row['lokasi']))
                 avg_emisi_loc = classroom_df['total_emisi'].mean()
                 fig_location.add_hline(y=avg_emisi_loc, line_dash="dash", line_color="#5e4fa2", line_width=2, annotation_text=f"Rata-rata: {avg_emisi_loc:.1f}")
-                fig_location.update_layout(height=270, margin=dict(t=25, b=0, l=0, r=0), title=dict(text="<b>Gedung Kelas Paling Boros Energi</b>", x=0.3, y=0.95, font=dict(size=12)), yaxis_title="Total Emisi (kg CO2)")
+                fig_location.update_layout(height=270, margin=dict(t=25, b=0, l=0, r=0), title=dict(text="<b>Emisi per Lokasi</b>", x=0.5   , y=0.95, font=dict(size=12)), yaxis_title="Total Emisi (kg CO2)")
                 st.plotly_chart(fig_location, config=MODEBAR_CONFIG, use_container_width=True)
             else: st.info("Tidak ada data aktivitas kelas untuk filter ini.")
 
