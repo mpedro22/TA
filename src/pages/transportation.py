@@ -9,16 +9,9 @@ from src.utils.db_connector import run_sql
 from io import BytesIO
 from xhtml2pdf import pisa
 
-# KONFIGURASI DAN PALET WARNA
-
-
 MAIN_PALETTE = ['#9e0142', '#d53e4f', '#f46d43', '#fdae61', '#fee08b', '#e6f598', '#abdda4', '#66c2a5', '#3288bd', '#5e4fa2']
 TRANSPORT_COLORS = { 'Sepeda': '#66c2a5', 'Jalan kaki': '#abdda4', 'Bike': '#66c2a5', 'Walk': '#abdda4', 'Bus': '#3288bd', 'Kereta': '#5e4fa2', 'Angkot': '#66c2a5', 'Angkutan Umum': '#3288bd', 'Ojek Online': '#5e4fa2', 'TransJakarta': '#3288bd', 'Motor': '#fdae61', 'Sepeda Motor': '#f46d43', 'Motorcycle': '#fdae61', 'Ojek': '#f46d43', 'Mobil': '#d53e4f', 'Mobil Pribadi': '#9e0142', 'Car': '#d53e4f', 'Taksi': '#9e0142', 'Taxi': '#9e0142' }
 MODEBAR_CONFIG = { 'displayModeBar': True, 'displaylogo': False, 'modeBarButtonsToRemove': [ 'pan2d', 'pan3d', 'select2d', 'lasso2d', 'zoom2d', 'zoom3d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'resetScale2d', 'resetScale3d', 'hoverClosestCartesian', 'hoverCompareCartesian', 'toggleSpikelines', 'hoverClosest3d', 'orbitRotation', 'tableRotation', 'resetCameraDefault3d', 'resetCameraLastSave3d' ], 'toImageButtonOptions': { 'format': 'png', 'filename': 'carbon_emission_chart', 'height': 600, 'width': 800, 'scale': 2 } }
-
-
-# FUNGSI-FUNGSI QUERY SQL
-
 
 @st.cache_data(ttl=3600)
 def build_transport_where_clause(selected_modes, selected_fakultas, selected_days):
@@ -150,25 +143,20 @@ def generate_pdf_report(where_clause, join_needed):
     df_heatmap = get_heatmap_data(where_clause, join_needed)
     df_kecamatan = get_kecamatan_data(where_clause, join_needed)
     
-    # Inisialisasi metrik utama dan default HTML untuk tabel/kesimpulan
     total_emisi = df_composition['total_emisi'].sum() if 'total_emisi' in df_composition.columns and not df_composition.empty else 0
     total_users = df_composition['total_users'].sum() if 'total_users' in df_composition.columns and not df_composition.empty else 0
     avg_emisi = total_emisi / total_users if total_users > 0 else 0
     
-    # Fallback HTML jika tidak ada data sama sekali
     if df_composition.empty or df_composition['total_emisi'].sum() == 0:
         return b"<html><body><h1>Tidak ada data untuk dilaporkan</h1><p>Silakan ubah filter Anda.</p></body></html>"
 
-    # --- Default Text & HTML for Sections ---
     daily_trend_table_html, trend_conclusion, trend_recommendation = ("<tr><td colspan='2'>Data tidak tersedia.</td></tr>", "Pola mobilitas mingguan belum dapat dipetakan.", "Data tidak cukup untuk analisis tren.")
     fakultas_table_html, fakultas_conclusion, fakultas_recommendation = ("<tr><td colspan='3'>Data tidak tersedia.</td></tr>", "Profil emisi per fakultas tidak dapat dibuat.", "Data tidak cukup untuk analisis fakultas.")
     mode_table_html, mode_conclusion, mode_recommendation = ("<tr><td colspan='3'>Data tidak tersedia.</td></tr>", "Preferensi moda transportasi tidak dapat dianalisis.", "Data tidak cukup untuk analisis moda.")
     heatmap_header_html, heatmap_body_html, heatmap_conclusion, heatmap_recommendation = ("<tr><th>-</th></tr>", "<tr><td>Data tidak tersedia.</td></tr>", "Pola perilaku harian belum teridentifikasi.", "Data tidak cukup untuk analisis heatmap.")
     kecamatan_table_html, kecamatan_conclusion, rec_kecamatan = ("<tr><td colspan='3'>Data tidak tersedia.</td></tr>", "Hotspot geografis belum dapat diidentifikasi.", "Data tidak cukup untuk analisis kecamatan.")
-
-    # --- Pembuatan Insight Dinamis ---
     
-    # 1. Ritme Mobilitas Mingguan
+    # 1. Tren Emisi Harian
     if not df_daily.empty and df_daily['emisi'].sum() > 0:
         daily_df_sorted = df_daily.sort_values(by='emisi', ascending=False)
         daily_trend_table_html = "".join([f"<tr><td>{row['hari']}</td><td style='text-align:right;'>{row['emisi']:.1f}</td></tr>" for _, row in daily_df_sorted.iterrows()])
@@ -186,7 +174,7 @@ def generate_pdf_report(where_clause, join_needed):
             highest_fakultas = df_faculty_sorted.iloc[0]['fakultas']
             fakultas_conclusion = f"Mahasiswa dari fakultas <strong>{highest_fakultas}</strong> memiliki jejak karbon transportasi tertinggi, mengindikasikan kemungkinan komunitasnya tinggal lebih jauh atau lebih bergantung pada kendaraan pribadi."
             fakultas_recommendation = f"Terapkan intervensi berbasis lokasi. Prioritaskan perbaikan fasilitas parkir sepeda dan shelter 'drop-off' di sekitar gedung fakultas <strong>{highest_fakultas}</strong>."
-        else: # Only one faculty or very few
+        else: 
             fakultas_conclusion = f"Data hanya mencakup Fakultas <strong>{df_faculty_sorted.iloc[0]['fakultas']}</strong>. Perbandingan dengan fakultas lain tidak dapat dilakukan."
             fakultas_recommendation = "Perluas filter fakultas untuk mendapatkan perbandingan yang lebih komprehensif."
 
@@ -197,7 +185,7 @@ def generate_pdf_report(where_clause, join_needed):
         df_comp_sorted['avg_emisi_per_user'] = df_comp_sorted['total_emisi'] / df_comp_sorted['total_users']
         mode_table_html = "".join([f"<tr><td>{row['transportasi']}</td><td style='text-align:center;'>{int(row['total_users'])}</td><td style='text-align:right;'>{row['avg_emisi_per_user']:.2f}</td></tr>" for _, row in df_comp_sorted.iterrows()])
         
-        if len(df_comp_sorted) > 0: # Ensure there's at least one mode
+        if len(df_comp_sorted) > 0: 
             dominant_mode = df_comp_sorted.iloc[0]['transportasi']
             mode_conclusion = f"<strong>{dominant_mode}</strong> adalah moda pilihan utama, mencerminkan infrastruktur dan kondisi eksisting."
             mode_recommendation = "Tingkatkan 'user experience' untuk moda ramah lingkungan (tambah unit bike sharing) atau terapkan kebijakan 'mode shifting' (misal: zona rendah emisi) untuk mengurangi ketergantungan pada kendaraan pribadi."
@@ -207,27 +195,26 @@ def generate_pdf_report(where_clause, join_needed):
 
 
     # 4. Analisis Pola Perilaku Harian
-    if not df_heatmap.empty and df_heatmap['pengguna'].sum() > 0: # Check if there are actual 'pengguna' counts
+    if not df_heatmap.empty and df_heatmap['pengguna'].sum() > 0: 
         pivot_df = df_heatmap.pivot_table(index='hari', columns='transportasi', values='pengguna', aggfunc='sum').fillna(0)
         day_order = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
         pivot_df = pivot_df.reindex(index=day_order, fill_value=0)
         
-        top_modes = pivot_df.sum(axis=0).nlargest(6).index # Get top 6 modes by total usage for the heatmap table
-        pivot_df_filtered = pivot_df[top_modes] # Filter the pivot table to only include these top modes
+        top_modes = pivot_df.sum(axis=0).nlargest(6).index
+        pivot_df_filtered = pivot_df[top_modes] 
 
-        if not pivot_df_filtered.empty and pivot_df_filtered.sum().sum() > 0: # Check if there's any data left after filtering modes
+        if not pivot_df_filtered.empty and pivot_df_filtered.sum().sum() > 0: 
             header_cells_html = "<th>Hari</th>" + "".join([f"<th>{mode}</th>" for mode in pivot_df_filtered.columns])
             heatmap_header_html = f"<tr>{header_cells_html}</tr>"
             body_rows_list = [f"<tr><td><strong>{day}</strong></td>" + "".join([f"<td style='text-align:center;'>{int(count)}</td>" for count in row]) + "</tr>" for day, row in pivot_df_filtered.iterrows()]
             heatmap_body_html = "".join(body_rows_list)
             
-            # Find peak usage
-            peak_usage_day = pivot_df_filtered.sum(axis=1).idxmax() # Day with max total usage
-            peak_usage_mode = pivot_df_filtered.loc[peak_usage_day].idxmax() # Mode with max usage on that day
+            peak_usage_day = pivot_df_filtered.sum(axis=1).idxmax() 
+            peak_usage_mode = pivot_df_filtered.loc[peak_usage_day].idxmax() 
             
             heatmap_conclusion = f"Teridentifikasi sebuah kebiasaan kuat (strong habit): penggunaan <strong>{peak_usage_mode}</strong> secara masif pada hari <strong>{peak_usage_day}</strong>."
             heatmap_recommendation = f"Fokus pada intervensi perilaku. Usulkan 'Tantangan {peak_usage_day} Hijau': ajak komunitas untuk tidak menggunakan {peak_usage_mode} dan berbagi pengalaman di media sosial."
-        else: # No meaningful data for heatmap after filtering/reindexing
+        else: 
             heatmap_conclusion = "Pola perilaku harian belum teridentifikasi. Data tidak cukup atau moda transportasi/hari tidak relevan."
             heatmap_recommendation = "Perluas filter moda transportasi atau hari untuk analisis pola perilaku."
 
@@ -237,7 +224,7 @@ def generate_pdf_report(where_clause, join_needed):
         kecamatan_stats_sorted = df_kecamatan.sort_values('total_emisi', ascending=False)
         kecamatan_table_html = "".join([f"<tr><td>{row['kecamatan']}</td><td style='text-align:right;'>{row['total_emisi']:.1f}</td><td style='text-align:center;'>{int(row['jumlah_mahasiswa'])}</td></tr>" for _, row in kecamatan_stats_sorted.iterrows()])
         
-        if len(kecamatan_stats_sorted) > 0: # Check if there's at least one kecamatan
+        if len(kecamatan_stats_sorted) > 0:
             hottest_spot = kecamatan_stats_sorted.iloc[0]['kecamatan']
             kecamatan_conclusion = f"Kecamatan <strong>{hottest_spot}</strong> merupakan 'feeder' utama komuter ke kampus dan sumber emisi terbesar. Ini adalah titik intervensi paling strategis di luar kampus."
             rec_kecamatan = f"Gunakan data ini sebagai dasar proposal ke Dishub untuk optimalisasi rute angkutan umum dari <strong>{hottest_spot}</strong>, atau jadikan titik jemput utama untuk layanan shuttle kampus."
@@ -290,26 +277,20 @@ def generate_pdf_report(where_clause, join_needed):
     </div></body></html>
     """
     
-    # --- BAGIAN KONVERSI KE PDF ---
     pdf_buffer = BytesIO()
 
     pisa_status = pisa.CreatePDF(
-        src=html_content,    # String HTML Anda
-        dest=pdf_buffer)     # Tujuan output adalah buffer bytes
+        src=html_content,   
+        dest=pdf_buffer)     
 
     if pisa_status.err:
         st.error(f"Error during PDF conversion: {pisa_status.err}. Check HTML format or xhtml2pdf installation.")
-        return None # Mengembalikan None jika ada error
+        return None 
 
     pdf_bytes = pdf_buffer.getvalue()
     pdf_buffer.close()
 
-    # Mengembalikan bytes PDF
     return pdf_bytes
-
-
-# FUNGSI UTAMA (SHOW)
-
 
 def show():
     st.markdown("""
@@ -327,7 +308,6 @@ def show():
     """, unsafe_allow_html=True)
     time.sleep(0.25)
     
-    # --- BAGIAN FILTER ---
     filter_col1, filter_col2, filter_col3, export_col1, export_col2 = st.columns([1.8, 1.8, 1.8, 1, 1])
     with filter_col1:
         day_options = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
@@ -343,10 +323,8 @@ def show():
         available_fakultas = fakultas_df['fakultas'].tolist() if not fakultas_df.empty else []
         selected_fakultas = st.multiselect("Fakultas:", options=available_fakultas, placeholder="Pilih Opsi", key='transport_fakultas_filter')
 
-    # Bangun klausa WHERE dari filter
     where_clause, join_needed = build_transport_where_clause(selected_modes, selected_fakultas, selected_days)
     
-    # --- TOMBOL EXPORT (DIPERBAIKI) ---
     with export_col1:
         raw_data_df = get_filtered_raw_data(where_clause, join_needed)
         st.download_button(
@@ -376,13 +354,11 @@ def show():
         except Exception as e:
             st.error(f"Gagal membuat laporan: {e}")
 
-    # --- BAGIAN VISUALISASI ---
     with loading():
         col1, col2, col3 = st.columns([1, 1, 1])
         with col1:
             daily_df = get_daily_trend_data(where_clause, join_needed)
             if not daily_df.empty and daily_df['emisi'].sum() > 0:
-                # Filter hari sekarang tidak dibutuhkan di sini, tapi kita lakukan untuk visualisasi saja
                 if selected_days: 
                     daily_df_display = daily_df[daily_df['hari'].str.strip().isin(selected_days)]
                 else:

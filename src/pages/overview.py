@@ -1,6 +1,4 @@
-﻿# src/pages/overview.py
-
-import streamlit as st
+﻿import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -12,10 +10,6 @@ warnings.filterwarnings('ignore')
 from src.utils.db_connector import run_sql
 from io import BytesIO
 from xhtml2pdf import pisa
-
-# =============================================================================
-# KONFIGURASI DAN PALET WARNA
-# =============================================================================
 
 CATEGORY_COLORS = {'Transportasi': '#d53e4f', 'Elektronik': '#3288bd', 'Sampah': '#66c2a5'}
 PROFILE_COLOR_MAP = {
@@ -41,10 +35,6 @@ MODEBAR_CONFIG = {
     }
 }
 DAY_ORDER = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
-
-# =============================================================================
-# FUNGSI-FUNGSI QUERY SQL (Utama)
-# =============================================================================
 
 @st.cache_data(ttl=3600)
 def get_aggregated_daily_data():
@@ -100,11 +90,6 @@ def get_aggregated_daily_data():
     GROUP BY de.id_mahasiswa, r.fakultas, de.hari, de.kategori
     """
     return run_sql(daily_query)
-
-
-# =============================================================================
-# FUNGSI-FUNGSI BANTU & LAPORAN
-# =============================================================================
 
 def create_behavior_profile(row, thresholds):
     t_level = "Tinggi" if row['transportasi'] > thresholds['transportasi'] else "Rendah"

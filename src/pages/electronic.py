@@ -1,6 +1,4 @@
-﻿# src/pages/electronic.py
-
-import streamlit as st
+﻿import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -11,9 +9,6 @@ from src.utils.db_connector import run_sql
 from io import BytesIO
 from xhtml2pdf import pisa
 
-# =============================================================================
-# KONFIGURASI DAN PALET WARNA
-# =============================================================================
 
 MAIN_PALETTE = ['#9e0142', '#d53e4f', '#f46d43', '#fdae61', '#fee08b', '#e6f598', '#abdda4', '#66c2a5', '#3288bd', '#5e4fa2']
 DEVICE_COLORS = { 'HP': '#d53e4f', 'Laptop': '#3288bd', 'Tablet': '#66c2a5', 'AC': '#f46d43', 'Lampu': '#fdae61' }
@@ -21,10 +16,6 @@ MODEBAR_CONFIG = { 'displayModeBar': True, 'displaylogo': False, 'modeBarButtons
 DAY_ORDER = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
 PERSONAL_DEVICES = ['HP', 'Laptop', 'Tablet']
 FACILITY_DEVICES = ['AC', 'Lampu']
-
-# =============================================================================
-# FUNGSI-FUNGSI QUERY SQL (TIDAK ADA PERUBAHAN)
-# =============================================================================
 
 @st.cache_data(ttl=3600)
 def build_universal_where_clause(selected_fakultas, selected_days):
@@ -152,18 +143,15 @@ def generate_pdf_report(where_elektronik, where_aktivitas, join_needed, selected
     from datetime import datetime
     time.sleep(0.6)
     
-    # Menjalankan semua query yang dibutuhkan untuk laporan
     df_daily = get_daily_trend_data(where_elektronik, where_aktivitas, join_needed, selected_devices)
     df_faculty = get_faculty_data(where_elektronik, where_aktivitas, selected_devices)
     df_devices_raw = get_device_emissions_data(where_elektronik, where_aktivitas, join_needed)
     df_heatmap = get_heatmap_data(where_aktivitas, join_needed, selected_devices)
     df_classrooms = get_classroom_data(where_aktivitas, join_needed, selected_devices)
     
-    # Filter df_devices berdasarkan pilihan, karena query-nya mengambil semua
     df_devices_filtered = df_devices_raw[df_devices_raw['device'].isin(selected_devices)] if selected_devices else df_devices_raw
     df_devices = df_devices_filtered[df_devices_filtered['emisi'].notna() & (df_devices_filtered['emisi'] > 0)]
 
-    # Inisialisasi metrik utama dan default HTML untuk tabel/kesimpulan
     total_emisi = df_devices['emisi'].sum() if not df_devices.empty else 0
     avg_emisi = 0
     try:
@@ -177,18 +165,14 @@ def generate_pdf_report(where_elektronik, where_aktivitas, join_needed, selected
     except (IndexError, KeyError):
         total_responden_unique = 0
 
-    # Fallback HTML jika tidak ada data sama sekali
     if df_devices.empty or df_devices['emisi'].sum() == 0:
         return b"<html><body><h1>Tidak ada data untuk dilaporkan</h1><p>Silakan sesuaikan filter Anda dan coba lagi.</p></body></html>"
 
-    # --- Default Text & HTML for Sections ---
     daily_trend_table_html, trend_conclusion, trend_recommendation = ("<tr><td colspan='2'>Data tidak tersedia.</td></tr>", "Pola emisi harian tidak dapat diidentifikasi.", "Data tidak cukup untuk analisis tren.")
     fakultas_table_html, fakultas_conclusion, fakultas_recommendation = ("<tr><td colspan='3'>Data tidak tersedia.</td></tr>", "Profil emisi per fakultas tidak dapat dibuat.", "Data tidak cukup untuk analisis fakultas.")
     device_table_html, device_conclusion, device_recommendation = ("<tr><td colspan='3'>Data tidak tersedia.</td></tr>", "Proporsi emisi perangkat tidak dapat dianalisis.", "Data tidak cukup untuk analisis perangkat.")
     heatmap_header_html, heatmap_body_html, heatmap_conclusion, heatmap_recommendation = ("<tr><th>-</th></tr>", "<tr><td>Data tidak tersedia.</td></tr>", "Pola penggunaan fasilitas tidak teridentifikasi.", "Data tidak cukup untuk analisis heatmap.")
     location_table_html, location_conclusion, location_recommendation = ("<tr><td colspan='3'>Data tidak tersedia.</td></tr>", "Lokasi dengan konsumsi energi tertinggi tidak dapat ditentukan.", "Data tidak cukup untuk analisis lokasi.")
-
-    # --- Pembuatan Insight Dinamis ---
     
     # 1. Tren Harian
     if not df_daily.empty and df_daily['total_emisi'].sum() > 0:
@@ -276,7 +260,6 @@ def generate_pdf_report(where_elektronik, where_aktivitas, join_needed, selected
         location_conclusion = f"Gedung/Ruang <strong>{highest_emission_loc['lokasi']}</strong> tercatat sebagai lokasi dengan konsumsi energi tertinggi untuk kegiatan kelas, dengan total emisi <strong>{highest_emission_loc['total_emisi']:.1f} kg CO<sub>2</sub></strong> dari {highest_emission_loc['session_count']} sesi."
         location_recommendation = f"Lokasi ini adalah kandidat utama untuk proyek percontohan efisiensi energi. Audit sederhana pada perangkat AC dan sistem pencahayaan di <strong>{highest_emission_loc['lokasi']}</strong> dapat memberikan insight cepat untuk potensi penghematan."
 
-    # --- Penggabungan HTML Final ---
     html_content = f"""
     <!DOCTYPE html><html><head><title>Laporan Emisi Elektronik</title><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet"><style>
         body {{ font-family: 'Poppins', sans-serif; color: #333; line-height: 1.6; font-size: 11px; }}
@@ -298,27 +281,20 @@ def generate_pdf_report(where_elektronik, where_aktivitas, join_needed, selected
     </style></head><body><div class="page"><div class="header"><h1>Laporan Emisi Elektronik</h1><p>Institut Teknologi Bandung | Dibuat pada: {datetime.now().strftime('%d %B %Y')}</p></div><div class="grid"><div class="card primary"><strong>{total_emisi:.1f} kg CO<sub>2</sub></strong>Total Emisi (sesuai filter)</div><div class="card secondary"><strong>{avg_emisi:.2f} kg CO<sub>2</sub></strong>Rata-rata/Total Mahasiswa</div></div><h2>1. Tren Emisi Harian</h2><table><thead><tr><th>Hari</th><th>Total Emisi (kg CO<sub>2</sub>)</th></tr></thead><tbody>{daily_trend_table_html}</tbody></table><div class="conclusion"><strong>Insight:</strong> {trend_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {trend_recommendation}</div><h2>2. Emisi per Fakultas</h2><table><thead><tr><th>Fakultas</th><th>Total Emisi (kg CO<sub>2</sub>)</th><th>Jumlah Responden</th></tr></thead><tbody>{fakultas_table_html}</tbody></table><div class="conclusion"><strong>Insight:</strong> {fakultas_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {fakultas_recommendation}</div><h2>3. Proporsi Emisi per Perangkat</h2><table><thead><tr><th>Perangkat</th><th>Total Emisi (kg CO<sub>2</sub>)</th><th>Persentase</th></tr></thead><tbody>{device_table_html}</tbody></table><div class="conclusion"><strong>Insight:</strong> {device_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {device_recommendation}</div><h2>4. Pola Penggunaan Fasilitas Kampus</h2><table><thead>{heatmap_header_html}</thead><tbody>{heatmap_body_html}</tbody></table><div class="conclusion"><strong>Insight:</strong> {heatmap_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {heatmap_recommendation}</div><h2>5. Lokasi Kelas Paling Intensif Energi</h2><table><thead><tr><th>Gedung</th><th>Jumlah Sesi</th><th>Total Emisi (kg CO<sub>2</sub>)</th></tr></thead><tbody>{location_table_html}</tbody></table><div class="conclusion"><strong>Insight:</strong> {location_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {location_recommendation}</div></div></body></html>
     """
     
-    # --- BAGIAN KONVERSI KE PDF ---
     pdf_buffer = BytesIO()
 
     pisa_status = pisa.CreatePDF(
-        src=html_content,    # String HTML Anda
-        dest=pdf_buffer)     # Tujuan output adalah buffer bytes
+        src=html_content,   
+        dest=pdf_buffer)     
 
     if pisa_status.err:
         st.error(f"Error during PDF conversion: {pisa_status.err}. Check HTML format or xhtml2pdf installation.")
-        return None # Mengembalikan None jika ada error
+        return None 
 
     pdf_bytes = pdf_buffer.getvalue()
     pdf_buffer.close()
 
-    # Mengembalikan bytes PDF
     return pdf_bytes
-
-
-# =============================================================================
-# FUNGSI UTAMA (SHOW) - Perubahan minor untuk memanggil report yang baru
-# =============================================================================
 
 def show():
     st.markdown("""
@@ -354,7 +330,7 @@ def show():
                 st.download_button(
                     label="Laporan",
                     data=pdf_data,
-                    file_name=f"electronic_report_{pd.Timestamp.now().strftime('%Y%m%d')}.pdf", # Ubah ekstensi menjadi .pdf
+                    file_name=f"electronic_report_{pd.Timestamp.now().strftime('%Y%m%d')}.pdf",
                     mime="application/pdf", 
                     use_container_width=True,
                     key="electronic_export_pdf"

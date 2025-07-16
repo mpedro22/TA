@@ -3,7 +3,6 @@ from src.components.loading import loading, loading_decorator
 import time
 
 def show():
-    # Header halaman tetap sama
     with loading():
         st.markdown("""
         <div class="wow-header">
@@ -20,7 +19,6 @@ def show():
         """, unsafe_allow_html=True)
         time.sleep(0.2)
 
-    # EXTENDED HEIGHT CSS
     st.markdown("""
     <style>
     /* === CIRCLE TEMPLATE - DESKRIPSI === */
@@ -225,12 +223,10 @@ def show():
     </style>
     """, unsafe_allow_html=True)
 
-    # --- EXTENDED LAYOUT ---
     
     col1, col2 = st.columns(2, gap="medium")
 
     with col1:
-        # CIRCLE TEMPLATE - DESKRIPSI (EXTENDED)
         st.markdown("""
         <div class="hero-circle">
             <div class="hero-title">ITB Carbon Dashboard</div>
@@ -245,7 +241,6 @@ def show():
         
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # BOX TEMPLATE 1 - TUJUAN (EXTENDED)
         st.markdown("""
         <div class="tujuan-box" style="height: 360px;">
             <div class="section-title">Tujuan Utama</div>
@@ -278,7 +273,6 @@ def show():
         """, unsafe_allow_html=True)
 
     with col2:
-        # HALAMAN BOX
         st.markdown("""
         <div class="tujuan-box" style="margin-bottom: 1.5rem;">
             <div class="section-title">Halaman</div>
@@ -311,7 +305,6 @@ def show():
         </div>
         """, unsafe_allow_html=True)
         
-        # FITUR BOX
         st.markdown("""
         <div class="tujuan-box">
             <div class="section-title">Fitur</div>

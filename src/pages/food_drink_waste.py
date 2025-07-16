@@ -1,5 +1,3 @@
-# src/pages/food_drink_waste.py
-
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -11,14 +9,12 @@ from src.utils.db_connector import run_sql
 from io import BytesIO
 from xhtml2pdf import pisa
 
-# KONFIGURASI DAN PALET WARNA =
 
 MAIN_PALETTE = ['#9e0142', '#d53e4f', '#f46d43', '#fdae61', '#fee08b', '#e6f598', '#abdda4', '#66c2a5', '#3288bd', '#5e4fa2']
 PERIOD_COLORS = { 'Pagi': '#66c2a5', 'Siang': '#fdae61', 'Sore': '#f46d43', 'Malam': '#5e4fa2' }
 MODEBAR_CONFIG = { 'displayModeBar': True, 'displaylogo': False, 'modeBarButtonsToRemove': [ 'pan2d', 'pan3d', 'select2d', 'lasso2d', 'zoom2d', 'zoom3d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'resetScale2d', 'resetScale3d', 'hoverClosestCartesian', 'hoverCompareCartesian', 'toggleSpikelines', 'hoverClosest3d', 'orbitRotation', 'tableRotation', 'resetCameraDefault3d', 'resetCameraLastSave3d' ], 'toImageButtonOptions': { 'format': 'png', 'filename': 'carbon_emission_chart', 'height': 600, 'width': 800, 'scale': 2 } }
 DAY_ORDER = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
 
-# PERBAIKAN: Definisikan daftar lokasi kantin resmi
 OFFICIAL_CANTEENS = [
     'Kantin SBM', 'Pratama Corner', 'Kantin GKU Barat', 'Kantin Tunnel', 
     'Kantin Borju', 'Kantin Barrac', 'Cafetaria Sejoli CC Barat', 
@@ -26,22 +22,19 @@ OFFICIAL_CANTEENS = [
     'Kantin Labtek III', 'Koperasi'
 ]
 
-# NEW: Definisikan mapping untuk nama tampilan kantin agar unik dan rapi di grafik
 CANTEEN_DISPLAY_NAMES = {
     'Kantin SBM': 'Kantin SBM',
     'Pratama Corner': 'Pratama Corner',
-    'Kantin GKU Barat': 'Kantin GKU Barat', # Cukup panjang, tapi biarkan dulu. Akan dipotong otomatis jika >15.
+    'Kantin GKU Barat': 'Kantin GKU Barat', 
     'Kantin Tunnel': 'Kantin Tunnel',
     'Kantin Borju': 'Kantin Borju',
     'Kantin Barrac': 'Kantin Barrac',
-    'Cafetaria Sejoli CC Barat': 'Cafetaria Sejoli', # Dipersingkat agar unik dan rapi
+    'Cafetaria Sejoli CC Barat': 'Cafetaria Sejoli', 
     'Kantin CC Timur': 'Kantin CC Timur',
-    'Cafetaria Tunas Padi (Ex ITB Press)': 'Cafetaria Tunas', # Dipersingkat agar unik dan rapi
+    'Cafetaria Tunas Padi (Ex ITB Press)': 'Cafetaria Tunas', 
     'Kantin Labtek III': 'Kantin Labtek III',
     'Koperasi': 'Koperasi',
 }
-
-# FUNGSI-FUNGSI QUERY SQL (tidak ada perubahan)
 
 @st.cache_data(ttl=3600)
 def build_food_where_clause(selected_days, selected_periods, selected_fakultas):
@@ -99,11 +92,9 @@ def get_period_data(where_clause, join_needed):
 def get_heatmap_data(where_clause, join_needed):
     join_sql = "JOIN v_informasi_fakultas_mahasiswa r ON m.id_mahasiswa = r.id_mahasiswa" if join_needed else ""
     
-    # PERBAIKAN: Tambahkan filter untuk lokasi kantin resmi
     canteens_str = "','".join(OFFICIAL_CANTEENS)
     location_filter = f"m.lokasi IN ('{canteens_str}')"
     
-    # Gabungkan dengan where_clause yang sudah ada
     final_where_clause = f"{where_clause} AND {location_filter}" if where_clause else f"WHERE {location_filter}"
 
     query = f"""
@@ -117,11 +108,9 @@ def get_heatmap_data(where_clause, join_needed):
 def get_canteen_data(where_clause, join_needed):
     join_sql = "JOIN v_informasi_fakultas_mahasiswa r ON m.id_mahasiswa = r.id_mahasiswa" if join_needed else ""
 
-    # PERBAIKAN: Tambahkan filter untuk lokasi kantin resmi
     canteens_str = "','".join(OFFICIAL_CANTEENS)
     location_filter = f"m.lokasi IN ('{canteens_str}')"
 
-    # Gabungkan dengan where_clause yang sudah ada
     final_where_clause = f"{where_clause} AND {location_filter}" if where_clause else f"WHERE {location_filter}"
 
     query = f"""
@@ -132,39 +121,24 @@ def get_canteen_data(where_clause, join_needed):
     """
     return run_sql(query)
 
-# =============================================================================
-# FUNGSI LAPORAN PDF (HTML) - Tidak ada perubahan di sini
-# =============================================================================
-# src/pages/food_drink_waste.py
-
-# ... (kode lainnya tetap sama di atas) ...
-
-# =============================================================================
-# FUNGSI LAPORAN PDF (HTML) - GANTI SELURUH FUNGSI INI
-# =============================================================================
 @st.cache_data(ttl=3600)
 @loading_decorator()
 def generate_pdf_report(where_clause, join_needed):
     from datetime import datetime
     time.sleep(0.6)
 
-    # --- Pengambilan Data ---
     daily_stats = get_daily_trend_data(where_clause, join_needed)
     fakultas_stats = get_faculty_data(where_clause.replace("WHERE", "AND") if "WHERE" in where_clause else "")
     period_stats = get_period_data(where_clause, join_needed)
     heatmap_data = get_heatmap_data(where_clause, join_needed)
     canteen_stats = get_canteen_data(where_clause, join_needed)
     
-    # Inisialisasi variabel untuk laporan agar tidak error jika DataFrame kosong
     total_emisi = daily_stats['total_emisi'].sum() if 'total_emisi' in daily_stats.columns and not daily_stats.empty else 0
     total_activities = daily_stats['activity_count'].sum() if 'activity_count' in daily_stats.columns and not daily_stats.empty else 0
     avg_emisi_per_activity = total_emisi / total_activities if total_activities > 0 else 0
 
-    # Fallback HTML jika tidak ada data sama sekali
     if daily_stats.empty and fakultas_stats.empty and period_stats.empty and heatmap_data.empty and canteen_stats.empty:
         return b"<html><body><h1>Tidak ada data untuk dilaporkan</h1><p>Silakan ubah filter Anda.</p></body></html>"
-
-    # --- Bagian Pembuatan Insight Dinamis dan HTML Tabel ---
     
     # 1. Tren Harian
     daily_trend_table_html = "<tr><td colspan='3'>Data tidak tersedia.</td></tr>"
@@ -228,7 +202,6 @@ def generate_pdf_report(where_clause, join_needed):
                 pivot_df = pivot_df[sorted_columns]
             except (ValueError, IndexError): pass
             
-            # Map/truncate Y-axis labels for HTML table (similar to what was done for Plotly)
             original_locations_heatmap = pivot_df.index.tolist()
             display_locations_heatmap = [CANTEEN_DISPLAY_NAMES.get(loc, loc) for loc in original_locations_heatmap]
             display_locations_heatmap = [name if len(name) <= 15 else name[:13] + '..' for name in display_locations_heatmap]
@@ -245,7 +218,7 @@ def generate_pdf_report(where_clause, join_needed):
             hotspot_value = pivot_df.max().max()
             if hotspot_value > 0:
                 hotspot_time = pivot_df.max().idxmax()
-                hotspot_location_orig = pivot_df.idxmax()[hotspot_time] # Original location name
+                hotspot_location_orig = pivot_df.idxmax()[hotspot_time] 
                 hotspot_location_display = CANTEEN_DISPLAY_NAMES.get(hotspot_location_orig, hotspot_location_orig)
 
                 heatmap_conclusion = f"Teridentifikasi 'hotspot' emisi di <strong>{hotspot_location_display}</strong> pada jam <strong>{hotspot_time}</strong>, yang merupakan kombinasi lokasi dan waktu dengan emisi tertinggi."
@@ -264,10 +237,9 @@ def generate_pdf_report(where_clause, join_needed):
             for _, row in canteen_stats.iterrows()
         ])
         
-        hottest_canteen_orig = hottest_canteen_row['lokasi'] # Original location name
+        hottest_canteen_orig = hottest_canteen_row['lokasi'] 
         hottest_canteen_display = CANTEEN_DISPLAY_NAMES.get(hottest_canteen_orig, hottest_canteen_orig)
         
-        # Mengakses avg_emisi dengan aman dari hottest_canteen_row (Series)
         avg_emisi_canteen_val = hottest_canteen_row['avg_emisi'] if 'avg_emisi' in hottest_canteen_row else 0.0
 
         canteen_conclusion = f"Lokasi/kantin <strong>{hottest_canteen_display}</strong> adalah kontributor tunggal terbesar terhadap emisi sampah makanan, dengan rata-rata limbah per aktivitas sebesar <strong>{avg_emisi_canteen_val:.2f} kg CO<sub>2</sub></strong>. Ini menunjukkan adanya masalah sistemik di lokasi ini."
@@ -318,7 +290,6 @@ def generate_pdf_report(where_clause, join_needed):
     </div></body></html>
     """
     
-    # --- BAGIAN KONVERSI KE PDF ---
     pdf_buffer = BytesIO()
 
     pisa_status = pisa.CreatePDF(
@@ -327,12 +298,11 @@ def generate_pdf_report(where_clause, join_needed):
 
     if pisa_status.err:
         st.error(f"Error during PDF conversion: {pisa_status.err}. Check HTML format or xhtml2pdf installation.")
-        return None # Mengembalikan None jika ada error
+        return None 
 
     pdf_bytes = pdf_buffer.getvalue()
     pdf_buffer.close()
 
-    # Mengembalikan bytes PDF
     return pdf_bytes
 
 def show():
@@ -344,7 +314,6 @@ def show():
         """, unsafe_allow_html=True)
     time.sleep(0.25)  
 
-    # --- Filters ---
     filter_col1, filter_col2, filter_col3, export_col1, export_col2 = st.columns([1.8, 1.8, 1.8, 1, 1])
 
     with filter_col1:
@@ -359,10 +328,8 @@ def show():
         available_fakultas = fakultas_df['fakultas'].tolist() if not fakultas_df.empty else []
         selected_fakultas = st.multiselect("Fakultas:", options=available_fakultas, placeholder="Pilih Opsi", key='food_fakultas_filter')
 
-    # --- Membangun Query Berdasarkan Filter ---
     where_clause, join_needed = build_food_where_clause(selected_days, selected_periods, selected_fakultas)
     
-    # --- Tombol Ekspor ---
     with export_col1:
         st.download_button("Raw Data", "Fitur dinonaktifkan.", "raw_data.csv", use_container_width=True, disabled=True)
     
@@ -374,7 +341,7 @@ def show():
                 st.download_button(
                     label="Laporan",
                     data=pdf_data, 
-                    file_name=f"food_waste_report_{pd.Timestamp.now().strftime('%Y%m%d')}.pdf", # Ubah ekstensi menjadi .pdf
+                    file_name=f"food_waste_report_{pd.Timestamp.now().strftime('%Y%m%d')}.pdf", 
                     mime="application/pdf", 
                     use_container_width=True,
                     key="food_export_pdf"
@@ -384,11 +351,10 @@ def show():
         except Exception as e:
             st.error(f"Gagal membuat laporan: {e}")
 
-    # --- Baris Visualisasi 1 ---
     with loading():
         col1, col2, col3 = st.columns([1, 1, 1])
 
-        with col1: # Tren Emisi Harian
+        with col1: 
             daily_trend_df = get_daily_trend_data(where_clause, join_needed)
             if not daily_trend_df.empty:
                 daily_trend_df['day_order'] = pd.Categorical(daily_trend_df['hari'], categories=DAY_ORDER, ordered=True)
@@ -399,7 +365,7 @@ def show():
             else:
                 st.info("Tidak ada data tren harian untuk filter ini.")
 
-        with col2: # Emisi per Fakultas
+        with col2: 
             faculty_where = where_clause.replace("WHERE", "AND") if "WHERE" in where_clause else ""
             faculty_df = get_faculty_data(faculty_where)
             if not faculty_df.empty:
@@ -442,11 +408,10 @@ def show():
             else:
                 st.info("Tidak ada data periode untuk filter ini.")
 
-    # --- Baris Visualisasi 2 ---
     with loading():
         col1, col2 = st.columns([1, 1])
 
-        with col1: # Heatmap Lokasi vs Waktu (PERBAIKAN DIMULAI DI SINI)
+        with col1: 
             heatmap_df = get_heatmap_data(where_clause, join_needed)
             if not heatmap_df.empty:
                 pivot_df = heatmap_df.pivot_table(index='lokasi', columns='time_slot', values='total_emisi', fill_value=0)
@@ -456,7 +421,6 @@ def show():
                         pivot_df = pivot_df[sorted_columns]
                     except (ValueError, IndexError): pass
                     
-                    # --- NEW: Siapkan label Y-axis yang dipotong/di-map ---
                     original_locations = pivot_df.index.tolist()
                     display_locations_truncated = [CANTEEN_DISPLAY_NAMES.get(loc, loc) for loc in original_locations]
                     # Fallback truncation for any unmapped or still too long names
@@ -478,11 +442,10 @@ def show():
                         margin=dict(t=30, b=20, l=20, r=20), 
                         title=dict(text="<b>Heatmap Emisi Lokasi per Jam</b>", x=0.35, y=0.95, font=dict(size=12)),
                         xaxis=dict(tickangle=25),
-                        # --- NEW: Konfigurasi Y-axis untuk menampilkan label yang dipotong ---
                         yaxis=dict(
-                            tickvals=original_locations, # Nilai sebenarnya di sumbu Y
-                            ticktext=display_locations_truncated, # Label yang akan ditampilkan
-                            automargin=True, # Memastikan label terlihat
+                            tickvals=original_locations,
+                            ticktext=display_locations_truncated,
+                            automargin=True, 
                         )
                     )
                     
@@ -492,7 +455,7 @@ def show():
             else:
                 st.info("Tidak ada data heatmap untuk kantin yang dipilih.")
 
-        with col2: # Emisi per Kantin (tidak ada perubahan dari perbaikan sebelumnya)
+        with col2: 
             canteen_df = get_canteen_data(where_clause, join_needed)
             if not canteen_df.empty:
                 canteen_df = canteen_df.sort_values('total_emisi', ascending=False)
