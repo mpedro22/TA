@@ -44,5 +44,3 @@ htmlcov/
 # Kredensial dan file sensitif
 .env
 credentials.json
-
-etl_script.py
