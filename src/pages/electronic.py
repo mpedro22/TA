@@ -138,6 +138,41 @@ def get_classroom_data(where_aktivitas, join_needed, selected_devices):
     return df
 
 @st.cache_data(ttl=3600)
+def get_filtered_raw_elektronik_data(selected_fakultas, selected_days):
+    """
+    Mengambil data mentah dari tabel 'elektronik' yang difilter oleh fakultas dan hari datang.
+    Digunakan untuk tombol 'Raw Data'.
+    """
+    clauses = []
+    join_sql = "LEFT JOIN v_informasi_fakultas_mahasiswa r ON e.id_mahasiswa = r.id_mahasiswa"
+
+    if selected_fakultas:
+        fakultas_str = ", ".join([f"'{f}'" for f in selected_fakultas])
+        clauses.append(f"r.fakultas IN ({fakultas_str})")
+    if selected_days:
+        day_patterns = [f"'%{day}%'" for day in selected_days]
+        clauses.append(f"e.hari_datang ILIKE ANY (ARRAY[{', '.join(day_patterns)}])")
+
+    where_sql = "WHERE " + " AND ".join(clauses) if clauses else ""
+
+    query = f"""
+    SELECT
+        e.id_mahasiswa,
+        COALESCE(r.fakultas, 'N/A') as fakultas,
+        e.hari_datang,
+        e.durasi_hp,
+        e.durasi_laptop,
+        e.durasi_tab,
+        e.emisi_elektronik_pribadi,
+        e.emisi_elektronik
+    FROM
+        elektronik e
+    {join_sql}
+    {where_sql}
+    """
+    return run_sql(query)
+
+@st.cache_data(ttl=3600)
 @loading_decorator()
 def generate_pdf_report(where_elektronik, where_aktivitas, join_needed, selected_days, selected_devices):
     from datetime import datetime
@@ -321,7 +356,16 @@ def show():
     where_elektronik, where_aktivitas, join_needed = build_universal_where_clause(selected_fakultas, selected_days)
 
     with export_col1:
-        st.download_button("Raw Data", "Fitur dinonaktifkan.", "raw_data.csv", disabled=True, use_container_width=True)
+        # Ambil data mentah yang difilter untuk diunduh
+        raw_data_df = get_filtered_raw_elektronik_data(selected_fakultas, selected_days)
+        st.download_button(
+            "Raw Data", 
+            data=raw_data_df.to_csv(index=False), # Pastikan ini adalah data yang valid
+            file_name=f"electronic_raw_data_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            mime="text/csv",
+            use_container_width=True,
+            disabled=(raw_data_df.empty) # Tombol aktif jika ada data
+        )
     with export_col2:
         try:
             pdf_data = generate_pdf_report(where_elektronik, where_aktivitas, join_needed, selected_days, selected_devices)

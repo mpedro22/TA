@@ -122,6 +122,46 @@ def get_canteen_data(where_clause, join_needed):
     return run_sql(query)
 
 @st.cache_data(ttl=3600)
+def get_filtered_raw_food_waste_data(selected_fakultas, selected_days):
+    """
+    Mengambil data mentah dari tabel 'sampah_makanan' yang difilter oleh fakultas dan hari datang.
+    Digunakan untuk tombol 'Raw Data'.
+    """
+    clauses = []
+    join_sql = "LEFT JOIN v_informasi_fakultas_mahasiswa r ON s.id_mahasiswa = r.id_mahasiswa"
+
+    if selected_fakultas:
+        fakultas_str = ", ".join([f"'{f}'" for f in selected_fakultas])
+        clauses.append(f"r.fakultas IN ({fakultas_str})")
+    if selected_days:
+        day_patterns = [f"'%{day}%'" for day in selected_days]
+        clauses.append(f"s.hari_datang ILIKE ANY (ARRAY[{', '.join(day_patterns)}])")
+
+    where_sql = "WHERE " + " AND ".join(clauses) if clauses else ""
+
+    query = f"""
+    SELECT
+        s.id_mahasiswa,
+        COALESCE(r.fakultas, 'N/A') as fakultas,
+        s.hari_datang,
+        s.tempat_makan,
+        s.emisi_sampah_makanan_senin,
+        s.emisi_sampah_makanan_selasa,
+        s.emisi_sampah_makanan_rabu,
+        s.emisi_sampah_makanan_kamis,
+        s.emisi_sampah_makanan_jumat,
+        s.emisi_sampah_makanan_sabtu,
+        s.emisi_sampah_makanan_minggu
+    FROM
+        sampah_makanan s
+    {join_sql}
+    {where_sql}
+    """
+    return run_sql(query)
+
+
+
+@st.cache_data(ttl=3600)
 @loading_decorator()
 def generate_pdf_report(where_clause, join_needed):
     from datetime import datetime
@@ -331,7 +371,16 @@ def show():
     where_clause, join_needed = build_food_where_clause(selected_days, selected_periods, selected_fakultas)
     
     with export_col1:
-        st.download_button("Raw Data", "Fitur dinonaktifkan.", "raw_data.csv", use_container_width=True, disabled=True)
+        # Ambil data mentah yang difilter untuk diunduh
+        raw_data_df = get_filtered_raw_food_waste_data(selected_fakultas, selected_days)
+        st.download_button(
+            "Raw Data", 
+            data=raw_data_df.to_csv(index=False), 
+            file_name=f"food_waste_raw_data_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv", 
+            mime="text/csv", 
+            use_container_width=True,
+            disabled=(raw_data_df.empty) # Tombol aktif jika ada data
+        )
     
     with export_col2:
         try:
