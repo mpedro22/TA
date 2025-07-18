@@ -39,6 +39,7 @@ def show():
         /* Menargetkan kontainer form */
         div[data-testid="stForm"] {
             width: 100%;
+            height: auto;
             max-width: 700px; /* Lebar form disesuaikan agar tidak terlalu lebar */
             background: white !important;
             border-radius: 20px;
@@ -58,9 +59,9 @@ def show():
             color: #1e293b;
             font-family: 'Poppins', sans-serif;
             font-weight: 600;
-            font-size: 1.6rem;
-            margin-top: -1rem;
-            margin-bottom: 2rem;
+            font-size: 1.2rem;
+            margin-top: -2rem;
+            margin-bottom: -3rem;
         }
 
         /* Menghilangkan tooltip "Press Enter to submit" */
