@@ -177,6 +177,10 @@ def create_behavior_profile(row, thresholds):
     return "Profil Campuran"
 
 
+# src/pages/overview.py
+
+# ... (bagian import dan definisi di atas tetap sama) ...
+
 @st.cache_data(ttl=3600)
 @loading_decorator()
 def generate_overview_pdf_report(filtered_agg_df_for_report, daily_pivot_for_report, fakultas_stats_for_report, num_responden_unique_pdf: int):
@@ -198,6 +202,7 @@ def generate_overview_pdf_report(filtered_agg_df_for_report, daily_pivot_for_rep
         'Sampah': filtered_agg_df_for_report['sampah_makanan'].sum() if 'sampah_makanan' in filtered_agg_df_for_report.columns else 0.0
     }
     
+    # Filter out categories with zero emission for a more relevant conclusion
     composition_data_filtered_for_conclusion = {k: v for k, v in composition_data.items() if v > 0}
     
     dominant_cat = "Tidak Tersedia"
@@ -214,17 +219,17 @@ def generate_overview_pdf_report(filtered_agg_df_for_report, daily_pivot_for_rep
             secondary_cat = sorted_comp[1][0]
             secondary_pct = (sorted_comp[1][1] / total_emisi * 100)
 
-        composition_conclusion = f"Sumber emisi utama adalah <strong>{dominant_cat}</strong>, menyumbang <strong>{dominant_pct:.1f}%</strong> dari total emisi ({total_emisi:.1f} kg CO<sub>2</sub>). {f'Kategori kedua terbesar adalah {secondary_cat} sebesar {secondary_pct:.1f}%.' if secondary_cat != 'Tidak Tersedia' else ''} Ini menunjukkan area mana yang paling perlu diperhatikan untuk pengurangan emisi."
+        composition_conclusion = f"Sumber emisi utama adalah <strong>{dominant_cat}</strong>, menyumbang <strong>{dominant_pct:.1f}%</strong> dari total emisi ({total_emisi:.1f} kg CO<sub>2</sub>) sesuai filter yang aktif. {f'Kategori kedua terbesar adalah {secondary_cat} sebesar {secondary_pct:.1f}%.' if secondary_cat != 'Tidak Tersedia' else ''} Proporsi ini mengindikasikan area utama yang perlu menjadi fokus strategis untuk inisiatif pengurangan emisi."
         
     else:
-        composition_conclusion = "Data komposisi emisi tidak tersedia atau semua kategori memiliki emisi nol."
+        composition_conclusion = "Data komposisi emisi tidak tersedia atau semua kategori memiliki emisi nol setelah filter diterapkan. Tidak dapat menentukan sumber emisi dominan."
 
     rec_map_cat = {
-        'Transportasi': "Dorong penggunaan transportasi publik, sepeda, atau jalan kaki dengan menyediakan fasilitas yang memadai. Pertimbangkan insentif untuk carpooling dan evaluasi kebijakan parkir untuk mengurangi penggunaan kendaraan pribadi di kampus.",
-        'Elektronik': "Tingkatkan efisiensi energi di fasilitas kampus (misal: ganti lampu LED, optimalkan AC dengan sensor). Edukasi mahasiswa dan staf untuk mematikan perangkat elektronik yang tidak digunakan dan memanfaatkan mode hemat daya.",
-        'Sampah': "Lakukan kampanye pengurangan limbah makanan yang konkret, seperti 'Jangan Sisakan Makanan'. Dukung program komposting dan kerja sama dengan kantin untuk manajemen porsi yang lebih baik serta penanganan sisa makanan yang bisa dimanfaatkan kembali."
+        'Transportasi': "Dorong penggunaan transportasi publik, sepeda, atau jalan kaki dengan menyediakan fasilitas yang memadai (misal: rute aman, parkir sepeda). Pertimbangkan insentif bagi pengguna moda berkelanjutan dan evaluasi kebijakan parkir kendaraan pribadi di kampus.",
+        'Elektronik': "Tingkatkan efisiensi energi di fasilitas kampus (misal: penggantian lampu LED, optimasi sistem pendingin ruangan). Edukasi mahasiswa dan staf untuk praktik hemat energi seperti mematikan perangkat yang tidak digunakan dan memanfaatkan mode hemat daya.",
+        'Sampah': "Implementasikan kampanye pengurangan limbah makanan yang konkret seperti 'Jangan Sisakan Makanan'. Dukung program pengolahan sampah organik (komposting) dan jalin kerja sama dengan kantin untuk manajemen porsi yang lebih baik serta penanganan sisa makanan."
     }
-    composition_recommendation = rec_map_cat.get(dominant_cat, "Rekomendasi spesifik berdasarkan komposisi emisi belum dapat diberikan.")
+    composition_recommendation = rec_map_cat.get(dominant_cat, "Rekomendasi spesifik berdasarkan komposisi emisi belum dapat diberikan karena data tidak memadai atau semua kategori memiliki emisi nol.")
 
     peak_day = "Tidak Tersedia"
     peak_emisi = 0
@@ -235,22 +240,23 @@ def generate_overview_pdf_report(filtered_agg_df_for_report, daily_pivot_for_rep
         if not daily_totals.empty and daily_totals.max() > 0:
             peak_day = daily_totals.idxmax()
             peak_emisi = daily_totals.max()
-            trend_conclusion = f"Emisi harian tertinggi terjadi pada hari <strong>{peak_day}</strong>, dengan total <strong>{peak_emisi:.1f} kg CO<sub>2</sub></strong>. Puncak ini mungkin terkait dengan aktivitas kampus yang padat pada hari tersebut."
-            trend_recommendation = f"Selidiki aktivitas apa saja yang paling banyak terjadi pada hari <strong>{peak_day}</strong> yang menyebabkan emisi tinggi. Pertimbangkan program penghematan energi atau pengingat digital pada hari-hari tersebut untuk mengurangi konsumsi yang tidak perlu."
+            trend_conclusion = f"Emisi harian tertinggi cenderung terjadi pada hari <strong>{peak_day}</strong>, dengan total <strong>{peak_emisi:.1f} kg CO<sub>2</sub></strong>. Pola ini mungkin terkait dengan intensitas aktivitas akademik dan operasional kampus pada hari tersebut."
+            trend_recommendation = f"Fokuskan program kesadaran dan efisiensi energi pada hari <strong>{peak_day}</strong>. Lakukan analisis lebih lanjut terhadap jenis aktivitas spesifik yang menyumbang emisi tinggi pada hari tersebut untuk intervensi yang lebih bertarget (misal: optimasi jadwal penggunaan fasilitas)."
         else:
-            trend_conclusion = "Tidak ada pola emisi harian yang menonjol atau emisi sangat rendah. Emisi cenderung tersebar merata antar hari."
-            trend_recommendation = "Lanjutkan memantau tren harian. Jika emisi mulai meningkat, identifikasi pemicunya. Dorong partisipasi lebih banyak dalam pengisian data aktivitas untuk gambaran tren yang lebih jelas."
+            trend_conclusion = "Tidak ada pola emisi harian yang menonjol atau emisi terdistribusi secara merata di antara hari-hari yang dipilih."
+            trend_recommendation = "Lanjutkan pemantauan tren harian. Jika terjadi lonjakan emisi, identifikasi pemicunya. Dorong partisipasi yang lebih luas dalam pengisian data aktivitas untuk gambaran tren yang lebih jelas."
     else:
-        trend_conclusion = "Data tren harian tidak tersedia untuk analisis."
-        trend_recommendation = "Pastikan data aktivitas harian dikumpulkan secara konsisten untuk memungkinkan analisis tren yang bermanfaat."
+        trend_conclusion = "Data tren emisi harian tidak tersedia untuk analisis setelah filter diterapkan."
+        trend_recommendation = "Pastikan data aktivitas harian dikumpulkan secara konsisten dan mencukupi untuk memungkinkan analisis tren yang bermanfaat."
 
     fakultas_report_html = "<tr><td colspan='2'>Data tidak tersedia.</td></tr>" 
-    fakultas_conclusion = "Data fakultas tidak cukup untuk dianalisis (minimal 2 fakultas dengan data emisi diperlukan)."
-    fakultas_recommendation = "Dorong partisipasi lebih banyak mahasiswa dari berbagai fakultas untuk mendapatkan perbandingan yang lebih komprehensif."
+    fakultas_conclusion = "Data emisi per fakultas tidak cukup untuk analisis komparatif (diperlukan minimal 2 fakultas dengan data emisi yang valid)."
+    fakultas_recommendation = "Dorong partisipasi lebih banyak mahasiswa dari berbagai fakultas untuk mendapatkan perbandingan yang lebih komprehensif dan representatif."
     
     if not fakultas_stats_for_report.empty and fakultas_stats_for_report['total_emisi'].sum() > 0:
         fakultas_report = fakultas_stats_for_report.sort_values('total_emisi', ascending=False)
-        fakultas_report_html = ''.join([f"<tr><td>{row['fakultas']}</td><td style='text-align:right;'>{row['total_emisi']:.1f}</td></tr>" for idx, row in fakultas_report.head(10).iterrows()])
+        # Menampilkan SEMUA fakultas, bukan hanya top 10
+        fakultas_report_html = ''.join([f"<tr><td>{row['fakultas']}</td><td style='text-align:right;'>{row['total_emisi']:.1f}</td></tr>" for idx, row in fakultas_report.iterrows()])
         
         if len(fakultas_report) > 1:
             highest_fakultas_row = fakultas_report.iloc[0]
@@ -259,22 +265,23 @@ def generate_overview_pdf_report(filtered_agg_df_for_report, daily_pivot_for_rep
             conclusion_detail = ""
             if lowest_fakultas_row['total_emisi'] > 0:
                 emission_ratio = highest_fakultas_row['total_emisi'] / lowest_fakultas_row['total_emisi']
-                conclusion_detail = f"Fakultas <strong>{highest_fakultas_row['fakultas']}</strong> memiliki emisi <strong>{highest_fakultas_row['total_emisi']:.1f} kg CO<sub>2</sub></strong>, sekitar {emission_ratio:.1f} kali lebih tinggi dari fakultas <strong>{lowest_fakultas_row['fakultas']} ({lowest_fakultas_row['total_emisi']:.1f} kg CO<sub>2</sub>)</strong>."
+                conclusion_detail = f"Fakultas <strong>{highest_fakultas_row['fakultas']}</strong> menunjukkan emisi tertinggi dengan <strong>{highest_fakultas_row['total_emisi']:.1f} kg CO<sub>2</sub></strong>, sekitar {emission_ratio:.1f} kali lebih tinggi dari fakultas dengan emisi terendah, <strong>{lowest_fakultas_row['fakultas']} ({lowest_fakultas_row['total_emisi']:.1f} kg CO<sub>2</sub>)</strong>."
             else:
-                conclusion_detail = f"Fakultas <strong>{highest_fakultas_row['fakultas']}</strong> memiliki emisi tertinggi sebesar <strong>{highest_fakultas_row['total_emisi']:.1f} kg CO<sub>2</sub></strong>, sementara <strong>{lowest_fakultas_row['fakultas']}</strong> memiliki emisi terendah sebesar <strong>{lowest_fakultas_row['total_emisi']:.1f} kg CO<sub>2</sub></strong> (bisa jadi nol)."
+                conclusion_detail = f"Fakultas <strong>{highest_fakultas_row['fakultas']}</strong> memiliki emisi tertinggi sebesar <strong>{highest_fakultas_row['total_emisi']:.1f} kg CO<sub>2</sub></strong>, sementara beberapa fakultas lain memiliki emisi mendekati nol atau nol."
 
-            fakultas_conclusion = f"Terdapat perbedaan emisi yang jelas antar fakultas. {conclusion_detail} Ini menunjukkan variasi dalam kebiasaan penggunaan energi atau jumlah aktivitas yang menghasilkan emisi di tiap fakultas."
-            fakultas_recommendation = f"Fasilitasi program pertukaran informasi atau 'benchmarking' antara fakultas beremisi rendah (misal <strong>{lowest_fakultas_row['fakultas']}</strong>) dan beremisi tinggi (misal <strong>{highest_fakultas_row['fakultas']}</strong>). Lakukan audit energi dan limbah yang lebih spesifik untuk fakultas dengan emisi tinggi guna menemukan sumber emisi terbesar dan cara menguranginya."
+            fakultas_conclusion = f"Terdapat variasi signifikan emisi antar fakultas. {conclusion_detail} Pola ini mungkin mengindikasikan perbedaan dalam kebiasaan penggunaan sumber daya atau aktivitas spesifik yang menghasilkan emisi di tiap fakultas."
+            fakultas_recommendation = f"Fasilitasi program 'benchmarking' antar fakultas (misal: studi kasus dari Fakultas <strong>{lowest_fakultas_row['fakultas']}</strong> ke <strong>{highest_fakultas_row['fakultas']}</strong>). Lakukan audit energi dan limbah yang lebih spesifik untuk fakultas dengan emisi tinggi guna mengidentifikasi sumber emisi terbesar dan potensi pengurangan yang optimal."
         else: 
-            fakultas_conclusion = f"Data hanya mencakup Fakultas <strong>{fakultas_report.iloc[0]['fakultas']}</strong>. Perbandingan dengan fakultas lain tidak dapat dilakukan."
-            fakultas_recommendation = "Perluas filter fakultas untuk mendapatkan perbandingan yang lebih komprehensif."
+            fakultas_conclusion = f"Data hanya mencakup Fakultas <strong>{fakultas_report.iloc[0]['fakultas']}</strong> setelah filter diterapkan. Perbandingan lintas fakultas tidak dapat dilakukan."
+            fakultas_recommendation = "Perluas filter fakultas untuk mendapatkan perbandingan yang lebih komprehensif atau pastikan data dari fakultas lain tersedia."
 
     segmentation_table_html = "<tr><td colspan='5'>Data tidak cukup untuk segmentasi.</td></tr>"
-    segmentation_conclusion = "Tidak dapat membuat profil perilaku mahasiswa karena data terbatas (diperlukan minimal 6 responden unik untuk analisis ini)."
-    segmentation_recommendation = "Tingkatkan jumlah responden yang mengisi data untuk mendapatkan gambaran profil perilaku yang lebih akurat dan dapat digunakan untuk kebijakan yang lebih bertarget."
+    segmentation_conclusion = "Tidak dapat membuat profil perilaku mahasiswa karena data responden terbatas (diperlukan minimal 6 responden unik setelah filter diterapkan untuk analisis ini)."
+    segmentation_recommendation = "Tingkatkan jumlah responden yang mengisi data untuk mendapatkan gambaran profil perilaku yang lebih akurat dan dapat digunakan untuk kebijakan yang lebih bertarget dan efektif."
 
     if num_responden_unique_pdf > 5: 
         if not filtered_agg_df_for_report.empty:
+            # Handle potential NaNs from median if all values are zero or missing after filtering
             median_transportasi = filtered_agg_df_for_report['transportasi'].median() if 'transportasi' in filtered_agg_df_for_report.columns else 0.0
             median_elektronik = filtered_agg_df_for_report['elektronik'].median() if 'elektronik' in filtered_agg_df_for_report.columns else 0.0
             median_sampah = filtered_agg_df_for_report['sampah_makanan'].median() if 'sampah_makanan' in filtered_agg_df_for_report.columns else 0.0
@@ -317,13 +324,13 @@ def generate_overview_pdf_report(filtered_agg_df_for_report, daily_pivot_for_rep
                 segmentation_conclusion = f"Analisis perilaku mengidentifikasi '<strong>{dominant_profile}</strong>' sebagai kelompok terbesar dengan <strong>{dominant_count}</strong> mahasiswa. Kelompok ini memiliki rata-rata emisi transportasi {avg_transport_dom:.2f} kg CO<sub>2</sub>, elektronik {avg_elektronik_dom:.2f} kg CO<sub>2</sub>, dan sampah {avg_sampah_dom:.2f} kg CO<sub>2</sub>. Memahami profil ini membantu menentukan strategi pengurangan emisi yang tepat sasaran."
                 
                 rec_map_behavior = {
-                    "Kontributor Utama": "Prioritaskan kelompok ini dengan program edukasi dan insentif yang menyeluruh. Contoh: 'Green Campus Challenge' dengan hadiah, panduan personal tentang efisiensi energi, dan promosi gaya hidup minim emisi.",
+                    "Kontributor Utama": "Prioritaskan kelompok ini dengan program edukasi dan insentif yang menyeluruh, seperti 'Green Campus Challenge' dengan hadiah atau panduan personal tentang efisiensi energi dan promosi gaya hidup minim emisi.",
                     "Komuter & Digital": "Fokus pada transportasi berkelanjutan (misal: promo tiket bus/kereta, diskon sewa sepeda) dan kampanye penghematan energi perangkat elektronik (misal: 'Cabut Chargermu!').",
-                    "Komuter & Boros Pangan": "Kombinasikan program transportasi berkelanjutan dengan inisiatif pengurangan limbah makanan. Contoh: workshop masak minim sisa, kerja sama dengan kantin untuk opsi porsi kecil atau program makanan sisa.",
+                    "Komuter & Boros Pangan": "Kombinasikan program transportasi berkelanjutan dengan inisiatif pengurangan limbah makanan, seperti workshop masak minim sisa atau kerja sama dengan kantin untuk opsi porsi kecil/program makanan sisa.",
                     "Digital & Boros Pangan": "Targetkan dengan kampanye 'Hemat Energi Layar' untuk perangkat dan 'Habiskan Porsi Makananmu' di area makan. Pertimbangkan aplikasi pelacak emisi yang menyoroti dampak dari kebiasaan digital dan pangan.",
-                    "Komuter Berat": "Perluas pilihan transportasi alternatif. Contoh: sediakan lebih banyak shuttle bus kampus, hari 'Tanpa Kendaraan Pribadi' dengan hadiah, atau dukung komunitas carpooling mahasiswa.",
+                    "Komuter Berat": "Perluas pilihan transportasi alternatif, seperti penyediaan lebih banyak shuttle bus kampus, hari 'Tanpa Kendaraan Pribadi' dengan hadiah, atau dukungan komunitas carpooling mahasiswa.",
                     "Pengguna Elektronik Berat": "Edukasi mendalam tentang konsumsi daya perangkat. Promosikan penggunaan mode hemat daya, berikan daftar perangkat elektronik efisien, atau tawarkan audit energi kecil untuk ruang kerja/belajar.",
-                    "Boros Pangan": "Fokus pada edukasi tentang dampak limbah makanan. Contoh: kampanye 'Piring Bersih', program donasi makanan berlebih ke komunitas, atau kerja sama dengan katering kampus untuk mengurangi sisa produksi.",
+                    "Boros Pangan": "Fokus pada edukasi tentang dampak limbah makanan, seperti kampanye 'Piring Bersih', program donasi makanan berlebih ke komunitas, atau kerja sama dengan katering kampus untuk mengurangi sisa produksi.",
                     "Sangat Sadar Lingkungan": "Libatkan mereka sebagai 'Duta Lingkungan' atau mentor bagi mahasiswa lain. Berikan platform untuk berbagi praktik terbaik dan ide-ide inovatif untuk keberlanjutan kampus.",
                     "Profil Campuran": "Sediakan materi edukasi umum yang mudah diakses (infografis, video singkat) tentang sumber emisi utama dan tips sederhana untuk mengurangi jejak karbon dalam kehidupan kampus sehari-hari."
                 }
@@ -349,7 +356,7 @@ def generate_overview_pdf_report(filtered_agg_df_for_report, daily_pivot_for_rep
         .card strong {{ font-size: 1.5em; display: block; }}
         .conclusion, .recommendation {{ padding: 12px 15px; margin-top: 10px; border-radius: 6px; }}
         .conclusion {{ background: #f0fdf4; border-left: 4px solid #10b981; }}
-        .recommendation {{ background: #fffbeb; border-left: 44px solid #f59e0b; }}
+        .recommendation {{ background: #fffbeb; border-left: 4px solid #f59e0b; }} /* Changed back to 4px from 44px */
         ul {{ padding-left: 20px; margin-top: 8px; margin-bottom: 0; }} li {{ margin-bottom: 5px; }}
         table {{ width: 100%; border-collapse: collapse; margin-top: 15px; }} th, td {{ padding: 8px; text-align: left; border: 1px solid #e5e7eb; }}
         th {{ background-color: #f3f4f6; font-weight: 600; text-align: center; }}
@@ -363,7 +370,7 @@ def generate_overview_pdf_report(filtered_agg_df_for_report, daily_pivot_for_rep
         </div>
         <h2>1. Emisi per Fakultas</h2>
         <table><thead><tr><th>Fakultas</th><th>Total Emisi (kg CO<sub>2</sub>)</th></tr></thead><tbody>
-        {''.join([f"<tr><td>{row['fakultas']}</td><td style='text-align:right;'>{row['total_emisi']:.1f}</td></tr>" for idx, row in fakultas_stats_for_report.sort_values('total_emisi', ascending=False).head(10).iterrows()]) if not fakultas_stats_for_report.empty and fakultas_stats_for_report['total_emisi'].sum() > 0 else "<tr><td colspan='2'>Data tidak tersedia.</td></tr>"}
+        {fakultas_report_html}
         </tbody></table>
         <div class="conclusion"><strong>Insight:</strong> {fakultas_conclusion}</div>
         <div class="recommendation"><strong>Rekomendasi:</strong> {fakultas_recommendation}</div>
@@ -498,7 +505,7 @@ def show():
 
     with export_col1:
         st.download_button(
-            "Raw Data Agregat", 
+            "Raw Data", 
             filtered_overall_data_for_metrics.to_csv(index=False), 
             file_name=f"overview_filtered_data_aggregated_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
             mime="text/csv",
@@ -511,7 +518,7 @@ def show():
             pdf_data = generate_overview_pdf_report(filtered_overall_data_for_metrics, daily_pivot, fakultas_stats, num_responden_unique_kpi)
             if pdf_data: 
                 st.download_button(
-                    label="Laporan PDF",
+                    label="Laporan",
                     data=pdf_data,
                     file_name=f"overview_report_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.pdf",
                     mime="application/pdf",
@@ -569,7 +576,7 @@ def show():
                     title_x=0.32,
                     margin=dict(t=40, b=0, l=0, r=20),
                     xaxis_title="Total Emisi (kg CO₂)",
-                    yaxis_title=None,
+                    yaxis_title="Fakultas",
                     showlegend=False,
                     paper_bgcolor='rgba(0,0,0,0)',
                     plot_bgcolor='rgba(0,0,0,0)',
@@ -599,8 +606,8 @@ def show():
                     ))
             
             if fig_trend.data: 
-                fig_trend.update_layout(height=265, title_text="<b>Tren Emisi Harian</b>", title_x=0.32,
-                    margin=dict(t=40, b=0, l=0, r=0), legend_title_text='', yaxis_title="Emisi (kg CO₂)", xaxis_title=None,
+                fig_trend.update_layout(height=265, title_text="<b>Tren Emisi Harian</b>", title_x=0.32, title_y=0.95,
+                    margin=dict(t=30, b=0, l=0, r=0), legend_title_text='', yaxis_title="Emisi (kg CO₂)", xaxis_title="Hari",
                     legend=dict(orientation="h", yanchor="bottom", y=-0.4, xanchor="center", x=0.5, font_size=9))
                 st.plotly_chart(fig_trend, config=MODEBAR_CONFIG, use_container_width=True)
             else:

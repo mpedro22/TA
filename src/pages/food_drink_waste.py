@@ -159,16 +159,16 @@ def get_filtered_raw_food_waste_data(selected_fakultas, selected_days):
     """
     return run_sql(query)
 
-
-
 @st.cache_data(ttl=3600)
 @loading_decorator()
 def generate_pdf_report(where_clause, join_needed):
     from datetime import datetime
+    import time 
+    
     time.sleep(0.6)
 
     daily_stats = get_daily_trend_data(where_clause, join_needed)
-    fakultas_stats = get_faculty_data(where_clause.replace("WHERE", "AND") if "WHERE" in where_clause else "")
+    fakultas_stats = get_faculty_data(where_clause) 
     period_stats = get_period_data(where_clause, join_needed)
     heatmap_data = get_heatmap_data(where_clause, join_needed)
     canteen_stats = get_canteen_data(where_clause, join_needed)
@@ -177,63 +177,80 @@ def generate_pdf_report(where_clause, join_needed):
     total_activities = daily_stats['activity_count'].sum() if 'activity_count' in daily_stats.columns and not daily_stats.empty else 0
     avg_emisi_per_activity = total_emisi / total_activities if total_activities > 0 else 0
 
-    if daily_stats.empty and fakultas_stats.empty and period_stats.empty and heatmap_data.empty and canteen_stats.empty:
+    if total_emisi == 0 and total_activities == 0 and daily_stats.empty and fakultas_stats.empty and period_stats.empty and heatmap_data.empty and canteen_stats.empty:
         return b"<html><body><h1>Tidak ada data untuk dilaporkan</h1><p>Silakan ubah filter Anda.</p></body></html>"
     
-    # 1. Tren Harian
-    daily_trend_table_html = "<tr><td colspan='3'>Data tidak tersedia.</td></tr>"
-    trend_conclusion = "Pola emisi harian tidak dapat diidentifikasi."
-    trend_recommendation = "Data tidak cukup untuk analisis tren."
+    # Inisialisasi default content
+    daily_trend_table_html, trend_conclusion, trend_recommendation = ("<tr><td colspan='3'>Data tidak tersedia.</td></tr>", "Pola emisi harian tidak dapat diidentifikasi.", "Data tidak cukup untuk analisis tren.")
+    fakultas_table_html, fakultas_conclusion, fakultas_recommendation = ("<tr><td colspan='3'>Data tidak tersedia.</td></tr>", "Profil emisi per fakultas tidak dapat dibuat.", "Data tidak cukup untuk analisis fakultas.")
+    period_table_html, period_conclusion, period_recommendation = ("<tr><td colspan='3'>Data tidak tersedia.</td></tr>", "Distribusi periode makan tidak dapat dianalisis.", "Data tidak cukup untuk analisis periode.")
+    heatmap_header_html, heatmap_body_html, heatmap_conclusion, heatmap_recommendation = ("<tr><th>-</th></tr>", "<tr><td>Data tidak tersedia.</td></tr>", "Pola emisi antar lokasi dan waktu belum dapat dipetakan.", "Data tidak cukup untuk mengidentifikasi hotspot.")
+    canteen_table_html, canteen_conclusion, canteen_recommendation = ("<tr><td colspan='3'>Data tidak tersedia.</td></tr>", "Lokasi dengan kontribusi emisi terbesar tidak dapat ditentukan.", "Data tidak cukup untuk analisis lokasi.")
     
+    # --- 1. Tren Emisi Harian ---
+    # Judul: Tren Emisi Harian
     if not daily_stats.empty and daily_stats['total_emisi'].sum() > 0:
         daily_stats['day_order'] = pd.Categorical(daily_stats['hari'], categories=DAY_ORDER, ordered=True)
         daily_stats_sorted = daily_stats.sort_values('day_order')
         daily_trend_table_html = "".join([f"<tr><td>{row['hari']}</td><td style='text-align:right;'>{row['total_emisi']:.1f}</td><td style='text-align:center;'>{row['activity_count']}</td></tr>" for _, row in daily_stats_sorted.iterrows()])
-        if len(daily_stats) > 1:
-            peak_day = daily_stats_sorted.loc[daily_stats_sorted['total_emisi'].idxmax()]
-            trend_conclusion = f"Puncak emisi sampah makanan terjadi pada hari <strong>{peak_day['hari']}</strong>, dengan total <strong>{peak_day['total_emisi']:.1f} kg CO<sub>2</sub></strong> dari {peak_day['activity_count']} aktivitas. Ini mengindikasikan pola konsumsi mingguan yang jelas."
-            trend_recommendation = f"Fokuskan kampanye 'Zero Food Waste' atau 'Habiskan Makananmu' agar lebih intensif pada hari <strong>{peak_day['hari']}</strong>. Ini bisa dilakukan melalui media sosial resmi atau poster di kantin-kantin utama."
-        elif len(daily_stats) == 1:
+        
+        if len(daily_stats_sorted) > 1:
+            peak_day_row = daily_stats_sorted.loc[daily_stats_sorted['total_emisi'].idxmax()]
+            low_day_row = daily_stats_sorted.loc[daily_stats_sorted['total_emisi'].idxmin()]
+            
+            trend_conclusion = f"Puncak emisi sampah makanan terjadi pada hari <strong>{peak_day_row['hari']}</strong> ({peak_day_row['total_emisi']:.1f} kg CO<sub>2</sub>) dan terendah pada <strong>{low_day_row['hari']}</strong> ({low_day_row['total_emisi']:.1f} kg CO<sub>2</sub>). Pola ini menunjukkan kebiasaan konsumsi mingguan mahasiswa."
+            trend_recommendation = f"Fokuskan kampanye 'Zero Food Waste' intensif pada hari <strong>{peak_day_row['hari']}</strong>. Bisa melalui media sosial atau poster di kantin."
+        elif len(daily_stats_sorted) == 1:
             day_name = daily_stats_sorted.iloc[0]['hari']
             day_emisi = daily_stats_sorted.iloc[0]['total_emisi']
-            trend_conclusion = f"Data yang ditampilkan hanya untuk hari <strong>{day_name}</strong>, dengan total emisi tercatat sebesar {day_emisi:.1f} kg CO<sub>2</sub>."
-            trend_recommendation = "Untuk melihat tren, perluas rentang hari pada filter. Analisis untuk hari ini dapat difokuskan pada komposisi perangkat dan lokasi."
+            trend_conclusion = f"Data tren emisi harian hanya tersedia untuk hari <strong>{day_name}</strong>, dengan total emisi {day_emisi:.1f} kg CO<sub>2</sub>. Analisis pola konsumsi mingguan terbatas."
+            trend_recommendation = "Perluas rentang hari pada filter untuk tren komprehensif. Analisis hari ini fokus pada periode makan dan lokasi."
 
-
-    # 2. Emisi per Fakultas
-    fakultas_table_html = "<tr><td colspan='3'>Data tidak tersedia.</td></tr>"
-    fakultas_conclusion = "Profil emisi per fakultas tidak dapat dibuat."
-    fakultas_recommendation = "Data tidak cukup untuk analisis fakultas."
-    
+    # --- 2. Emisi per Fakultas ---
+    # Judul: Emisi per Fakultas
     if not fakultas_stats.empty and fakultas_stats['total_emisi'].sum() > 0:
         fakultas_stats_sorted = fakultas_stats.sort_values('total_emisi', ascending=False)
-        fakultas_table_html = "".join([f"<tr><td>{row['fakultas']}</td><td style='text-align:right;'>{row['total_emisi']:.2f}</td><td style='text-align:center;'>{row['activity_count']}</td></tr>" for _, row in fakultas_stats_sorted.head(10).iterrows()])
-        if len(fakultas_stats) > 1:
-            highest_fakultas = fakultas_stats_sorted.iloc[0]
-            fakultas_conclusion = f"Fakultas <strong>{highest_fakultas['fakultas']}</strong> merupakan kontributor emisi sampah makanan terbesar berdasarkan filter saat ini. Ini bisa mengindikasikan adanya kantin populer atau kebiasaan konsumsi yang spesifik di sekitar fakultas tersebut."
-            fakultas_recommendation = f"Jadikan Fakultas <strong>{highest_fakultas['fakultas']}</strong> sebagai area prioritas. Pengelola kampus dapat berkolaborasi dengan pengelola kantin terdekat untuk membahas opsi penyesuaian porsi atau diversifikasi menu."
-        else:
-            fakultas_conclusion = f"Data hanya mencakup Fakultas <strong>{fakultas_stats.iloc[0]['fakultas']}</strong>."
-            fakultas_recommendation = "Perluas filter fakultas untuk melakukan perbandingan."
+        # Tampilkan SEMUA fakultas yang memiliki emisi > 0
+        fakultas_table_html = "".join([f"<tr><td>{row['fakultas']}</td><td style='text-align:right;'>{row['total_emisi']:.2f}</td><td style='text-align:center;'>{row['activity_count']}</td></tr>" for _, row in fakultas_stats_sorted[fakultas_stats_sorted['total_emisi'] > 0].iterrows()])
+        
+        if len(fakultas_stats_sorted[fakultas_stats_sorted['total_emisi'] > 0]) > 1:
+            highest_fakultas_row = fakultas_stats_sorted.iloc[0]
+            lowest_fakultas_candidates = fakultas_stats_sorted[fakultas_stats_sorted['total_emisi'] > 0]
+            lowest_fakultas_row = lowest_fakultas_candidates.iloc[-1] if not lowest_fakultas_candidates.empty else highest_fakultas_row
+            
+            conclusion_detail = ""
+            if lowest_fakultas_row['total_emisi'] > 0:
+                emission_ratio = highest_fakultas_row['total_emisi'] / lowest_fakultas_row['total_emisi']
+                conclusion_detail = f"Fakultas <strong>{highest_fakultas_row['fakultas']}</strong> kontributor terbesar ({highest_fakultas_row['total_emisi']:.1f} kg CO<sub>2</sub>), sekitar {emission_ratio:.1f}x lebih tinggi dari fakultas terendah <strong>{lowest_fakultas_row['fakultas']} ({lowest_fakultas_row['total_emisi']:.1f} kg CO<sub>2</sub>)</strong>. Ini mengindikasikan kantin populer atau kebiasaan konsumsi spesifik."
+            else:
+                conclusion_detail = f"Fakultas <strong>{highest_fakultas_row['fakultas']}</strong> kontributor terbesar ({highest_fakultas_row['total_emisi']:.1f} kg CO<sub>2</sub>), sementara fakultas lain memiliki emisi mendekati nol."
 
-    # 3. Distribusi per Periode Waktu
-    period_table_html = "<tr><td colspan='3'>Data tidak tersedia.</td></tr>"
-    period_conclusion = "Distribusi periode makan tidak dapat dianalisis."
-    period_recommendation = "Data tidak cukup untuk analisis periode."
-    
+            fakultas_conclusion = f"Terdapat perbedaan kontribusi emisi sampah makanan antar fakultas. {conclusion_detail}"
+            fakultas_recommendation = f"Jadikan Fakultas <strong>{highest_fakultas_row['fakultas']}</strong> prioritas reduksi sampah. Berkolaborasi dengan kantin untuk evaluasi porsi/menu atau fasilitasi pemilahan organik. Pelajari praktik terbaik dari Fakultas <strong>{lowest_fakultas_row['fakultas']}</strong>."
+        else: # Hanya ada satu fakultas dengan emisi > 0
+            if not fakultas_stats_sorted[fakultas_stats_sorted['total_emisi'] > 0].empty:
+                fakultas_conclusion = f"Data hanya mencakup Fakultas <strong>{fakultas_stats_sorted[fakultas_stats_sorted['total_emisi'] > 0].iloc[0]['fakultas']}</strong>, dengan total emisi {fakultas_stats_sorted[fakultas_stats_sorted['total_emisi'] > 0].iloc[0]['total_emisi']:.1f} kg CO<sub>2</sub>. Perbandingan terbatas karena filter."
+                fakultas_recommendation = "Perluas filter fakultas untuk perbandingan komprehensif atau pastikan data fakultas lain tersedia."
+            else:
+                fakultas_conclusion = "Tidak ada fakultas dengan emisi sampah makanan tercatat setelah filter."
+                fakultas_recommendation = "Sesuaikan filter untuk mencakup fakultas dengan data emisi sampah makanan."
+
+    # --- 3. Proporsi Emisi per Waktu ---
+    # Judul: Proporsi Emisi per Waktu
     if not period_stats.empty and period_stats['total_emisi'].sum() > 0:
         period_stats_sorted = period_stats.sort_values('total_emisi', ascending=False)
         period_table_html = "".join([f"<tr><td>{row['meal_period']}</td><td style='text-align:right;'>{row['total_emisi']:.1f}</td><td style='text-align:center;'>{row['activity_count']}</td></tr>" for _, row in period_stats_sorted.iterrows()])
-        peak_period = period_stats_sorted.iloc[0]
-        period_conclusion = f"Periode <strong>{peak_period['meal_period']}</strong> menjadi 'critical window' dengan kontribusi emisi tertinggi, yaitu <strong>{peak_period['total_emisi']:.1f} kg CO<sub>2</sub></strong>."
-        period_recommendation = f"Pengelola kampus dapat bekerja sama dengan vendor makanan untuk memastikan ketersediaan pilihan makanan porsi kecil/sedang, terutama selama periode <strong>{peak_period['meal_period']}</strong>, untuk mengurangi potensi sisa makanan."
         
-    # 4. Pola Emisi (Lokasi & Waktu)
-    heatmap_header_html = "<tr><th>-</th></tr>"
-    heatmap_body_html = "<tr><td>Data tidak tersedia.</td></tr>"
-    heatmap_conclusion = "Pola emisi antar lokasi dan waktu belum dapat dipetakan."
-    heatmap_recommendation = "Data tidak cukup untuk mengidentifikasi hotspot."
-    
+        if len(period_stats_sorted) > 0:
+            peak_period_row = period_stats_sorted.iloc[0]
+            period_conclusion = f"Periode <strong>{peak_period_row['meal_period']}</strong> adalah waktu kritis dengan emisi sampah makanan tertinggi ({peak_period_row['total_emisi']:.1f} kg CO<sub>2</sub> dari {peak_period_row['activity_count']} aktivitas). Ini menunjukkan konsumsi makanan dan produksi sampah paling intensif pada waktu tersebut."
+            period_recommendation = f"Berkolaborasi dengan vendor makanan untuk porsi kecil/sedang saat periode <strong>{peak_period_row['meal_period']}</strong>. Promosikan kampanye 'Habiskan Makananmu' lebih intensif pada waktu ini."
+        else:
+            period_conclusion = "Tidak ada data distribusi emisi per periode waktu untuk analisis."
+            period_recommendation = "Pastikan data aktivitas makanan dikumpulkan dan filter tidak terlalu membatasi."
+        
+    # --- 4. Pola Emisi (Lokasi & Waktu) ---
+    # Judul: Pola Emisi (Lokasi & Waktu)
     if not heatmap_data.empty and heatmap_data['total_emisi'].sum() > 0:
         pivot_df = heatmap_data.pivot_table(index='lokasi', columns='time_slot', values='total_emisi', fill_value=0)
         if not pivot_df.empty:
@@ -255,20 +272,24 @@ def generate_pdf_report(where_clause, join_needed):
             ]
             heatmap_body_html = "".join(body_rows_list)
             
-            hotspot_value = pivot_df.max().max()
-            if hotspot_value > 0:
-                hotspot_time = pivot_df.max().idxmax()
-                hotspot_location_orig = pivot_df.idxmax()[hotspot_time] 
+            flat_heatmap = pivot_df.stack()
+            if not flat_heatmap.empty:
+                hotspot_value = flat_heatmap.max()
+                hotspot_idx = flat_heatmap.idxmax()
+                hotspot_location_orig, hotspot_time = hotspot_idx[0], hotspot_idx[1] 
                 hotspot_location_display = CANTEEN_DISPLAY_NAMES.get(hotspot_location_orig, hotspot_location_orig)
 
-                heatmap_conclusion = f"Teridentifikasi 'hotspot' emisi di <strong>{hotspot_location_display}</strong> pada jam <strong>{hotspot_time}</strong>, yang merupakan kombinasi lokasi dan waktu dengan emisi tertinggi."
-                heatmap_recommendation = f"Jadikan waktu puncak ini sebagai acuan. Pertimbangkan untuk menerapkan sistem otomatisasi (timer AC/lampu) yang aktif sebelum dan non-aktif setelah jam sibuk ini untuk efisiensi maksimal."
+                heatmap_conclusion = f"'Hotspot' emisi sampah makanan teridentifikasi di <strong>{hotspot_location_display}</strong> pada jam <strong>{hotspot_time}</strong>, dengan emisi {hotspot_value:.1f} kg CO<sub>2</sub>. Ini merupakan kombinasi lokasi dan waktu produksi sampah tertinggi."
+                heatmap_recommendation = f"Jadikan lokasi dan waktu puncak ini acuan strategis. Pertimbangkan staf kebersihan tambahan atau optimalkan frekuensi pengumpulan sampah di <strong>{hotspot_location_display}</strong> pada jam <strong>{hotspot_time}</strong>. Edukasi langsung pemilahan sampah juga bisa diterapkan."
+            else:
+                heatmap_conclusion = "Pola emisi antar lokasi dan waktu belum terpetakan. Data mungkin terlalu sedikit atau filter terlalu spesifik."
+                heatmap_recommendation = "Perluas filter lokasi, hari, atau periode waktu untuk analisis pola yang lebih komprehensif."
+    else:
+        heatmap_conclusion = "Pola emisi antar lokasi dan waktu belum dapat dipetakan. Data tidak cukup untuk mengidentifikasi hotspot."
+        heatmap_recommendation = "Perluas filter lokasi, hari, atau periode waktu untuk analisis pola yang lebih komprehensif."
 
-    # 5. Hotspot Emisi per Lokasi/Kantin
-    canteen_table_html = "<tr><td colspan='3'>Data tidak tersedia.</td></tr>"
-    canteen_conclusion = "Lokasi dengan kontribusi emisi terbesar tidak dapat ditentukan."
-    canteen_recommendation = "Data tidak cukup untuk analisis lokasi."
-    
+    # --- 5. Hotspot Emisi per Lokasi/Kantin ---
+    # Judul: Hotspot Emisi per Lokasi/Kantin
     if not canteen_stats.empty and canteen_stats['total_emisi'].sum() > 0:
         hottest_canteen_row = canteen_stats.sort_values('total_emisi', ascending=False).iloc[0] 
         
@@ -282,8 +303,8 @@ def generate_pdf_report(where_clause, join_needed):
         
         avg_emisi_canteen_val = hottest_canteen_row['avg_emisi'] if 'avg_emisi' in hottest_canteen_row else 0.0
 
-        canteen_conclusion = f"Lokasi/kantin <strong>{hottest_canteen_display}</strong> adalah kontributor tunggal terbesar terhadap emisi sampah makanan, dengan rata-rata limbah per aktivitas sebesar <strong>{avg_emisi_canteen_val:.2f} kg CO<sub>2</sub></strong>. Ini menunjukkan adanya masalah sistemik di lokasi ini."
-        canteen_recommendation = f"Jadikan <strong>{hottest_canteen_display}</strong> sebagai lokasi percontohan program reduksi sampah. Langkah yang bisa diambil: (1) Mengadakan diskusi dengan vendor untuk evaluasi porsi. (2) Memfasilitasi sistem pemilahan sampah organik yang lebih baik di lokasi ini."
+        canteen_conclusion = f"Lokasi/kantin <strong>{hottest_canteen_display}</strong> adalah kontributor terbesar emisi sampah makanan, dengan rata-rata limbah per aktivitas <strong>{avg_emisi_canteen_val:.2f} kg CO<sub>2</sub></strong>. Tingginya emisi di sini menunjukkan masalah sistemik atau volume konsumsi tinggi."
+        canteen_recommendation = f"Jadikan <strong>{hottest_canteen_display}</strong> percontohan reduksi sampah. Langkah: (1) Diskusi vendor evaluasi porsi/menu. (2) Fasilitasi pemilahan sampah organik jelas. (3) Kampanye edukasi pentingnya mengurangi sisa makanan."
 
 
     html_content = f"""
@@ -302,7 +323,7 @@ def generate_pdf_report(where_clause, join_needed):
         .conclusion {{ background: #f0fdf4; border-left: 4px solid #10b981; }}
         .recommendation {{ background: #fffbeb; border-left: 4px solid #f59e0b; }}
         ul {{ padding-left: 20px; margin-top: 8px; margin-bottom: 0; }} li {{ margin-bottom: 5px; }}
-        table {{ width: 100%; border-collapse: collapse; margin-top: 15px; }} th, td {{ padding: 8px; text-align: left; border: 1px solid #e5e7eb; }}
+        table {{ width: 100%; border-collapse: collapse; margin-top: 15px; }} th, td {{ padding: 7px; text-align: left; border: 1px solid #e5e7eb; }}
         th {{ background-color: #f3f4f6; font-weight: 600; text-align: center; }}
         td:first-child {{ font-weight: 500; }}
     </style></head>
@@ -318,13 +339,13 @@ def generate_pdf_report(where_clause, join_needed):
         <h2>2. Emisi per Fakultas</h2>
         <table><thead><tr><th>Fakultas</th><th>Total Emisi (kg CO<sub>2</sub>)</th><th>Jumlah Aktivitas</th></tr></thead><tbody>{fakultas_table_html}</tbody></table>
         <div class="conclusion"><strong>Insight:</strong> {fakultas_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {fakultas_recommendation}</div>
-        <h2>3. Distribusi per Periode Waktu</h2>
+        <h2>3. Proporsi Emisi per Waktu</h2>
         <table><thead><tr><th>Periode</th><th>Total Emisi (kg CO<sub>2</sub>)</th><th>Jumlah Aktivitas</th></tr></thead><tbody>{period_table_html}</tbody></table>
         <div class="conclusion"><strong>Insight:</strong> {period_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {period_recommendation}</div>
-        <h2>4. Pola Emisi (Lokasi & Waktu)</h2>
+        <h2>4. Heatmap Emisi Lokasi per Jam</h2>
         <table><thead>{heatmap_header_html}</thead><tbody>{heatmap_body_html}</tbody></table>
         <div class="conclusion"><strong>Insight:</strong> {heatmap_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {heatmap_recommendation}</div>
-        <h2>5. Hotspot Emisi per Lokasi/Kantin</h2>
+        <h2>5. Emisi per Lokasi</h2>
         <table><thead><tr><th>Lokasi/Kantin</th><th>Total Emisi (kg CO<sub>2</sub>)</th><th>Jumlah Aktivitas</th></tr></thead><tbody>{canteen_table_html}</tbody></table>
         <div class="conclusion"><strong>Insight:</strong> {canteen_conclusion}</div><div class="recommendation"><strong>Rekomendasi:</strong> {canteen_recommendation}</div>
     </div></body></html>
@@ -409,7 +430,7 @@ def show():
                 daily_trend_df['day_order'] = pd.Categorical(daily_trend_df['hari'], categories=DAY_ORDER, ordered=True)
                 daily_trend_df = daily_trend_df.sort_values('day_order')
                 fig_trend = go.Figure(go.Scatter(x=daily_trend_df['hari'], y=daily_trend_df['total_emisi'], fill='tonexty', mode='lines+markers', line=dict(color='#3288bd', width=2, shape='spline'), marker=dict(size=6, color='#3288bd'), fillcolor="rgba(102, 194, 165, 0.3)", hovertemplate='<b>%{x}</b><br>%{y:.1f} kg CO₂<extra></extra>', showlegend=False))
-                fig_trend.update_layout(height=270, margin=dict(t=30, b=0, l=0, r=20), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', title=dict(text="<b>Tren Emisi Harian</b>", x=0.38, y=0.95, font=dict(size=12)))
+                fig_trend.update_layout(height=270, margin=dict(t=30, b=0, l=0, r=20), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', title=dict(text="<b>Tren Emisi Harian</b>", x=0.38, y=0.95, font=dict(size=12)), xaxis_title="Hari", yaxis_title="Emisi (kg CO₂)", font=dict(size=8))
                 st.plotly_chart(fig_trend, config=MODEBAR_CONFIG, use_container_width=True)
             else:
                 st.info("Tidak ada data tren harian untuk filter ini.")
@@ -426,7 +447,7 @@ def show():
                     ratio = (row['total_emisi'] - min_emisi) / (max_emisi - min_emisi) if max_emisi > min_emisi else 0
                     color = color_palette[int(ratio * (len(color_palette) - 1))]
                     fig_fakultas.add_trace(go.Bar(x=[row['total_emisi']], y=[row['fakultas']], orientation='h', marker=dict(color=color), showlegend=False, text=[f"{row['total_emisi']:.1f}"], textposition='inside', textfont=dict(color='white', size=10, weight='bold'), hovertemplate=f'<b>{row["fakultas"]}</b><br>Total: {row["total_emisi"]:.1f} kg CO₂<br>Aktivitas: {row["activity_count"]}<extra></extra>'))
-                fig_fakultas.update_layout(height=270, margin=dict(t=30, b=0, l=0, r=20), title=dict(text="<b>Emisi per Fakultas</b>", x=0.39, y=0.95, font=dict(size=12)))
+                fig_fakultas.update_layout(height=270, margin=dict(t=40, b=0, l=0, r=20), title=dict(text="<b>Emisi per Fakultas</b>", x=0.39, y=0.95, font=dict(size=12)), xaxis_title="Emisi (kg CO₂)", yaxis_title="Fakultas", font=dict(size=8))
                 st.plotly_chart(fig_fakultas, config=MODEBAR_CONFIG, use_container_width=True)
             else:
                 st.info("Tidak ada data fakultas untuk filter ini.")
@@ -495,7 +516,8 @@ def show():
                             tickvals=original_locations,
                             ticktext=display_locations_truncated,
                             automargin=True, 
-                        )
+                        ),
+                        xaxis_title="Waktu", yaxis_title="Lokasi", font=dict(size=8)
                     )
                     
                     st.plotly_chart(fig_heatmap, config=MODEBAR_CONFIG, use_container_width=True)
@@ -545,7 +567,8 @@ def show():
                     margin=dict(t=30, b=0, l=0, r=0), 
                     title=dict(text="<b>Emisi per Kantin</b>", x=0.45, y=0.95, font=dict(size=12)), 
                     yaxis_title="Total Emisi (kg CO2)",
-                    xaxis=dict(tickangle=-45) 
+                    xaxis=dict(tickangle=-15),
+                    xaxis_title="Lokasi",
                 )
                 st.plotly_chart(fig_canteen, config=MODEBAR_CONFIG, use_container_width=True)
             else:
