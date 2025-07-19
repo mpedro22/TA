@@ -44,3 +44,7 @@ htmlcov/
 # Kredensial dan file sensitif
 .env
 credentials.json
+
+struktur_proyek_dashboard.txt
+convert_tree_to_image.py
+generate_project_tree.py
