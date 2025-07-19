@@ -1,7 +1,7 @@
 [server]
 port = 8501
 enableCORS = false
-runOnSave = true
+runOnSave = false
 fileWatcherType = "none"
 
 [theme]
