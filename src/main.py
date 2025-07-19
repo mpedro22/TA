@@ -2,18 +2,19 @@
 
 import streamlit as st
 import sys
-import os
+import os # Tetap import untuk penggunaan lain jika ada, tapi tidak untuk sys.path.append
 import time
 import importlib
 import logging
-import requests # Untuk requests.exceptions
-import socket # Untuk socket.gaierror
+import requests 
+import socket 
 
-# Import init_supabase_connection untuk inisialisasi client
-from src.utils.db_connector import init_supabase_connection # Tidak perlu import Client di sini
+# --- HAPUS BARIS INI KARENA INI PENYEBAB ERROR 'ModuleNotFoundError' DI STREAMLIT CLOUD ---
+# sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-# Import fungsi-fungsi autentikasi dari auth
-from src.auth.auth import is_logged_in, get_current_user, is_admin, logout
+# --- PENTING: PASTIKAN SEMUA IMPOR BERASAL DARI ROOT PROYEK (misal 'src.utils...') ---
+from src.utils.db_connector import init_supabase_connection 
+from src.auth.auth import is_logged_in, get_current_user, is_admin, logout 
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -35,37 +36,29 @@ def main():
         initial_sidebar_state="expanded",
     )
 
-    css_file_path = "assets/css/style.css"
+    css_file_path = "assets/css/style.css" # Path ini relatif ke root main.py
     if os.path.exists(css_file_path):
         with open(css_file_path, encoding="utf-8") as f:
             css_content = f.read()
             st.markdown(f'<style>/* Cache Buster: {time.time()} */\n{css_content}</style>', unsafe_allow_html=True)
     else:
-        st.error("Error: style.css not found!")
+        st.error("Error: style.css not found! Pastikan file berada di 'assets/css/style.css'.") # Pesan lebih detail
 
     # --- Cek Status Offline Global ---
     if st.session_state.is_app_offline:
         render_offline_message()
         st.stop() 
 
-    # --- PENTING: Panggil init_supabase_connection() HANYA DI DALAM FUNGSI INI ---
-    # Ini untuk memastikan @st.cache_resource bekerja dan tidak ada inisialisasi global
-    # Fungsi ini akan menangani st.stop() jika ada error fatal atau network error
     try:
-        # Panggil init_supabase_connection. Jika berhasil, client di-cache. Jika tidak, akan st.stop()
         init_supabase_connection() 
     except Exception as e:
-        # Ini hanya akan menangkap Exception yang lolos dari init_supabase_connection (jarang)
         st.error(f"Kesalahan Fatal: Aplikasi tidak dapat memulai koneksi ke Supabase. {e}")
         st.stop()
     
     # --- START REHYDRATION LOGIC (FOR AUTH SESSION) ---
-    # Attempt to rehydrate Supabase session from client storage on every rerun
     try:
-        # Dapatkan client yang sudah diinisialisasi/cache dari init_supabase_connection()
-        # Perlu dipanggil ulang di sini karena client mungkin di-cache
         current_client = init_supabase_connection() 
-        if current_client is None: # Seharusnya sudah dihandle st.stop() di init_supabase_connection
+        if current_client is None: 
             st.error("Sistem tidak dapat memproses sesi login karena koneksi Supabase tidak aktif.")
             st.stop()
 
@@ -74,7 +67,6 @@ def main():
             st.session_state.supabase_session = current_session
             st.session_state.supabase_user = current_session.user
             st.session_state.user_metadata = current_session.user.user_metadata if current_session.user else {}
-            # Reset offline flag jika berhasil rehydrate
             if st.session_state.is_app_offline:
                 st.session_state.is_app_offline = False
                 logging.info("Supabase session re-established. App is back online.")
@@ -155,6 +147,7 @@ def main():
     # === AUTH LOGIC ===
     if not is_logged_in():
         from src.auth.login import show as show_login_page 
+        importlib.reload(show_login_page) # Reload login page on error/re-entry
         show_login_page()
         end_main_time_login = time.time()
         elapsed_main_time_login = end_main_time_login - start_main_time
