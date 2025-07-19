@@ -1,26 +1,22 @@
 # src/auth/auth.py
 
 import streamlit as st
-# Hapus os dan load_dotenv, karena kredensial dihandle oleh db_connector
-# from dotenv import load_dotenv 
 from supabase import Client # Pastikan Client diimpor
 from typing import Dict, Optional
 
-# Import FUNGSI init_supabase_connection untuk mendapatkan client
+# Impor fungsi init_supabase_connection untuk mendapatkan client Supabase
 from src.utils.db_connector import init_supabase_connection
 
-# Objek supabase client akan didapatkan saat fungsi dipanggil, BUKAN global
-# supabase: Client = init_supabase_connection() # Hapus baris ini
-
-# Hapus bagian SUPABASE_URL = os.getenv("SUPABASE_URL") dan if not SUPABASE_URL:
+# Objek supabase client tidak lagi diimpor global.
+# Ini akan didapatkan secara on-demand melalui init_supabase_connection()
 
 def authenticate(email: str, password: str) -> Optional[Dict]:
     """
     Mengautentikasi pengguna menggunakan Supabase Auth (email/password).
     """
-    # Panggil init_supabase_connection untuk mendapatkan client yang sudah di-cache/dibuat
+    # Dapatkan objek client Supabase (dari cache atau inisialisasi baru)
     local_supabase_client = init_supabase_connection()
-    if local_supabase_client is None: # Jika init gagal (karena st.stop di db_connector)
+    if local_supabase_client is None: 
         st.error("Sistem tidak terhubung ke Supabase. Autentikasi tidak dapat dilakukan.")
         return None
     
@@ -51,7 +47,7 @@ def create_user(email: str, password: str, is_admin: bool = False, username: Opt
     Mendaftarkan pengguna baru via Supabase Auth.
     """
     local_supabase_client = init_supabase_connection()
-    if local_supabase_client is None: # Pastikan objek supabase sudah ada
+    if local_supabase_client is None: 
         st.error("Sistem tidak terhubung ke Supabase. Pendaftaran gagal.")
         return False
     try:
@@ -78,10 +74,12 @@ def create_user(email: str, password: str, is_admin: bool = False, username: Opt
 
 def is_logged_in() -> bool:
     """Mengecek apakah pengguna sedang login berdasarkan sesi Supabase di st.session_state."""
+    # is_logged_in tidak membutuhkan objek supabase client secara langsung
     return st.session_state.get("supabase_session") is not None
 
 def is_admin() -> bool:
     """Mengecek apakah pengguna yang sedang login memiliki peran admin dari metadata."""
+    # is_admin tidak membutuhkan objek supabase client secara langsung
     if not is_logged_in():
         return False
     user_metadata = st.session_state.get("user_metadata", {}) 
@@ -89,6 +87,7 @@ def is_admin() -> bool:
 
 def get_current_user() -> Optional[Dict]:
     """Mengembalikan metadata pengguna yang sedang login."""
+    # get_current_user tidak membutuhkan objek supabase client secara langsung
     if is_logged_in():
         return st.session_state.get("user_metadata")
     return None
@@ -96,7 +95,7 @@ def get_current_user() -> Optional[Dict]:
 def logout():
     """Melakukan logout pengguna dari Supabase dan membersihkan state terkait."""
     local_supabase_client = init_supabase_connection()
-    if local_supabase_client is None: # Pastikan objek supabase sudah ada
+    if local_supabase_client is None: 
         st.error("Sistem tidak terhubung ke Supabase. Logout gagal.")
         return
     try:
