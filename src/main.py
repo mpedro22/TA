@@ -10,9 +10,36 @@ import logging
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 
+# Perbaikan: Sesuaikan path import
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-from src.auth.auth import is_logged_in, get_current_user, is_admin, logout, supabase 
+# Perbaikan: Import tanpa supabase object langsung, dan handle error dengan lebih baik
+try:
+    from src.auth.auth import is_logged_in, get_current_user, is_admin, logout
+    auth_available = True
+except ImportError:
+    try:
+        # Fallback jika struktur folder berbeda
+        from auth.auth import is_logged_in, get_current_user, is_admin, logout
+        auth_available = True
+    except ImportError:
+        st.error("Error: Tidak dapat mengimport modul auth. Periksa struktur folder.")
+        auth_available = False
+
+def check_supabase_connection():
+    """Check if Supabase connection is working"""
+    try:
+        # Import supabase object untuk pengecekan
+        from src.auth.auth import supabase
+        return supabase is not None
+    except ImportError:
+        try:
+            from auth.auth import supabase
+            return supabase is not None
+        except ImportError:
+            return False
+    except Exception:
+        return False
 
 def main():
     # Inisialisasi session state untuk pelacakan halaman jika belum ada
@@ -36,15 +63,34 @@ def main():
             css_content = f.read()
             st.markdown(f'<style>/* Cache Buster: {time.time()} */\n{css_content}</style>', unsafe_allow_html=True)
     else:
-        st.error("Error: style.css not found!")
+        st.warning("Warning: style.css not found! Using default styling.")
 
-    if supabase is None:
-        st.error("Dashboard tidak dapat beroperasi. Gagal menginisialisasi koneksi ke Supabase. Periksa konfigurasi .env Anda.")
+    # Perbaikan: Pengecekan koneksi Supabase yang lebih robust
+    if not auth_available:
+        st.error("Dashboard tidak dapat beroperasi. Modul auth tidak dapat diimport.")
+        return
+    
+    if not check_supabase_connection():
+        st.error("Dashboard tidak dapat beroperasi. Gagal menginisialisasi koneksi ke Supabase. Periksa konfigurasi secrets Anda.")
+        
+        # Tampilkan panduan konfigurasi
+        st.write("### 📋 Panduan Konfigurasi Secrets")
+        st.write("Di Streamlit Cloud > Settings > Secrets, tambahkan:")
+        st.code("""
+SUPABASE_URL = "https://your-project-id.supabase.co"
+SUPABASE_KEY = "your-anon-public-key"
+        """)
         return 
     
     # --- START REHYDRATION LOGIC (MOVED UP) ---
     # Attempt to rehydrate Supabase session from client storage on every rerun
     # This is crucial for staying logged in after a page refresh/reload
+    try:
+        # Import supabase object hanya ketika dibutuhkan
+        from src.auth.auth import supabase
+    except ImportError:
+        from auth.auth import supabase
+        
     if supabase: # Only attempt if supabase client is initialized
         try:
             current_session = supabase.auth.get_session() # This reads from localStorage
@@ -120,7 +166,10 @@ def main():
     # === AUTH LOGIC ===
     # This check now relies on the rehydration logic above
     if not is_logged_in():
-        from src.auth.login import show as show_login_page 
+        try:
+            from src.auth.login import show as show_login_page 
+        except ImportError:
+            from auth.login import show as show_login_page
         show_login_page()
         end_main_time_login = time.time()
         elapsed_main_time_login = end_main_time_login - start_main_time
@@ -138,36 +187,41 @@ def main():
         
     create_sidebar()
 
-    if current_page_id == 'overview':
-        from src.pages import overview
-        importlib.reload(overview)
-        overview.show()
-    elif current_page_id == 'transportation':
-        from src.pages import transportation
-        importlib.reload(transportation)
-        transportation.show()
-    elif current_page_id == 'electronic':
-        from src.pages import electronic
-        importlib.reload(electronic)
-        electronic.show()
-    elif current_page_id == 'sampah':
-        from src.pages import food_drink_waste
-        importlib.reload(food_drink_waste)
-        food_drink_waste.show()
-    elif current_page_id == 'about':
-        from src.pages import about
-        importlib.reload(about)
-        about.show()
-    elif current_page_id == 'register':
-        if is_admin():
-            from src.auth import register
-            importlib.reload(register)
-            register.show()
-        else:
-            st.error("Akses ditolak!")
-            st.query_params["page"] = "overview"
-            time.sleep(1)
-            st.rerun()
+    # Perbaikan: Handle import error untuk setiap page
+    try:
+        if current_page_id == 'overview':
+            from src.pages import overview
+            importlib.reload(overview)
+            overview.show()
+        elif current_page_id == 'transportation':
+            from src.pages import transportation
+            importlib.reload(transportation)
+            transportation.show()
+        elif current_page_id == 'electronic':
+            from src.pages import electronic
+            importlib.reload(electronic)
+            electronic.show()
+        elif current_page_id == 'sampah':
+            from src.pages import food_drink_waste
+            importlib.reload(food_drink_waste)
+            food_drink_waste.show()
+        elif current_page_id == 'about':
+            from src.pages import about
+            importlib.reload(about)
+            about.show()
+        elif current_page_id == 'register':
+            if is_admin():
+                from src.auth import register
+                importlib.reload(register)
+                register.show()
+            else:
+                st.error("Akses ditolak!")
+                st.query_params["page"] = "overview"
+                time.sleep(1)
+                st.rerun()
+    except ImportError as e:
+        st.error(f"Error mengimport page '{current_page_id}': {e}")
+        st.write("Periksa struktur folder dan nama file.")
 
     end_main_time = time.time()
     elapsed_main_time = end_main_time - start_main_time
