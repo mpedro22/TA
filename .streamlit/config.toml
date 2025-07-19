@@ -2,7 +2,7 @@
 port = 8501
 enableCORS = false
 runOnSave = true
-fileWatcherType = "watchdog"
+fileWatcherType = "none"
 
 [theme]
 primaryColor = "#059669"
