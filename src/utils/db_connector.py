@@ -1,56 +1,113 @@
-# src/utils/db_connector.py
+# src/auth/auth.py
 
 import streamlit as st
-import pandas as pd
-from supabase import create_client, Client
-import logging
+# Hapus os dan load_dotenv, karena kredensial dihandle oleh db_connector
+# from dotenv import load_dotenv 
+import os # Tetap import jika masih ada os.getenv() di bawah, tapi idealnya tidak perlu
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
+from supabase import Client # Pastikan Client diimpor
+from typing import Dict, Optional
 
-@st.cache_resource
-def init_supabase_connection() -> Client:
-    """Initializes a connection to the Supabase client."""
-    try:
-        supabase_url = st.secrets["supabase"]["url"]
-        supabase_key = st.secrets["supabase"]["key"]
-        return create_client(supabase_url, supabase_key)
-    except Exception as e:
-        st.error(f"Gagal terhubung ke Supabase: {e}")
-        st.stop()
+# Import objek supabase yang sudah diinisialisasi dari db_connector
+# Ini adalah objek client Supabase yang sudah siap pakai
+from src.utils.db_connector import supabase
 
-@st.cache_data(ttl=3600)
-def run_query(table_name: str) -> pd.DataFrame:
-    """Runs a SELECT * query on the specified Supabase table and returns a DataFrame."""
-    logging.info(f"Running SELECT * on table: {table_name}")
-    supabase = init_supabase_connection()
-    try:
-        response = supabase.table(table_name).select("*").execute()
-        return pd.DataFrame(response.data)
-    except Exception as e:
-        st.error(f"Error saat mengambil data dari tabel '{table_name}': {e}")
-        return pd.DataFrame()
+# Hapus bagian SUPABASE_URL = os.getenv("SUPABASE_URL") dan if not SUPABASE_URL:
+# Semua kredensial dan inisialisasi supabase client kini dihandle oleh db_connector.py
 
-# --- FUNGSI BARU UNTUK OPTIMASI (TAMBAHKAN INI) ---
-@st.cache_data(ttl=3600)
-def run_sql(sql_query: str) -> pd.DataFrame:
+def authenticate(email: str, password: str) -> Optional[Dict]:
     """
-    Runs a raw SQL query using Supabase's PostgREST RPC function.
-    NOTE: Requires a `public.exec_sql` function in your Supabase DB.
+    Mengautentikasi pengguna menggunakan Supabase Auth (email/password).
+    Menyimpan sesi dan objek pengguna Supabase di st.session_state.
+    Mengembalikan metadata pengguna jika autentikasi berhasil.
+    """
+    # Pastikan objek supabase sudah ada dari db_connector
+    if supabase is None: # Ini hanya akan terjadi jika inisialisasi di db_connector gagal fatal (st.stop() tidak bekerja)
+        st.error("Sistem tidak terhubung ke Supabase. Autentikasi tidak dapat dilakukan.")
+        return None
     
-    Args:
-        sql_query (str): The raw SQL query to execute.
-
-    Returns:
-        pd.DataFrame: A pandas DataFrame containing the query results.
-    """
-    logging.info(f"Executing raw SQL query: {sql_query[:150]}...") # Log 150 char pertama
-    supabase = init_supabase_connection()
     try:
-        # Panggil Remote Procedure Call (RPC) 'exec_sql'
-        response = supabase.rpc('exec_sql', {'query': sql_query}).execute()
-        return pd.DataFrame(response.data)
+        response = supabase.auth.sign_in_with_password({
+            "email": email,
+            "password": password,
+        })
+        
+        if response.user and response.session:
+            st.session_state.supabase_session = response.session 
+            st.session_state.supabase_user = response.user      
+            st.session_state.user_metadata = response.user.user_metadata 
+            return response.user.user_metadata
+        else:
+            st.error("Autentikasi gagal: Respons Supabase tidak lengkap atau user/sesi tidak ditemukan.")
+            return None
     except Exception as e:
-        st.error(f"Gagal menjalankan query SQL: {e}. Periksa koneksi internet Anda.")
-        logging.error(f"SQL Query failed: {sql_query}\nError: {e}")
-        return pd.DataFrame()
+        error_message = e.message if hasattr(e, 'message') else str(e)
+        st.error(f"Autentikasi gagal: {error_message}")
+        st.session_state.pop("supabase_session", None)
+        st.session_state.pop("supabase_user", None)
+        st.session_state.pop("user_metadata", None)
+        return None
+
+def create_user(email: str, password: str, is_admin: bool = False, username: Optional[str] = None) -> bool:
+    """
+    Mendaftarkan pengguna baru via Supabase Auth.
+    Peran admin dan username (opsional) disimpan di user_metadata.
+    """
+    if supabase is None: # Pastikan objek supabase sudah ada
+        st.error("Sistem tidak terhubung ke Supabase. Pendaftaran gagal.")
+        return False
+    try:
+        user_metadata = {"is_admin": is_admin}
+        if username:
+            user_metadata["username"] = username
+        
+        response = supabase.auth.sign_up({
+            "email": email,
+            "password": password,
+            "options": {
+                "data": user_metadata 
+            }
+        })
+        
+        if response.user:
+            print(f"Pengguna '{email}' berhasil didaftarkan di Supabase. User ID: {response.user.id}")
+            return True
+        return False
+    except Exception as e:
+        error_message = e.message if hasattr(e, 'message') else str(e)
+        st.error(f"Gagal mendaftarkan pengguna: {error_message}")
+        return False
+
+def is_logged_in() -> bool:
+    """Mengecek apakah pengguna sedang login berdasarkan sesi Supabase di st.session_state."""
+    return st.session_state.get("supabase_session") is not None
+
+def is_admin() -> bool:
+    """Mengecek apakah pengguna yang sedang login memiliki peran admin dari metadata."""
+    if not is_logged_in():
+        return False
+    user_metadata = st.session_state.get("user_metadata", {}) 
+    return user_metadata.get("is_admin", False)
+
+def get_current_user() -> Optional[Dict]:
+    """Mengembalikan metadata pengguna yang sedang login."""
+    if is_logged_in():
+        return st.session_state.get("user_metadata")
+    return None
+
+def logout():
+    """Melakukan logout pengguna dari Supabase dan membersihkan state terkait."""
+    if supabase is None: # Pastikan objek supabase sudah ada
+        st.error("Sistem tidak terhubung ke Supabase. Logout gagal.")
+        return
+    try:
+        supabase.auth.sign_out()
+        keys_to_clear = ["supabase_session", "supabase_user", "user_metadata"]
+        for key in keys_to_clear:
+            if key in st.session_state:
+                del st.session_state[key]
+        st.query_params.clear() 
+        print("Logout berhasil dari Supabase.")
+    except Exception as e:
+        error_message = e.message if hasattr(e, 'message') else str(e)
+        st.error(f"Gagal logout: {error_message}")
