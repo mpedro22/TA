@@ -4,6 +4,7 @@ import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
 import logging
+import os
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -12,8 +13,31 @@ logging.basicConfig(level=logging.INFO)
 def init_supabase_connection() -> Client:
     """Initializes a connection to the Supabase client."""
     try:
-        supabase_url = st.secrets["supabase"]["url"]
-        supabase_key = st.secrets["supabase"]["key"]
+        # Perbaikan: Coba gunakan format secrets yang konsisten
+        try:
+            # Format 1: nested secrets
+            supabase_url = st.secrets["supabase"]["url"]
+            supabase_key = st.secrets["supabase"]["key"]
+        except KeyError:
+            try:
+                # Format 2: flat secrets
+                supabase_url = st.secrets["SUPABASE_URL"]
+                supabase_key = st.secrets["SUPABASE_KEY"]
+            except KeyError:
+                # Fallback untuk development local
+                try:
+                    from dotenv import load_dotenv
+                    load_dotenv()
+                    supabase_url = os.environ.get("SUPABASE_URL")
+                    supabase_key = os.environ.get("SUPABASE_KEY")
+                except ImportError:
+                    supabase_url = os.environ.get("SUPABASE_URL")
+                    supabase_key = os.environ.get("SUPABASE_KEY")
+        
+        if not supabase_url or not supabase_key:
+            st.error("SUPABASE_URL atau SUPABASE_KEY tidak ditemukan dalam konfigurasi.")
+            st.stop()
+            
         return create_client(supabase_url, supabase_key)
     except Exception as e:
         st.error(f"Gagal terhubung ke Supabase: {e}")

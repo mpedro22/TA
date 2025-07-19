@@ -2,22 +2,36 @@ import streamlit as st
 from supabase import create_client, Client
 import os
 from typing import Dict, Optional
-from dotenv import load_dotenv
 
-load_dotenv()
+# Perbaikan: Hapus dotenv untuk Streamlit Cloud
+# from dotenv import load_dotenv
+# load_dotenv()
 
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+# Perbaikan: Gunakan st.secrets dengan benar
+try:
+    # Untuk Streamlit Cloud
+    SUPABASE_URL = st.secrets["SUPABASE_URL"]
+    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+except KeyError:
+    # Fallback untuk development local
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+        SUPABASE_URL = os.environ.get("SUPABASE_URL")
+        SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+    except ImportError:
+        SUPABASE_URL = os.environ.get("SUPABASE_URL")
+        SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
 if not SUPABASE_URL or not SUPABASE_KEY:
     supabase: Optional[Client] = None
-    print("ERROR: SUPABASE_URL atau SUPABASE_KEY tidak ditemukan di environment variables. Pastikan file .env ada dan terisi.")
+    st.error("ERROR: SUPABASE_URL atau SUPABASE_KEY tidak ditemukan. Pastikan secrets sudah dikonfigurasi.")
 else:
     try:
         supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
     except Exception as e:
         supabase: Optional[Client] = None
-        print(f"ERROR: Gagal menginisialisasi klien Supabase: {e}. Pastikan URL dan KEY benar.")
+        st.error(f"ERROR: Gagal menginisialisasi klien Supabase: {e}. Pastikan URL dan KEY benar.")
 
 def authenticate(email: str, password: str) -> Optional[Dict]:
     """
@@ -72,7 +86,7 @@ def create_user(email: str, password: str, is_admin: bool = False, username: Opt
         })
         
         if response.user:
-            print(f"Pengguna '{email}' berhasil didaftarkan di Supabase. User ID: {response.user.id}")
+            st.success(f"Pengguna '{email}' berhasil didaftarkan di Supabase. User ID: {response.user.id}")
             return True
         return False
     except Exception as e:
@@ -109,7 +123,7 @@ def logout():
             if key in st.session_state:
                 del st.session_state[key]
         st.query_params.clear() 
-        print("Logout berhasil dari Supabase.")
+        st.success("Logout berhasil dari Supabase.")
     except Exception as e:
         error_message = e.message if hasattr(e, 'message') else str(e)
         st.error(f"Gagal logout: {error_message}")
