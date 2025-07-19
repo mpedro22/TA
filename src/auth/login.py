@@ -1,21 +1,9 @@
-# src/auth/login.py
-
 import streamlit as st
-# Hapus 'supabase' dari impor ini
-from src.auth.auth import authenticate 
+from src.auth.auth import authenticate, supabase 
 import time
 
-# Impor init_supabase_connection untuk melakukan pengecekan di halaman login saja
-from src.utils.db_connector import init_supabase_connection
-
 def show():
-    # Lakukan pengecekan koneksi di sini agar pesan muncul sebelum form login
-    # init_supabase_connection() akan memicu st.error dan st.stop() jika ada masalah
-    local_supabase_client = init_supabase_connection()
-    if local_supabase_client is None:
-        # Pesan error sudah ditangani oleh init_supabase_connection() di db_connector.py
-        # dan sudah st.stop(), jadi kode di bawah ini seharusnya tidak dieksekusi.
-        # Namun, ini sebagai fallback keamanan.
+    if supabase is None:
         st.error("Dashboard tidak dapat beroperasi. Gagal menginisialisasi koneksi ke Supabase.")
         return
 
@@ -70,6 +58,7 @@ def show():
         width: 80px; height: 80px;
         background: linear-gradient(135deg, #059669 0%, #10b981 100%);
         border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
         box-shadow: 0 10px 25px rgba(5, 150, 105, 0.2);
     }
     .login-logo .logo-text {
@@ -195,7 +184,6 @@ def show():
 
         if submit:
             if email and password:
-                # Panggil authenticate
                 user_metadata = authenticate(email, password) 
                 if user_metadata:
                     st.query_params["logged_in"] = "true" 
