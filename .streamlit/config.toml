@@ -3,6 +3,7 @@ port = 8501
 enableCORS = false
 runOnSave = true
 fileWatcherType = "watchdog"
+folderWatchExclusions = ["**/.git", "**/venv", "**/__pycache__", "**/node_modules", "*.pyc", ".env"]
 
 [theme]
 primaryColor = "#059669"
