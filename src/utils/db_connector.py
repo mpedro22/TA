@@ -1,113 +1,111 @@
-# src/auth/auth.py
+# src/utils/db_connector.py
 
 import streamlit as st
-# Hapus os dan load_dotenv, karena kredensial dihandle oleh db_connector
-# from dotenv import load_dotenv 
-import os # Tetap import jika masih ada os.getenv() di bawah, tapi idealnya tidak perlu
+import pandas as pd
+from supabase import create_client, Client # Pastikan Client diimpor
+import logging
+import psycopg2 
+import requests 
+from requests.exceptions import ConnectionError, Timeout 
+import socket 
+from postgrest.exceptions import APIError
 
-from supabase import Client # Pastikan Client diimpor
-from typing import Dict, Optional
+logging.basicConfig(level=logging.INFO)
 
-# Import objek supabase yang sudah diinisialisasi dari db_connector
-# Ini adalah objek client Supabase yang sudah siap pakai
-from src.utils.db_connector import supabase
+# --- TIDAK ADA GLOBAL SUPABASE CLIENT DI SINI UNTUK MENGHINDARI CIRCULAR IMPORT ---
+# Objek Client akan diinisialisasi dan di-cache oleh @st.cache_resource
 
-# Hapus bagian SUPABASE_URL = os.getenv("SUPABASE_URL") dan if not SUPABASE_URL:
-# Semua kredensial dan inisialisasi supabase client kini dihandle oleh db_connector.py
+# Fungsi helper untuk menangani error jaringan
+def _handle_network_error(e: Exception, context: str):
+    logging.error(f"Network error in {context}: {e}")
+    if 'is_app_offline' not in st.session_state:
+        st.session_state.is_app_offline = False 
 
-def authenticate(email: str, password: str) -> Optional[Dict]:
+    if not st.session_state.is_app_offline:
+        st.session_state.is_app_offline = True
+        st.rerun() 
+
+@st.cache_resource
+def init_supabase_connection() -> Client:
     """
-    Mengautentikasi pengguna menggunakan Supabase Auth (email/password).
-    Menyimpan sesi dan objek pengguna Supabase di st.session_state.
-    Mengembalikan metadata pengguna jika autentikasi berhasil.
+    Initializes a connection to the Supabase client using st.secrets.
+    This function is cached to ensure only one client is created per session.
     """
-    # Pastikan objek supabase sudah ada dari db_connector
-    if supabase is None: # Ini hanya akan terjadi jika inisialisasi di db_connector gagal fatal (st.stop() tidak bekerja)
-        st.error("Sistem tidak terhubung ke Supabase. Autentikasi tidak dapat dilakukan.")
-        return None
-    
     try:
-        response = supabase.auth.sign_in_with_password({
-            "email": email,
-            "password": password,
-        })
+        supabase_url = st.secrets["supabase"]["url"]
+        supabase_key = st.secrets["supabase"]["key"]
         
-        if response.user and response.session:
-            st.session_state.supabase_session = response.session 
-            st.session_state.supabase_user = response.user      
-            st.session_state.user_metadata = response.user.user_metadata 
-            return response.user.user_metadata
+        # Reset offline flag jika koneksi berhasil diinisialisasi
+        if 'is_app_offline' in st.session_state and st.session_state.is_app_offline:
+            st.session_state.is_app_offline = False
+            logging.info("Supabase connection re-established. App is back online.")
+            # st.rerun() # Tidak perlu reruns di sini, karena client sudah diinisialisasi dan akan dipakai
+
+        return create_client(supabase_url, supabase_key)
+
+    except Exception as e:
+        if isinstance(e, (ConnectionError, Timeout, socket.gaierror)):
+            _handle_network_error(e, "init_supabase_connection")
+            st.stop() # Hentikan proses jika network error di awal
+        elif isinstance(e, KeyError) and "supabase" in str(e): 
+            st.error("Kredensial Supabase tidak ditemukan. Pastikan 'secrets.toml' Anda terkonfigurasi dengan benar.")
+            st.exception(e)
+            st.stop() # Hentikan jika kredensial tidak ada
         else:
-            st.error("Autentikasi gagal: Respons Supabase tidak lengkap atau user/sesi tidak ditemukan.")
-            return None
-    except Exception as e:
-        error_message = e.message if hasattr(e, 'message') else str(e)
-        st.error(f"Autentikasi gagal: {error_message}")
-        st.session_state.pop("supabase_session", None)
-        st.session_state.pop("supabase_user", None)
-        st.session_state.pop("user_metadata", None)
-        return None
+            st.error(f"Inisialisasi Supabase Gagal: {e}. Periksa konfigurasi atau kredensial Anda.")
+            st.exception(e) 
+            st.stop()
+        return None 
 
-def create_user(email: str, password: str, is_admin: bool = False, username: Optional[str] = None) -> bool:
-    """
-    Mendaftarkan pengguna baru via Supabase Auth.
-    Peran admin dan username (opsional) disimpan di user_metadata.
-    """
-    if supabase is None: # Pastikan objek supabase sudah ada
-        st.error("Sistem tidak terhubung ke Supabase. Pendaftaran gagal.")
-        return False
+# run_query dan run_sql akan memanggil init_supabase_connection() secara internal
+
+@st.cache_data(ttl=3600)
+def run_query(table_name: str) -> pd.DataFrame:
+    logging.info(f"Running SELECT * on table: {table_name}")
+    if 'is_app_offline' in st.session_state and st.session_state.is_app_offline:
+        return pd.DataFrame() 
+
+    # Dapatkan client dari cache
+    local_supabase_client = init_supabase_connection() 
+    if local_supabase_client is None: # Jika inisialisasi gagal (sudah st.stop() di init_supabase_connection)
+        return pd.DataFrame()
+
     try:
-        user_metadata = {"is_admin": is_admin}
-        if username:
-            user_metadata["username"] = username
-        
-        response = supabase.auth.sign_up({
-            "email": email,
-            "password": password,
-            "options": {
-                "data": user_metadata 
-            }
-        })
-        
-        if response.user:
-            print(f"Pengguna '{email}' berhasil didaftarkan di Supabase. User ID: {response.user.id}")
-            return True
-        return False
+        response = local_supabase_client.table(table_name).select("*").execute()
+        return pd.DataFrame(response.data)
     except Exception as e:
-        error_message = e.message if hasattr(e, 'message') else str(e)
-        st.error(f"Gagal mendaftarkan pengguna: {error_message}")
-        return False
+        if isinstance(e, (psycopg2.OperationalError, ConnectionError, Timeout, socket.gaierror)):
+            _handle_network_error(e, f"run_query for {table_name}")
+        elif isinstance(e, APIError) and "exec_sql" in str(e): 
+             st.error(f"Gagal menjalankan query: Pastikan fungsi 'exec_sql' sudah dibuat di database Supabase Anda.")
+             st.exception(e) 
+        else:
+            st.error(f"Error saat mengambil data dari tabel '{table_name}': {e}.")
+            st.exception(e) 
+        logging.error(f"Error fetching data from '{table_name}': {e}")
+        return pd.DataFrame()
 
-def is_logged_in() -> bool:
-    """Mengecek apakah pengguna sedang login berdasarkan sesi Supabase di st.session_state."""
-    return st.session_state.get("supabase_session") is not None
+@st.cache_data(ttl=3600)
+def run_sql(sql_query: str) -> pd.DataFrame:
+    logging.info(f"Executing raw SQL query: {sql_query[:150]}...") 
+    if 'is_app_offline' in st.session_state and st.session_state.is_app_offline:
+        return pd.DataFrame()
 
-def is_admin() -> bool:
-    """Mengecek apakah pengguna yang sedang login memiliki peran admin dari metadata."""
-    if not is_logged_in():
-        return False
-    user_metadata = st.session_state.get("user_metadata", {}) 
-    return user_metadata.get("is_admin", False)
+    local_supabase_client = init_supabase_connection()
+    if local_supabase_client is None: # Jika inisialisasi gagal
+        return pd.DataFrame()
 
-def get_current_user() -> Optional[Dict]:
-    """Mengembalikan metadata pengguna yang sedang login."""
-    if is_logged_in():
-        return st.session_state.get("user_metadata")
-    return None
-
-def logout():
-    """Melakukan logout pengguna dari Supabase dan membersihkan state terkait."""
-    if supabase is None: # Pastikan objek supabase sudah ada
-        st.error("Sistem tidak terhubung ke Supabase. Logout gagal.")
-        return
     try:
-        supabase.auth.sign_out()
-        keys_to_clear = ["supabase_session", "supabase_user", "user_metadata"]
-        for key in keys_to_clear:
-            if key in st.session_state:
-                del st.session_state[key]
-        st.query_params.clear() 
-        print("Logout berhasil dari Supabase.")
+        response = local_supabase_client.rpc('exec_sql', {'query': sql_query}).execute()
+        return pd.DataFrame(response.data)
     except Exception as e:
-        error_message = e.message if hasattr(e, 'message') else str(e)
-        st.error(f"Gagal logout: {error_message}")
+        if isinstance(e, (psycopg2.OperationalError, ConnectionError, Timeout, socket.gaierror)):
+            _handle_network_error(e, "run_sql")
+        elif isinstance(e, APIError) and "exec_sql" in str(e):
+             st.error(f"Gagal menjalankan query: Pastikan fungsi 'exec_sql' sudah dibuat di database Supabase Anda.")
+             st.exception(e) 
+        else:
+            st.error(f"Gagal menjalankan query SQL: {e}. Pastikan query tidak ada syntax error.")
+            st.exception(e)
+        logging.error(f"SQL Query failed: {sql_query}\nError: {e}")
+        return pd.DataFrame()

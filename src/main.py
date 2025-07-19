@@ -7,17 +7,18 @@ import time
 import importlib
 import logging
 
+# Import ConnectionError dan Timeout untuk penanganan error di main
+import requests # Untuk requests.exceptions
+import socket # Untuk socket.gaierror
+
+# Import fungsi init_supabase_connection dan objek Client dari db_connector
+from src.utils.db_connector import init_supabase_connection, Client 
+
+# Import fungsi-fungsi autentikasi dari auth
+from src.auth.auth import is_logged_in, get_current_user, is_admin, logout 
+
 # Setup logging
 logging.basicConfig(level=logging.INFO)
-
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-
-# Import supabase client dari db_connector, bukan auth
-from src.utils.db_connector import init_supabase_connection # Ini akan memicu inisialisasi supabase client
-from src.auth.auth import is_logged_in, get_current_user, is_admin, logout # Hapus supabase dari sini
-
-# Initial check for supabase client, it will be initialized by db_connector import
-_initial_supabase_client = init_supabase_connection() 
 
 def main():
     # Inisialisasi session state untuk pelacakan halaman
@@ -26,7 +27,7 @@ def main():
     if 'is_initial_page_load' not in st.session_state:
         st.session_state.is_initial_page_load = True 
     if 'is_app_offline' not in st.session_state: 
-        st.session_state.is_app_offline = False # Ini harus direset setiap kali reload browser
+        st.session_state.is_app_offline = False
 
     start_main_time = time.time()
 
@@ -44,22 +45,38 @@ def main():
     else:
         st.error("Error: style.css not found!")
 
-    # Cek apakah client supabase berhasil diinisialisasi
-    if _initial_supabase_client is None:
-        st.error("Dashboard tidak dapat beroperasi. Gagal menginisialisasi koneksi ke Supabase. Periksa konfigurasi atau kredensial Anda.")
-        st.stop()
+    # --- Cek Status Offline Global ---
+    if st.session_state.is_app_offline:
+        render_offline_message()
+        st.stop() # Hentikan eksekusi script lebih awal
 
-    # --- START REHYDRATION LOGIC (FOR AUTH SESSION) ---
-    # Attempt to rehydrate Supabase session from client storage on every rerun
-    # This is crucial for staying logged in after a page refresh/reload
+    # Coba inisialisasi koneksi Supabase di sini
+    # Objek client Supabase akan di-cache oleh @st.cache_resource
+    # Jika gagal karena network, is_app_offline akan di-set oleh db_connector
     try:
-        # Panggil get_session() dari objek supabase yang sudah diinisialisasi
-        current_session = _initial_supabase_client.auth.get_session() 
+        # Panggil init_supabase_connection untuk memicu inisialisasi atau mendapatkan cache client
+        _ = init_supabase_connection() # Cukup panggil, hasilnya akan di-cache
+    except Exception as e:
+        # Jika init_supabase_connection memicu Exception yang tidak tertangkap di dalamnya
+        # Atau st.stop() tidak bekerja seperti yang diharapkan
+        st.error(f"Kesalahan Fatal: Gagal menginisialisasi koneksi Supabase di awal aplikasi. {e}")
+        st.stop()
+    
+    # --- START REHYDRATION LOGIC (FOR AUTH SESSION) ---
+    # Ini akan bekerja dengan client Supabase yang sudah diinisialisasi di atas
+    try:
+        # Dapatkan client yang sudah diinisialisasi/cache
+        local_supabase_client = init_supabase_connection() 
+        if local_supabase_client is None: # Jika init gagal fatal
+            st.error("Sistem tidak dapat memproses sesi login karena koneksi Supabase tidak aktif.")
+            st.stop()
+
+        current_session = local_supabase_client.auth.get_session() 
         if current_session:
             st.session_state.supabase_session = current_session
             st.session_state.supabase_user = current_session.user
             st.session_state.user_metadata = current_session.user.user_metadata if current_session.user else {}
-            # Jika berhasil rehydrate, pastikan flag offline direset
+            # Reset offline flag jika berhasil rehydrate
             if st.session_state.is_app_offline:
                 st.session_state.is_app_offline = False
                 logging.info("Supabase session re-established. App is back online.")
@@ -73,15 +90,15 @@ def main():
         st.session_state.pop("supabase_session", None)
         st.session_state.pop("supabase_user", None)
         st.session_state.pop("user_metadata", None)
-        # Jika rehidrasi gagal karena masalah koneksi, set offline flag
         if isinstance(e, (requests.exceptions.ConnectionError, requests.exceptions.Timeout, socket.gaierror)):
             st.session_state.is_app_offline = True
             logging.warning("App set to offline mode due to rehydration network error.")
+            st.experimental_rerun() # Trigger rerun to show offline message
     # --- END REHYDRATION LOGIC ---
 
     # Fungsi untuk menampilkan pesan offline terpusat
     def render_offline_message():
-        st.empty() # Clear all previous content
+        st.empty() 
         st.markdown("""
             <style>
                 .offline-container {
@@ -130,18 +147,11 @@ def main():
             </div>
         """, unsafe_allow_html=True)
         
-        # Tombol coba lagi
         if st.button("Coba Lagi", key="reconnect_button"):
             st.session_state.is_app_offline = False 
             st.experimental_rerun() 
 
-        # Hapus sidebar saat offline
         st.markdown('<style>section[data-testid="stSidebar"] { display: none !important; }</style>', unsafe_allow_html=True)
-
-    # --- Cek Status Offline Global ---
-    if st.session_state.is_app_offline:
-        render_offline_message()
-        st.stop() # Hentikan eksekusi script lebih awal
 
     # === AUTH LOGIC ===
     if not is_logged_in():
@@ -154,7 +164,6 @@ def main():
             
     current_page_id = st.query_params.get("page", "overview")
 
-    # Tentukan apakah ini navigasi halaman baru atau rerun filter di halaman yang sama
     if st.session_state.last_loaded_page != current_page_id:
         st.session_state.is_initial_page_load = True 
         st.session_state.last_loaded_page = current_page_id
