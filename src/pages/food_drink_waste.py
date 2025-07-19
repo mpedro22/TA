@@ -122,10 +122,10 @@ def get_canteen_data(where_clause, join_needed):
     return run_sql(query)
 
 @st.cache_data(ttl=3600)
-def get_filtered_raw_food_waste_data(selected_fakultas, selected_days):
+def get_filtered_food_waste_data(selected_fakultas, selected_days):
     """
     Mengambil data mentah dari tabel 'sampah_makanan' yang difilter oleh fakultas dan hari datang.
-    Digunakan untuk tombol 'Raw Data'.
+    Digunakan untuk tombol 'Data'.
     """
     clauses = []
     join_sql = "LEFT JOIN v_informasi_fakultas_mahasiswa r ON s.id_mahasiswa = r.id_mahasiswa"
@@ -393,14 +393,14 @@ def show():
     
     with export_col1:
         # Ambil data mentah yang difilter untuk diunduh
-        raw_data_df = get_filtered_raw_food_waste_data(selected_fakultas, selected_days)
+        data_df = get_filtered_food_waste_data(selected_fakultas, selected_days)
         st.download_button(
-            "Raw Data", 
-            data=raw_data_df.to_csv(index=False), 
-            file_name=f"food_waste_raw_data_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv", 
+            "Data", 
+            data=data_df.to_csv(index=False), 
+            file_name=f"food_waste_data_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv", 
             mime="text/csv", 
             use_container_width=True,
-            disabled=(raw_data_df.empty) # Tombol aktif jika ada data
+            disabled=(data_df.empty) # Tombol aktif jika ada data
         )
     
     with export_col2:

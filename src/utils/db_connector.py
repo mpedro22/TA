@@ -51,6 +51,6 @@ def run_sql(sql_query: str) -> pd.DataFrame:
         response = supabase.rpc('exec_sql', {'query': sql_query}).execute()
         return pd.DataFrame(response.data)
     except Exception as e:
-        st.error(f"Gagal menjalankan query SQL: {e}. Pastikan fungsi 'exec_sql' sudah dibuat di database Supabase Anda.")
+        st.error(f"Gagal menjalankan query SQL: {e}. Periksa koneksi internet Anda.")
         logging.error(f"SQL Query failed: {sql_query}\nError: {e}")
         return pd.DataFrame()

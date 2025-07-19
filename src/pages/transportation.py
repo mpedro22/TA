@@ -34,7 +34,7 @@ def build_transport_where_clause(selected_modes, selected_fakultas, selected_day
     return where_sql, join_needed
 
 @st.cache_data(ttl=3600)
-def get_filtered_raw_data(where_clause, join_needed):
+def get_filtered_data(where_clause, join_needed):
     """Query untuk mengambil data mentah sesuai filter untuk di-download."""
     join_sql = "JOIN v_informasi_fakultas_mahasiswa r ON t.id_mahasiswa = r.id_mahasiswa" if join_needed else ""
     query = f"""
@@ -398,14 +398,14 @@ def show():
     where_clause, join_needed = build_transport_where_clause(selected_modes, selected_fakultas, selected_days)
     
     with export_col1:
-        raw_data_df = get_filtered_raw_data(where_clause, join_needed)
+        data_df = get_filtered_data(where_clause, join_needed)
         st.download_button(
-            "Raw Data", 
-            data=raw_data_df.to_csv(index=False), 
-            file_name=f"transport_data_{len(raw_data_df)}.csv",
+            "Data", 
+            data=data_df.to_csv(index=False), 
+            file_name=f"transport_data{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
             mime="text/csv",
             use_container_width=True,
-            disabled=(raw_data_df.empty)
+            disabled=(data_df.empty)
         )
 
     with export_col2:

@@ -505,9 +505,9 @@ def show():
 
     with export_col1:
         st.download_button(
-            "Raw Data", 
+            "Data", 
             filtered_overall_data_for_metrics.to_csv(index=False), 
-            file_name=f"overview_filtered_data_aggregated_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            file_name=f"overview_data{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
             mime="text/csv",
             use_container_width=True,
             key="overview_export_csv",

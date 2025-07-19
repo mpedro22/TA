@@ -1,14 +1,28 @@
+# src/main.py
+
 import streamlit as st
 import sys
 import os
 import time
 import importlib
+import logging
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from src.auth.auth import is_logged_in, get_current_user, is_admin, logout, supabase 
 
 def main():
+    # Inisialisasi session state untuk pelacakan halaman jika belum ada
+    if 'last_loaded_page' not in st.session_state:
+        st.session_state.last_loaded_page = None
+    if 'is_initial_page_load' not in st.session_state:
+        st.session_state.is_initial_page_load = True 
+
+    start_main_time = time.time()
+
     st.set_page_config(
         page_title="ITB Carbon Dashboard", 
         layout="wide", 
@@ -28,24 +42,30 @@ def main():
         st.error("Dashboard tidak dapat beroperasi. Gagal menginisialisasi koneksi ke Supabase. Periksa konfigurasi .env Anda.")
         return 
     
-    if 'supabase_session' not in st.session_state and supabase:
+    # --- START REHYDRATION LOGIC (MOVED UP) ---
+    # Attempt to rehydrate Supabase session from client storage on every rerun
+    # This is crucial for staying logged in after a page refresh/reload
+    if supabase: # Only attempt if supabase client is initialized
         try:
-            current_session = supabase.auth.get_session()
+            current_session = supabase.auth.get_session() # This reads from localStorage
             if current_session:
                 st.session_state.supabase_session = current_session
                 st.session_state.supabase_user = current_session.user
                 st.session_state.user_metadata = current_session.user.user_metadata if current_session.user else {}
-                print("Supabase session rehydrated from client storage.")
+                # logging.info("Supabase session rehydrated from client storage.") # Optional logging
             else:
-                print("No active Supabase session found in client storage.")
+                # If get_session() returns None, ensure session_state is clear
+                st.session_state.pop("supabase_session", None)
+                st.session_state.pop("supabase_user", None)
+                st.session_state.pop("user_metadata", None)
+                # logging.info("No active Supabase session found in client storage after rehydration attempt.") # Optional logging
         except Exception as e:
-            print(f"Error rehydrating Supabase session: {e}")
+            # Handle errors during rehydration (e.g., network issues preventing communication with Supabase Auth)
+            logging.error(f"Error rehydrating Supabase session: {e}")
             st.session_state.pop("supabase_session", None)
             st.session_state.pop("supabase_user", None)
             st.session_state.pop("user_metadata", None)
-
-    # --- END NEW LOGIC ---
-
+    # --- END REHYDRATION LOGIC ---
 
     def create_sidebar():
         with st.sidebar:
@@ -98,37 +118,47 @@ def main():
             st.markdown('</div>', unsafe_allow_html=True)
 
     # === AUTH LOGIC ===
-    
+    # This check now relies on the rehydration logic above
     if not is_logged_in():
         from src.auth.login import show as show_login_page 
         show_login_page()
+        end_main_time_login = time.time()
+        elapsed_main_time_login = end_main_time_login - start_main_time
+        logging.info(f"MAIN: Login page rendered/rerun in: {elapsed_main_time_login:.2f} seconds")
         return 
             
-    page = st.query_params.get("page", "overview")
+    current_page_id = st.query_params.get("page", "overview")
 
+    # Tentukan apakah ini navigasi halaman baru atau rerun filter di halaman yang sama
+    if st.session_state.last_loaded_page != current_page_id:
+        st.session_state.is_initial_page_load = True 
+        st.session_state.last_loaded_page = current_page_id
+    else:
+        st.session_state.is_initial_page_load = False 
+        
     create_sidebar()
 
-    if page == 'overview':
+    if current_page_id == 'overview':
         from src.pages import overview
         importlib.reload(overview)
         overview.show()
-    elif page == 'transportation':
+    elif current_page_id == 'transportation':
         from src.pages import transportation
         importlib.reload(transportation)
         transportation.show()
-    elif page == 'electronic':
+    elif current_page_id == 'electronic':
         from src.pages import electronic
         importlib.reload(electronic)
         electronic.show()
-    elif page == 'sampah':
+    elif current_page_id == 'sampah':
         from src.pages import food_drink_waste
         importlib.reload(food_drink_waste)
         food_drink_waste.show()
-    elif page == 'about':
+    elif current_page_id == 'about':
         from src.pages import about
         importlib.reload(about)
         about.show()
-    elif page == 'register':
+    elif current_page_id == 'register':
         if is_admin():
             from src.auth import register
             importlib.reload(register)
@@ -138,6 +168,11 @@ def main():
             st.query_params["page"] = "overview"
             time.sleep(1)
             st.rerun()
+
+    end_main_time = time.time()
+    elapsed_main_time = end_main_time - start_main_time
+    logging.info(f"MAIN: Total script execution for '{current_page_id}' rerun: {elapsed_main_time:.2f} seconds")
+
 
 if __name__ == "__main__":
     main()
