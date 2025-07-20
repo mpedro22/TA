@@ -56,6 +56,7 @@ def _get_dynamic_emission_clauses(selected_devices):
     include_facility = any(d in selected_devices for d in FACILITY_DEVICES)
     return personal_sum_clause, facility_sum_clause, include_personal, include_facility
 
+# electronic.py - get_daily_trend_data
 @st.cache_data(ttl=3600)
 def get_daily_trend_data(where_elektronik, where_aktivitas, join_needed, selected_devices):
     personal_sum, facility_sum, include_personal, include_facility = _get_dynamic_emission_clauses(selected_devices)
@@ -64,11 +65,21 @@ def get_daily_trend_data(where_elektronik, where_aktivitas, join_needed, selecte
     
     join_elektronik_sql = "JOIN v_informasi_fakultas_mahasiswa r ON t.id_mahasiswa = r.id_mahasiswa" if join_needed else ""
     join_aktivitas_sql = "JOIN v_informasi_fakultas_mahasiswa r ON a.id_mahasiswa = r.id_mahasiswa" if join_needed else ""
-    personal_cte_where = f"WHERE t.hari_datang IS NOT NULL AND TRIM(t.hari_datang) <> '' {where_elektronik}" if where_elektronik else "WHERE t.hari_datang IS NOT NULL AND TRIM(t.hari_datang) <> ''"
-    facility_cte_where = f"WHERE a.hari IS NOT NULL AND TRIM(a.hari) <> '' {where_aktivitas}" if where_aktivitas else "WHERE a.hari IS NOT NULL AND TRIM(a.hari) <> ''"
 
-    personal_cte = f"SELECT TRIM(unnest(string_to_array(t.hari_datang, ','))) AS hari, SUM({personal_sum}) as emisi FROM elektronik t {join_elektronik_sql} {personal_cte_where} GROUP BY hari"
-    facility_cte = f"SELECT a.hari, SUM({facility_sum}) as emisi FROM aktivitas_harian a {join_aktivitas_sql} {facility_cte_where} GROUP BY a.hari"
+    # Ubah cara building CTE where clauses
+    personal_base_conditions = ["t.hari_datang IS NOT NULL", "TRIM(t.hari_datang) <> ''"]
+    if where_elektronik: # where_elektronik sudah termasuk "WHERE "
+        personal_base_conditions.extend(where_elektronik[len("WHERE "):].split(" AND "))
+    personal_cte_where_sql = "WHERE " + " AND ".join(personal_base_conditions) if personal_base_conditions else ""
+
+    facility_base_conditions = ["a.hari IS NOT NULL", "TRIM(a.hari) <> ''"]
+    if where_aktivitas: # where_aktivitas sudah termasuk "WHERE "
+        facility_base_conditions.extend(where_aktivitas[len("WHERE "):].split(" AND "))
+    facility_cte_where_sql = "WHERE " + " AND ".join(facility_base_conditions) if facility_base_conditions else ""
+
+
+    personal_cte = f"SELECT TRIM(unnest(string_to_array(t.hari_datang, ','))) AS hari, SUM({personal_sum}) as emisi FROM elektronik t {join_elektronik_sql} {personal_cte_where_sql} GROUP BY hari"
+    facility_cte = f"SELECT a.hari, SUM({facility_sum}) as emisi FROM aktivitas_harian a {join_aktivitas_sql} {facility_cte_where_sql} GROUP BY a.hari"
 
     if include_personal and include_facility:
         query = f"WITH personal_daily AS ({personal_cte}), facility_daily AS ({facility_cte}) SELECT COALESCE(p.hari, f.hari) as hari, COALESCE(p.emisi, 0) + COALESCE(f.emisi, 0) as total_emisi FROM personal_daily p FULL OUTER JOIN facility_daily f ON p.hari = f.hari"
