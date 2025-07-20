@@ -52,13 +52,15 @@ def get_filtered_data(where_clause, join_needed):
 def get_daily_trend_data(where_clause, join_needed):
     """Query data untuk chart Tren Emisi Harian."""
     join_sql = "JOIN v_informasi_fakultas_mahasiswa r ON t.id_mahasiswa = r.id_mahasiswa" if join_needed else ""
+    extra_where = f"AND t.hari_datang IS NOT NULL AND TRIM(t.hari_datang) <> ''"
+    
     query = f"""
     SELECT 
         TRIM(unnest(string_to_array(t.hari_datang, ','))) AS hari,
         SUM(COALESCE(t.emisi_transportasi, 0)) AS emisi
     FROM transportasi t
     {join_sql}
-    {where_clause}
+    {where_clause} {extra_where}
     GROUP BY hari
     """
     return run_sql(query)
@@ -381,6 +383,7 @@ def show():
         transport_modes_df = run_sql("SELECT DISTINCT transportasi FROM transportasi WHERE transportasi IS NOT NULL AND TRIM(transportasi) <> '' ORDER BY transportasi")
         available_modes = transport_modes_df['transportasi'].tolist() if not transport_modes_df.empty else []
         selected_modes_input = st.multiselect("Moda Transportasi:", options=available_modes, placeholder="Pilih Opsi", key='transport_mode_filter')        
+        
         if not selected_modes_input and available_modes:
             selected_modes = available_modes
         else:

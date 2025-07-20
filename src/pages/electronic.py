@@ -43,11 +43,15 @@ def _get_dynamic_emission_clauses(selected_devices):
     if 'HP' in selected_devices: personal_terms.append("COALESCE(t.durasi_hp, 0)*4")
     if 'Laptop' in selected_devices: personal_terms.append("COALESCE(t.durasi_laptop, 0)*50")
     if 'Tablet' in selected_devices: personal_terms.append("COALESCE(t.durasi_tab, 0)*10")
-    personal_sum_clause = f"(({ ' + '.join(personal_terms) if personal_terms else '0' }) * 0.829 / 1000)"
+    personal_sum_expr = ' + '.join(personal_terms) if personal_terms else '0'
+    personal_sum_clause = f"(({personal_sum_expr}) * 0.829 / 1000)"
+    
     facility_terms = []
     if 'AC' in selected_devices: facility_terms.append("COALESCE(a.emisi_ac, 0)")
     if 'Lampu' in selected_devices: facility_terms.append("COALESCE(a.emisi_lampu, 0)")
-    facility_sum_clause = f"({ ' + '.join(facility_terms) if facility_terms else '0' })"
+    facility_sum_expr = ' + '.join(facility_terms) if facility_terms else '0'
+    facility_sum_clause = f"({facility_sum_expr})"
+    
     include_personal = any(d in selected_devices for d in PERSONAL_DEVICES)
     include_facility = any(d in selected_devices for d in FACILITY_DEVICES)
     return personal_sum_clause, facility_sum_clause, include_personal, include_facility
@@ -55,18 +59,30 @@ def _get_dynamic_emission_clauses(selected_devices):
 @st.cache_data(ttl=3600)
 def get_daily_trend_data(where_elektronik, where_aktivitas, join_needed, selected_devices):
     personal_sum, facility_sum, include_personal, include_facility = _get_dynamic_emission_clauses(selected_devices)
-    if not include_personal and not include_facility: return pd.DataFrame(columns=['hari', 'total_emisi'])
+    if not include_personal and not include_facility: 
+        return pd.DataFrame(columns=['hari', 'total_emisi'])
+    
     join_elektronik_sql = "JOIN v_informasi_fakultas_mahasiswa r ON t.id_mahasiswa = r.id_mahasiswa" if join_needed else ""
     join_aktivitas_sql = "JOIN v_informasi_fakultas_mahasiswa r ON a.id_mahasiswa = r.id_mahasiswa" if join_needed else ""
-    personal_cte = f"SELECT TRIM(unnest(string_to_array(t.hari_datang, ','))) AS hari, SUM({personal_sum}) as emisi FROM elektronik t {join_elektronik_sql} {where_elektronik} GROUP BY hari"
-    facility_cte = f"SELECT a.hari, SUM({facility_sum}) as emisi FROM aktivitas_harian a {join_aktivitas_sql} {where_aktivitas} GROUP BY a.hari"
+    personal_cte_where = f"WHERE t.hari_datang IS NOT NULL AND TRIM(t.hari_datang) <> '' {where_elektronik}" if where_elektronik else "WHERE t.hari_datang IS NOT NULL AND TRIM(t.hari_datang) <> ''"
+    facility_cte_where = f"WHERE a.hari IS NOT NULL AND TRIM(a.hari) <> '' {where_aktivitas}" if where_aktivitas else "WHERE a.hari IS NOT NULL AND TRIM(a.hari) <> ''"
+
+    personal_cte = f"SELECT TRIM(unnest(string_to_array(t.hari_datang, ','))) AS hari, SUM({personal_sum}) as emisi FROM elektronik t {join_elektronik_sql} {personal_cte_where} GROUP BY hari"
+    facility_cte = f"SELECT a.hari, SUM({facility_sum}) as emisi FROM aktivitas_harian a {join_aktivitas_sql} {facility_cte_where} GROUP BY a.hari"
+
     if include_personal and include_facility:
         query = f"WITH personal_daily AS ({personal_cte}), facility_daily AS ({facility_cte}) SELECT COALESCE(p.hari, f.hari) as hari, COALESCE(p.emisi, 0) + COALESCE(f.emisi, 0) as total_emisi FROM personal_daily p FULL OUTER JOIN facility_daily f ON p.hari = f.hari"
     elif include_personal:
         query = f"WITH personal_daily AS ({personal_cte}) SELECT hari, emisi as total_emisi FROM personal_daily"
-    else:
+    else: # include_facility
         query = f"WITH facility_daily AS ({facility_cte}) SELECT hari, emisi as total_emisi FROM facility_daily"
-    return run_sql(query)
+        
+    df = run_sql(query)
+    if not df.empty:
+        df['order'] = pd.Categorical(df['hari'], categories=DAY_ORDER, ordered=True)
+        df = df.sort_values('order').drop(columns=['order'])
+        df = df.dropna(subset=['total_emisi']) 
+    return df
 
 @st.cache_data(ttl=3600)
 def get_faculty_data(where_elektronik, where_aktivitas, selected_devices):

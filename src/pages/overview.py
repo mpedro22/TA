@@ -94,7 +94,7 @@ def get_daily_activity_emissions_for_trend(selected_fakultas: list, selected_day
             'Transportasi' AS kategori,
             COALESCE(t.emisi_transportasi, 0.0) AS emisi
         FROM transportasi t
-        WHERE t.hari_datang IS NOT NULL AND TRIM(t.hari_datang) <> ''
+        WHERE t.hari_datang IS NOT NULL AND TRIM(t.hari_datang) <> '' AND COALESCE(t.emisi_transportasi, 0.0) > 0.0 -- Tambahkan ini
         
         UNION ALL
         
@@ -107,6 +107,7 @@ def get_daily_activity_emissions_for_trend(selected_fakultas: list, selected_day
         FROM elektronik e
         WHERE e.hari_datang IS NOT NULL AND TRIM(e.hari_datang) <> '' 
           AND COALESCE(array_length(string_to_array(e.hari_datang, ','), 1), 0) > 0
+          AND COALESCE(e.emisi_elektronik, 0.0) > 0.0 -- Tambahkan ini
         
         UNION ALL
 
@@ -117,9 +118,8 @@ def get_daily_activity_emissions_for_trend(selected_fakultas: list, selected_day
             'Elektronik' AS kategori,
             (COALESCE(ah.emisi_ac, 0.0) + COALESCE(ah.emisi_lampu, 0.0)) AS emisi
         FROM aktivitas_harian ah
-        WHERE (ah.emisi_ac IS NOT NULL OR ah.emisi_lampu IS NOT NULL) 
+        WHERE ah.hari IS NOT NULL AND TRIM(ah.hari) <> ''
           AND (COALESCE(ah.emisi_ac, 0.0) > 0.0 OR COALESCE(ah.emisi_lampu, 0.0) > 0.0)
-          AND ah.hari IS NOT NULL AND TRIM(ah.hari) <> ''
 
         UNION ALL
         
@@ -148,7 +148,6 @@ def get_daily_activity_emissions_for_trend(selected_fakultas: list, selected_day
     df['fakultas'] = df['fakultas'].str.strip()
     return df
 
-# GANTI DENGAN INI:
 def create_behavior_profile(row, thresholds):
     """Mengklasifikasikan responden ke dalam profil perilaku berdasarkan ambang batas emisi."""
     t_val = row['transportasi'] if 'transportasi' in row and not pd.isna(row['transportasi']) else 0.0
@@ -582,8 +581,8 @@ def show():
         if not daily_pivot.empty and daily_pivot.sum().sum() > 0:
             fig_trend = go.Figure()
             all_categories = ['Transportasi', 'Elektronik', 'Sampah']
-            
             for cat in all_categories:
+                # Cek apakah kolom kategori ada dan memiliki sum > 0
                 if cat in daily_pivot.columns and daily_pivot[cat].sum() > 0:
                     fig_trend.add_trace(go.Scatter(
                         x=daily_pivot.index,
@@ -594,6 +593,7 @@ def show():
                         hovertemplate='<b>%{x}</b><br>' + cat + ': %{y:.1f} kg CO₂<extra></extra>'
                     ))
             
+            # Hanya plot jika ada setidaknya satu trace yang ditambahkan
             if fig_trend.data:
                 fig_trend.update_layout(height=265, title_text="<b>Tren Emisi Harian</b>", title_x=0.32, title_y=0.95,
                     margin=dict(t=30, b=0, l=0, r=0), legend_title_text='', yaxis_title="Emisi (kg CO₂)", xaxis_title="Hari",
