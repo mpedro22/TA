@@ -41,7 +41,7 @@ def get_filtered_data(where_clause, join_needed):
     SELECT 
         t.*,
         COALESCE(r.fakultas, 'N/A') as fakultas,
-        COALESCE(array_length(string_to_array(t.hari_datang, ','), 1), 0) * COALESCE(t.emisi_transportasi, 0) as emisi_mingguan
+        COALESCE(array_length(string_to_array(t.hari_datang, ','), 1), 0) * t.emisi_transportasi as emisi_mingguan
     FROM transportasi t
     LEFT JOIN v_informasi_fakultas_mahasiswa r ON t.id_mahasiswa = r.id_mahasiswa
     {where_clause}
@@ -52,15 +52,13 @@ def get_filtered_data(where_clause, join_needed):
 def get_daily_trend_data(where_clause, join_needed):
     """Query data untuk chart Tren Emisi Harian."""
     join_sql = "JOIN v_informasi_fakultas_mahasiswa r ON t.id_mahasiswa = r.id_mahasiswa" if join_needed else ""
-    extra_where = f"AND t.hari_datang IS NOT NULL AND TRIM(t.hari_datang) <> ''"
-    
     query = f"""
     SELECT 
         TRIM(unnest(string_to_array(t.hari_datang, ','))) AS hari,
-        SUM(COALESCE(t.emisi_transportasi, 0)) AS emisi
+        SUM(t.emisi_transportasi) AS emisi
     FROM transportasi t
     {join_sql}
-    {where_clause} {extra_where}
+    {where_clause}
     GROUP BY hari
     """
     return run_sql(query)
@@ -71,7 +69,7 @@ def get_faculty_data(where_clause):
     query = f"""
     SELECT
         r.fakultas,
-        SUM(COALESCE(array_length(string_to_array(t.hari_datang, ','), 1), 0) * COALESCE(t.emisi_transportasi, 0)) AS total_emisi,
+        SUM(COALESCE(array_length(string_to_array(t.hari_datang, ','), 1), 0) * t.emisi_transportasi) AS total_emisi,
         COUNT(DISTINCT t.id_mahasiswa) as count
     FROM transportasi t
     JOIN v_informasi_fakultas_mahasiswa r ON t.id_mahasiswa = r.id_mahasiswa
@@ -89,7 +87,7 @@ def get_transport_composition_data(where_clause, join_needed):
     SELECT
         t.transportasi,
         COUNT(DISTINCT t.id_mahasiswa) as total_users,
-        SUM(COALESCE(array_length(string_to_array(t.hari_datang, ','), 1), 0) * COALESCE(t.emisi_transportasi, 0)) as total_emisi
+        SUM(COALESCE(array_length(string_to_array(t.hari_datang, ','), 1), 0) * t.emisi_transportasi) as total_emisi
     FROM transportasi t
     {join_sql}
     {where_clause}
@@ -120,9 +118,9 @@ def get_kecamatan_data(where_clause, join_needed):
     query = f"""
     SELECT
         t.kecamatan,
-        AVG(COALESCE(array_length(string_to_array(t.hari_datang, ','), 1), 0) * COALESCE(t.emisi_transportasi, 0)) as rata_rata_emisi,
+        AVG(COALESCE(array_length(string_to_array(t.hari_datang, ','), 1), 0) * t.emisi_transportasi) as rata_rata_emisi,
         COUNT(DISTINCT t.id_mahasiswa) as jumlah_mahasiswa,
-        SUM(COALESCE(array_length(string_to_array(t.hari_datang, ','), 1), 0) * COALESCE(t.emisi_transportasi, 0)) as total_emisi
+        SUM(COALESCE(array_length(string_to_array(t.hari_datang, ','), 1), 0) * t.emisi_transportasi) as total_emisi
     FROM transportasi t
     {join_sql}
     {where_clause}
@@ -142,6 +140,12 @@ def generate_pdf_report(where_clause, join_needed):
     
     time.sleep(0.6) 
 
+    # Ambil data untuk semua visualisasi.
+    # Kolom yang diambil dari get_*_data akan diakses sesuai namanya:
+    # get_faculty_data -> 'count'
+    # get_transport_composition_data -> 'total_users'
+    # get_heatmap_data -> 'pengguna'
+    # get_kecamatan_data -> 'jumlah_mahasiswa'
     df_daily = get_daily_trend_data(where_clause, join_needed)
     df_faculty = get_faculty_data(where_clause) 
     df_composition = get_transport_composition_data(where_clause, join_needed) 
@@ -151,21 +155,23 @@ def generate_pdf_report(where_clause, join_needed):
     # KPI Calculation for PDF
     total_emisi = df_composition['total_emisi'].sum() if 'total_emisi' in df_composition.columns and not df_composition.empty else 0
     
+    # Menghitung total mahasiswa unik yang terlibat dalam data terfilter untuk KPI rata-rata
     unique_students_in_filtered_data = 0
-    if not df_composition.empty and 'total_users' in df_composition.columns:
+    if not df_composition.empty and 'total_users' in df_composition.columns: # Menggunakan total_users
         try:
             # Query langsung ke DB untuk count distinct id_mahasiswa sesuai filter
             unique_students_query_result = run_sql(f"""
                 SELECT COUNT(DISTINCT t.id_mahasiswa) as count FROM transportasi t
                 LEFT JOIN v_informasi_fakultas_mahasiswa r ON t.id_mahasiswa = r.id_mahasiswa
-                {where_clause} AND COALESCE(t.emisi_transportasi, 0) > 0
+                {where_clause}
             """)
             if not unique_students_query_result.empty and 'count' in unique_students_query_result.columns:
                 unique_students_in_filtered_data = unique_students_query_result.iloc[0,0]
         except Exception as e:
-            unique_students_in_filtered_data = df_composition['total_users'].sum()
-            if unique_students_in_filtered_data == 0 and not df_daily.empty:
-                 unique_students_in_filtered_data = df_daily['emisi'].count()
+            # Fallback jika query gagal, gunakan sum dari total_users sebagai perkiraan unik users.
+            unique_students_in_filtered_data = df_composition['total_users'].sum() 
+            if unique_students_in_filtered_data == 0 and not df_daily.empty: # Jika daily data ada tapi composition is empty
+                 unique_students_in_filtered_data = df_daily['emisi'].count() # Proxy: hitung jumlah aktivitas yang ada
     
     avg_emisi = total_emisi / unique_students_in_filtered_data if unique_students_in_filtered_data > 0 else 0
     
@@ -380,13 +386,9 @@ def show():
         selected_days = st.multiselect("Hari:", options=day_options, placeholder="Pilih Opsi", key='transport_day_filter')
     
     with filter_col2:
-        transport_modes_df = run_sql("SELECT DISTINCT transportasi FROM transportasi WHERE transportasi IS NOT NULL AND TRIM(transportasi) <> '' ORDER BY transportasi")
+        transport_modes_df = run_sql("SELECT DISTINCT transportasi FROM transportasi WHERE transportasi IS NOT NULL ORDER BY transportasi")
         available_modes = transport_modes_df['transportasi'].tolist() if not transport_modes_df.empty else []
-        selected_modes_input = st.multiselect("Moda Transportasi:", options=available_modes, placeholder="Pilih Opsi", key='transport_mode_filter')        
-        if not selected_modes_input and available_modes:
-            selected_modes = available_modes
-        else:
-            selected_modes = selected_modes_input
+        selected_modes = st.multiselect("Moda Transportasi:", options=available_modes, placeholder="Pilih Opsi", key='transport_mode_filter')
     
     with filter_col3:
         fakultas_df = run_sql("SELECT DISTINCT fakultas FROM v_informasi_fakultas_mahasiswa WHERE fakultas IS NOT NULL AND fakultas <> '' ORDER BY fakultas")
