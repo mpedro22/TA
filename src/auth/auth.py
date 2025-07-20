@@ -1,37 +1,26 @@
+# src/auth/auth.py
+
 import streamlit as st
-from supabase import create_client, Client
+from supabase import Client # Hanya perlu Client, bukan create_client langsung di sini
 import os
 from typing import Dict, Optional
 
-# Perbaikan: Hapus dotenv untuk Streamlit Cloud
-# from dotenv import load_dotenv
-# load_dotenv()
+# Import fungsi inisialisasi dari db_connector
+from src.utils.db_connector import init_supabase_connection
 
-# Perbaikan: Gunakan st.secrets dengan benar
+# Dapatkan instance klien Supabase.
+# Karena init_supabase_connection adalah @st.cache_resource,
+# ini hanya akan dijalankan sekali saat pertama kali diimpor/dipanggil,
+# dan hasilnya akan di-cache untuk penggunaan selanjutnya.
+# Ini memastikan st.secrets sudah tersedia saat dipanggil.
+supabase: Optional[Client] = None
 try:
-    # Untuk Streamlit Cloud
-    SUPABASE_URL = st.secrets["SUPABASE_URL"]
-    SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-except KeyError:
-    # Fallback untuk development local
-    try:
-        from dotenv import load_dotenv
-        load_dotenv()
-        SUPABASE_URL = os.environ.get("SUPABASE_URL")
-        SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
-    except ImportError:
-        SUPABASE_URL = os.environ.get("SUPABASE_URL")
-        SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
-
-if not SUPABASE_URL or not SUPABASE_KEY:
-    supabase: Optional[Client] = None
-    st.error("ERROR: SUPABASE_URL atau SUPABASE_KEY tidak ditemukan. Pastikan secrets sudah dikonfigurasi.")
-else:
-    try:
-        supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-    except Exception as e:
-        supabase: Optional[Client] = None
-        st.error(f"ERROR: Gagal menginisialisasi klien Supabase: {e}. Pastikan URL dan KEY benar.")
+    supabase = init_supabase_connection()
+except Exception:
+    # init_supabase_connection sudah menangani st.error dan st.stop() jika gagal.
+    # Kita hanya perlu memastikan 'supabase' adalah None di sini jika ada pengecualian
+    # yang entah bagaimana lolos dari init_supabase_connection (kemungkinan kecil).
+    supabase = None
 
 def authenticate(email: str, password: str) -> Optional[Dict]:
     """
@@ -39,8 +28,8 @@ def authenticate(email: str, password: str) -> Optional[Dict]:
     Menyimpan sesi dan objek pengguna Supabase di st.session_state.
     Mengembalikan metadata pengguna jika autentikasi berhasil.
     """
-    if not supabase:
-        st.error("Sistem tidak terhubung ke Supabase. Periksa konfigurasi.")
+    if not supabase: # Pastikan klien Supabase berhasil diinisialisasi
+        st.error("Sistem tidak terhubung ke Supabase. Autentikasi gagal. Periksa konfigurasi.")
         return None
     try:
         response = supabase.auth.sign_in_with_password({
@@ -69,7 +58,7 @@ def create_user(email: str, password: str, is_admin: bool = False, username: Opt
     Mendaftarkan pengguna baru via Supabase Auth.
     Peran admin dan username (opsional) disimpan di user_metadata.
     """
-    if not supabase:
+    if not supabase: # Pastikan klien Supabase berhasil diinisialisasi
         st.error("Sistem tidak terhubung ke Supabase. Pendaftaran gagal.")
         return False
     try:
@@ -113,7 +102,7 @@ def get_current_user() -> Optional[Dict]:
 
 def logout():
     """Melakukan logout pengguna dari Supabase dan membersihkan state terkait."""
-    if not supabase:
+    if not supabase: # Pastikan klien Supabase berhasil diinisialisasi
         st.error("Sistem tidak terhubung ke Supabase. Logout gagal.")
         return
     try:

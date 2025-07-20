@@ -10,35 +10,43 @@ import logging
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 
-# Perbaikan: Sesuaikan path import
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+# Perbaikan: Sesuaikan path import untuk memastikan modul ditemukan
+# Menambahkan folder utama proyek ke sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-# Perbaikan: Import tanpa supabase object langsung, dan handle error dengan lebih baik
+# Perbaikan: Import modul secara terpusat dari src/
 try:
     from src.auth.auth import is_logged_in, get_current_user, is_admin, logout
+    from src.utils.db_connector import init_supabase_connection # Import fungsi ini
     auth_available = True
-except ImportError:
+except ImportError as e:
+    logging.error(f"Initial import error: {e}. Trying fallback path.")
     try:
-        # Fallback jika struktur folder berbeda
+        # Fallback jika struktur folder atau PYTHONPATH berbeda
         from auth.auth import is_logged_in, get_current_user, is_admin, logout
+        from utils.db_connector import init_supabase_connection # Fallback import
         auth_available = True
-    except ImportError:
-        st.error("Error: Tidak dapat mengimport modul auth. Periksa struktur folder.")
+    except ImportError as e_fallback:
+        st.error(f"Error: Tidak dapat mengimport modul auth atau db_connector. Periksa struktur folder dan PYTHONPATH Anda.")
+        logging.critical(f"Critical import error: {e_fallback}")
         auth_available = False
 
 def check_supabase_connection():
-    """Check if Supabase connection is working"""
+    """
+    Check if Supabase connection is working by attempting to get the client.
+    This uses the cached init_supabase_connection function.
+    """
+    if not auth_available:
+        return False # Jika modul dasar tidak bisa diimport, koneksi pasti gagal
     try:
-        # Import supabase object untuk pengecekan
-        from src.auth.auth import supabase
-        return supabase is not None
-    except ImportError:
-        try:
-            from auth.auth import supabase
-            return supabase is not None
-        except ImportError:
-            return False
-    except Exception:
+        # Memanggil fungsi init_supabase_connection yang di-cache
+        # Ini akan menginisialisasi atau mengambil klien Supabase yang sudah ada
+        supabase_client = init_supabase_connection()
+        return supabase_client is not None
+    except Exception as e:
+        # init_supabase_connection sudah menangani st.error dan st.stop()
+        # di sini kita hanya log dan kembalikan False jika ada pengecualian
+        logging.error(f"Error during check_supabase_connection: {e}")
         return False
 
 def main():
@@ -61,19 +69,20 @@ def main():
     if os.path.exists(css_file_path):
         with open(css_file_path, encoding="utf-8") as f:
             css_content = f.read()
+            # Cache Buster ditambahkan agar CSS selalu di-reload saat aplikasi di-deploy/di-update
             st.markdown(f'<style>/* Cache Buster: {time.time()} */\n{css_content}</style>', unsafe_allow_html=True)
     else:
         st.warning("Warning: style.css not found! Using default styling.")
 
     # Perbaikan: Pengecekan koneksi Supabase yang lebih robust
     if not auth_available:
-        st.error("Dashboard tidak dapat beroperasi. Modul auth tidak dapat diimport.")
+        st.error("Dashboard tidak dapat beroperasi. Modul auth atau db_connector tidak dapat diimport.")
         return
     
+    # Panggil fungsi check_supabase_connection yang baru
     if not check_supabase_connection():
-        st.error("Dashboard tidak dapat beroperasi. Gagal menginisialisasi koneksi ke Supabase. Periksa konfigurasi secrets Anda.")
-        
-        # Tampilkan panduan konfigurasi
+        # Pesan error sudah ditampilkan oleh check_supabase_connection
+        # Tampilkan panduan konfigurasi jika koneksi gagal
         st.write("### 📋 Panduan Konfigurasi Secrets")
         st.write("Di Streamlit Cloud > Settings > Secrets, tambahkan:")
         st.code("""
@@ -85,15 +94,18 @@ SUPABASE_KEY = "your-anon-public-key"
     # --- START REHYDRATION LOGIC (MOVED UP) ---
     # Attempt to rehydrate Supabase session from client storage on every rerun
     # This is crucial for staying logged in after a page refresh/reload
+    
+    # Ambil instance Supabase yang sudah diinisialisasi/di-cache
+    supabase = None
     try:
-        # Import supabase object hanya ketika dibutuhkan
-        from src.auth.auth import supabase
-    except ImportError:
-        from auth.auth import supabase
+        supabase = init_supabase_connection()
+    except Exception as e:
+        logging.error(f"Could not get Supabase client for rehydration: {e}")
+        # Error handling sudah dilakukan di init_supabase_connection, jadi ini fallback log saja.
         
-    if supabase: # Only attempt if supabase client is initialized
+    if supabase: # Hanya lakukan rehidrasi jika klien supabase tersedia
         try:
-            current_session = supabase.auth.get_session() # This reads from localStorage
+            current_session = supabase.auth.get_session() # Ini membaca dari localStorage
             if current_session:
                 st.session_state.supabase_session = current_session
                 st.session_state.supabase_user = current_session.user
@@ -219,6 +231,11 @@ SUPABASE_KEY = "your-anon-public-key"
                 st.query_params["page"] = "overview"
                 time.sleep(1)
                 st.rerun()
+        else: # Halaman tidak dikenal, arahkan ke overview
+            st.warning("Halaman tidak ditemukan. Mengalihkan ke Dashboard Utama.")
+            st.query_params["page"] = "overview"
+            st.rerun()
+
     except ImportError as e:
         st.error(f"Error mengimport page '{current_page_id}': {e}")
         st.write("Periksa struktur folder dan nama file.")
