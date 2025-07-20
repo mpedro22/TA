@@ -46,10 +46,10 @@ def get_all_student_periodic_emissions() -> pd.DataFrame:
     query = """
     SELECT
         ve.id_mahasiswa,
-        COALESCE(TRIM(vim.fakultas), 'Unknown') AS fakultas, -- Menambahkan TRIM di SQL
-        ve.transportasi,
-        ve.elektronik,
-        ve.sampah_makanan
+        COALESCE(TRIM(vim.fakultas), 'Unknown') AS fakultas,
+        COALESCE(ve.transportasi, 0) AS transportasi,
+        COALESCE(ve.elektronik, 0) AS elektronik,
+        COALESCE(ve.sampah_makanan, 0) AS sampah_makanan
     FROM
         v_emisi_per_mahasiswa ve
     LEFT JOIN
@@ -85,38 +85,32 @@ def get_daily_activity_emissions_for_trend(selected_fakultas: list, selected_day
     
     final_where_sql = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
     
-    daily_query = f"""
+    query = f"""
     WITH DailyEmissions AS (
         -- 1. Emisi Transportasi per hari
-        -- Asumsi: emisi_transportasi adalah emisi per trip, diatribusikan PENUH ke setiap hari yang dilaporkan.
         SELECT
             t.id_mahasiswa,
             TRIM(UNNEST(STRING_TO_ARRAY(t.hari_datang, ','))) AS hari,
             'Transportasi' AS kategori,
-            t.emisi_transportasi AS emisi 
+            COALESCE(t.emisi_transportasi, 0.0) AS emisi
         FROM transportasi t
-        WHERE t.emisi_transportasi IS NOT NULL AND t.emisi_transportasi > 0.0
-          AND t.hari_datang IS NOT NULL AND TRIM(t.hari_datang) <> ''
+        WHERE t.hari_datang IS NOT NULL AND TRIM(t.hari_datang) <> ''
         
         UNION ALL
         
         -- 2. Emisi Elektronik (Pribadi) per hari
-        -- Asumsi: emisi_elektronik di tabel 'elektronik' adalah TOTAL mingguan dari perangkat pribadi.
-        -- Emisi ini dibagi rata per hari yang dilaporkan.
         SELECT
             e.id_mahasiswa,
             TRIM(UNNEST(STRING_TO_ARRAY(e.hari_datang, ','))) AS hari,
             'Elektronik' AS kategori,
-            (e.emisi_elektronik / NULLIF(array_length(string_to_array(e.hari_datang, ','), 1), 0)) AS emisi
+            (COALESCE(e.emisi_elektronik, 0.0) / NULLIF(COALESCE(array_length(string_to_array(e.hari_datang, ','), 1), 0), 0)) AS emisi
         FROM elektronik e
-        WHERE e.emisi_elektronik IS NOT NULL AND e.emisi_elektronik > 0.0
-          AND e.hari_datang IS NOT NULL AND TRIM(e.hari_datang) <> '' 
-          AND array_length(string_to_array(e.hari_datang, ','), 1) > 0 
+        WHERE e.hari_datang IS NOT NULL AND TRIM(e.hari_datang) <> '' 
+          AND COALESCE(array_length(string_to_array(e.hari_datang, ','), 1), 0) > 0
         
         UNION ALL
 
         -- 3. Emisi Elektronik (Fasilitas: AC & Lampu) per hari
-        -- Asumsi: emisi_ac dan emisi_lampu adalah emisi per aktivitas harian.
         SELECT
             ah.id_mahasiswa,
             TRIM(ah.hari) AS hari,
@@ -130,19 +124,18 @@ def get_daily_activity_emissions_for_trend(selected_fakultas: list, selected_day
         UNION ALL
         
         -- 4. Emisi Sampah per hari
-        -- Asumsi: emisi_sampah_makanan_per_waktu adalah emisi per aktivitas makan harian.
         SELECT
             m.id_mahasiswa,
             TRIM(m.hari) AS hari,
             'Sampah' AS kategori,
-            m.emisi_sampah_makanan_per_waktu AS emisi
+            COALESCE(m.emisi_sampah_makanan_per_waktu, 0.0) AS emisi
         FROM v_aktivitas_makanan m
         WHERE m.emisi_sampah_makanan_per_waktu IS NOT NULL AND m.emisi_sampah_makanan_per_waktu > 0.0
           AND m.hari IS NOT NULL AND TRIM(m.hari) <> ''
     )
     SELECT
         de.id_mahasiswa,
-        COALESCE(TRIM(vim.fakultas), 'Unknown') AS fakultas, -- Menambahkan TRIM di SQL
+        COALESCE(TRIM(vim.fakultas), 'Unknown') AS fakultas,
         de.hari,
         de.kategori,
         SUM(de.emisi) AS emisi
@@ -151,16 +144,16 @@ def get_daily_activity_emissions_for_trend(selected_fakultas: list, selected_day
     {final_where_sql}
     GROUP BY de.id_mahasiswa, vim.fakultas, de.hari, de.kategori
     """
-    df = run_sql(daily_query)
+    df = run_sql(query)
     df['fakultas'] = df['fakultas'].str.strip()
     return df
 
-
+# GANTI DENGAN INI:
 def create_behavior_profile(row, thresholds):
     """Mengklasifikasikan responden ke dalam profil perilaku berdasarkan ambang batas emisi."""
-    t_val = row['transportasi'] if 'transportasi' in row else 0.0
-    e_val = row['elektronik'] if 'elektronik' in row else 0.0
-    f_val = row['sampah_makanan'] if 'sampah_makanan' in row else 0.0
+    t_val = row['transportasi'] if 'transportasi' in row and not pd.isna(row['transportasi']) else 0.0
+    e_val = row['elektronik'] if 'elektronik' in row and not pd.isna(row['elektronik']) else 0.0
+    f_val = row['sampah_makanan'] if 'sampah_makanan' in row and not pd.isna(row['sampah_makanan']) else 0.0
 
     t_level = "Tinggi" if t_val > thresholds.get('transportasi', 0) else "Rendah"
     e_level = "Tinggi" if e_val > thresholds.get('elektronik', 0) else "Rendah"
@@ -175,11 +168,6 @@ def create_behavior_profile(row, thresholds):
     if e_level == "Tinggi": return "Pengguna Elektronik Berat"
     if f_level == "Tinggi": return "Boros Pangan"
     return "Profil Campuran"
-
-
-# src/pages/overview.py
-
-# ... (bagian import dan definisi di atas tetap sama) ...
 
 @st.cache_data(ttl=3600)
 @loading_decorator()
@@ -286,6 +274,7 @@ def generate_overview_pdf_report(filtered_agg_df_for_report, daily_pivot_for_rep
             median_elektronik = filtered_agg_df_for_report['elektronik'].median() if 'elektronik' in filtered_agg_df_for_report.columns else 0.0
             median_sampah = filtered_agg_df_for_report['sampah_makanan'].median() if 'sampah_makanan' in filtered_agg_df_for_report.columns else 0.0
 
+            # Pastikan nilai median yang mungkin NaN diubah menjadi 0
             median_transportasi = 0.0 if pd.isna(median_transportasi) else median_transportasi
             median_elektronik = 0.0 if pd.isna(median_elektronik) else median_elektronik
             median_sampah = 0.0 if pd.isna(median_sampah) else median_sampah
@@ -595,24 +584,24 @@ def show():
             all_categories = ['Transportasi', 'Elektronik', 'Sampah']
             
             for cat in all_categories:
-                if cat in daily_pivot.columns and daily_pivot[cat].sum() > 0: 
+                if cat in daily_pivot.columns and daily_pivot[cat].sum() > 0:
                     fig_trend.add_trace(go.Scatter(
-                        x=daily_pivot.index, 
-                        y=daily_pivot[cat], 
-                        name=cat, 
-                        mode='lines+markers', 
+                        x=daily_pivot.index,
+                        y=daily_pivot[cat],
+                        name=cat,
+                        mode='lines+markers',
                         line=dict(color=CATEGORY_COLORS.get(cat, '#cccccc')),
                         hovertemplate='<b>%{x}</b><br>' + cat + ': %{y:.1f} kg CO₂<extra></extra>'
                     ))
             
-            if fig_trend.data: 
+            if fig_trend.data:
                 fig_trend.update_layout(height=265, title_text="<b>Tren Emisi Harian</b>", title_x=0.32, title_y=0.95,
                     margin=dict(t=30, b=0, l=0, r=0), legend_title_text='', yaxis_title="Emisi (kg CO₂)", xaxis_title="Hari",
                     legend=dict(orientation="h", yanchor="bottom", y=-0.4, xanchor="center", x=0.5, font_size=9))
                 st.plotly_chart(fig_trend, config=MODEBAR_CONFIG, use_container_width=True)
             else:
                 st.info("Tidak ada data tren harian untuk filter yang dipilih.")
-        else: 
+        else:
             st.info("Tidak ada data tren harian untuk filter yang dipilih.")
 
         categories_data = {

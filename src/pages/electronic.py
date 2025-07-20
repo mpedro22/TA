@@ -40,13 +40,13 @@ def _get_dynamic_emission_clauses(selected_devices):
     if not selected_devices:
         selected_devices = PERSONAL_DEVICES + FACILITY_DEVICES
     personal_terms = []
-    if 'HP' in selected_devices: personal_terms.append("t.durasi_hp*4")
-    if 'Laptop' in selected_devices: personal_terms.append("t.durasi_laptop*50")
-    if 'Tablet' in selected_devices: personal_terms.append("t.durasi_tab*10")
+    if 'HP' in selected_devices: personal_terms.append("COALESCE(t.durasi_hp, 0)*4")
+    if 'Laptop' in selected_devices: personal_terms.append("COALESCE(t.durasi_laptop, 0)*50")
+    if 'Tablet' in selected_devices: personal_terms.append("COALESCE(t.durasi_tab, 0)*10")
     personal_sum_clause = f"(({ ' + '.join(personal_terms) if personal_terms else '0' }) * 0.829 / 1000)"
     facility_terms = []
-    if 'AC' in selected_devices: facility_terms.append("a.emisi_ac")
-    if 'Lampu' in selected_devices: facility_terms.append("a.emisi_lampu")
+    if 'AC' in selected_devices: facility_terms.append("COALESCE(a.emisi_ac, 0)")
+    if 'Lampu' in selected_devices: facility_terms.append("COALESCE(a.emisi_lampu, 0)")
     facility_sum_clause = f"({ ' + '.join(facility_terms) if facility_terms else '0' })"
     include_personal = any(d in selected_devices for d in PERSONAL_DEVICES)
     include_facility = any(d in selected_devices for d in FACILITY_DEVICES)
@@ -95,12 +95,12 @@ def get_device_emissions_data(where_elektronik, where_aktivitas, join_needed):
     join_aktivitas_sql = "JOIN v_informasi_fakultas_mahasiswa r ON a.id_mahasiswa = r.id_mahasiswa" if join_needed else ""
     query = f"""
     WITH personal_devices AS (
-        SELECT 'Laptop' as device, SUM((t.durasi_laptop * 50 * 0.829 / 1000) * COALESCE(array_length(string_to_array(t.hari_datang, ','), 1), 0)) as emisi FROM elektronik t {join_elektronik_sql} {where_elektronik} UNION ALL
-        SELECT 'HP' as device, SUM((t.durasi_hp * 4 * 0.829 / 1000) * COALESCE(array_length(string_to_array(t.hari_datang, ','), 1), 0)) as emisi FROM elektronik t {join_elektronik_sql} {where_elektronik} UNION ALL
-        SELECT 'Tablet' as device, SUM((t.durasi_tab * 10 * 0.829 / 1000) * COALESCE(array_length(string_to_array(t.hari_datang, ','), 1), 0)) as emisi FROM elektronik t {join_elektronik_sql} {where_elektronik}
+        SELECT 'Laptop' as device, SUM((COALESCE(t.durasi_laptop, 0) * 50 * 0.829 / 1000) * COALESCE(array_length(string_to_array(t.hari_datang, ','), 1), 0)) as emisi FROM elektronik t {join_elektronik_sql} {where_elektronik} UNION ALL
+        SELECT 'HP' as device, SUM((COALESCE(t.durasi_hp, 0) * 4 * 0.829 / 1000) * COALESCE(array_length(string_to_array(t.hari_datang, ','), 1), 0)) as emisi FROM elektronik t {join_elektronik_sql} {where_elektronik} UNION ALL
+        SELECT 'Tablet' as device, SUM((COALESCE(t.durasi_tab, 0) * 10 * 0.829 / 1000) * COALESCE(array_length(string_to_array(t.hari_datang, ','), 1), 0)) as emisi FROM elektronik t {join_elektronik_sql} {where_elektronik}
     ), facility_devices AS (
-        SELECT 'AC' as device, SUM(a.emisi_ac) as emisi FROM aktivitas_harian a {join_aktivitas_sql} {where_aktivitas} UNION ALL
-        SELECT 'Lampu' as device, SUM(a.emisi_lampu) as emisi FROM aktivitas_harian a {join_aktivitas_sql} {where_aktivitas}
+        SELECT 'AC' as device, SUM(COALESCE(a.emisi_ac, 0)) as emisi FROM aktivitas_harian a {join_aktivitas_sql} {where_aktivitas} UNION ALL
+        SELECT 'Lampu' as device, SUM(COALESCE(a.emisi_lampu, 0)) as emisi FROM aktivitas_harian a {join_aktivitas_sql} {where_aktivitas}
     )
     SELECT device, emisi FROM personal_devices UNION ALL SELECT device, emisi FROM facility_devices
     """
@@ -160,11 +160,11 @@ def get_filtered_elektronik_data(selected_fakultas, selected_days):
         e.id_mahasiswa,
         COALESCE(r.fakultas, 'N/A') as fakultas,
         e.hari_datang,
-        e.durasi_hp,
-        e.durasi_laptop,
-        e.durasi_tab,
-        e.emisi_elektronik_pribadi,
-        e.emisi_elektronik
+        COALESCE(e.durasi_hp, 0) as durasi_hp,
+        COALESCE(e.durasi_laptop, 0) as durasi_laptop,
+        COALESCE(e.durasi_tab, 0) as durasi_tab,
+        COALESCE(e.emisi_elektronik_pribadi, 0) as emisi_elektronik_pribadi,
+        COALESCE(e.emisi_elektronik, 0) as emisi_elektronik
     FROM
         elektronik e
     {join_sql}
@@ -192,19 +192,17 @@ def generate_pdf_report(where_elektronik, where_aktivitas, join_needed, selected
 
     total_emisi = df_devices['emisi'].sum() if not df_devices.empty else 0
     
-    # Hitung total mahasiswa unik yang terlibat dalam data terfilter untuk KPI rata-rata
     total_mahasiswa_unik = 0
     try:
-        # Menyatukan data mahasiswa dari elektronik dan aktivitas harian, lalu count distinct
         unique_mhs_query = f"""
         WITH FilteredStudents AS (
             SELECT t.id_mahasiswa FROM elektronik t
             LEFT JOIN v_informasi_fakultas_mahasiswa r ON t.id_mahasiswa = r.id_mahasiswa
-            {where_elektronik}
+            {where_elektronik} AND (COALESCE(t.durasi_hp, 0) > 0 OR COALESCE(t.durasi_laptop, 0) > 0 OR COALESCE(t.durasi_tab, 0) > 0)
             UNION
             SELECT a.id_mahasiswa FROM aktivitas_harian a
             LEFT JOIN v_informasi_fakultas_mahasiswa r ON a.id_mahasiswa = r.id_mahasiswa
-            {where_aktivitas}
+            {where_aktivitas} AND (COALESCE(a.emisi_ac, 0) > 0 OR COALESCE(a.emisi_lampu, 0) > 0)
         )
         SELECT COUNT(DISTINCT id_mahasiswa) as count FROM FilteredStudents
         """
@@ -212,7 +210,6 @@ def generate_pdf_report(where_elektronik, where_aktivitas, join_needed, selected
         if not result.empty and 'count' in result.columns:
             total_mahasiswa_unik = result.iloc[0,0]
     except Exception as e:
-        # Fallback jika query gagal
         total_mahasiswa_unik = 0
 
     avg_emisi = total_emisi / total_mahasiswa_unik if total_mahasiswa_unik > 0 else 0
@@ -411,7 +408,11 @@ def show():
         selected_days = st.multiselect("Hari:", options=DAY_ORDER, placeholder="Pilih Opsi", key='electronic_day_filter')
     with filter_col2:
         device_options = list(DEVICE_COLORS.keys())
-        selected_devices = st.multiselect("Perangkat:", options=device_options, placeholder="Pilih Opsi", key='electronic_device_filter')
+        selected_devices_input = st.multiselect("Perangkat:", options=device_options, placeholder="Pilih Opsi", key='electronic_device_filter')
+        if not selected_devices_input: 
+            selected_devices = PERSONAL_DEVICES + FACILITY_DEVICES 
+        else:
+            selected_devices = selected_devices_input
     with filter_col3:
         fakultas_df = run_sql("SELECT DISTINCT fakultas FROM v_informasi_fakultas_mahasiswa WHERE fakultas IS NOT NULL AND fakultas <> '' ORDER BY fakultas")
         available_fakultas = fakultas_df['fakultas'].tolist() if not fakultas_df.empty else []
@@ -482,8 +483,9 @@ def show():
             device_emissions_df = get_device_emissions_data(where_elektronik, where_aktivitas, join_needed)
             if not device_emissions_df.empty:
                 display_devices = device_emissions_df.copy()
-                if selected_devices:
-                    display_devices = display_devices[display_devices['device'].isin(selected_devices)]
+                # Tidak perlu filter di sini karena _get_dynamic_emission_clauses sudah menggunakan selected_devices
+                # dan selected_devices sudah di-default di atas.
+                
                 if not display_devices.empty and display_devices['emisi'].sum() > 0:
                     colors = [DEVICE_COLORS.get(d, '#cccccc') for d in display_devices['device']]
                     fig_devices = go.Figure(data=[go.Pie(labels=display_devices['device'], values=display_devices['emisi'], hole=0.45, marker=dict(colors=colors), textposition='outside', textinfo='label+percent', hovertemplate='<b>%{label}</b><br>%{value:.2f} kg CO₂ (%{percent})<extra></extra>')])
