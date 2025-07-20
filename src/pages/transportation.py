@@ -48,43 +48,26 @@ def get_filtered_data(where_clause, join_needed):
     """
     return run_sql(query)
 
+@st.cache_data(ttl=3600)
 def get_daily_trend_data(where_clause, join_needed):
+    """Query data untuk chart Tren Emisi Harian."""
     join_sql = "JOIN v_informasi_fakultas_mahasiswa r ON t.id_mahasiswa = r.id_mahasiswa" if join_needed else ""
+    extra_where = f"AND t.hari_datang IS NOT NULL AND TRIM(t.hari_datang) <> ''"
     
-    # 1. Kumpulkan semua kondisi 'WHERE' yang spesifik untuk kueri ini
-    conditions = ["t.hari_datang IS NOT NULL", "TRIM(t.hari_datang) <> ''"]
-    
-    # 2. Jika ada where_clause dari filter multiselect, tambahkan kondisinya
-    if where_clause:
-        # where_clause datang dengan "WHERE ", jadi kita hilangkan itu dulu
-        base_conditions = where_clause[len("WHERE "):].split(" AND ")
-        conditions.extend(base_conditions)
-    
-    # 3. Bentuk klausa WHERE final
-    final_where_sql = "WHERE " + " AND ".join(conditions) if conditions else ""
-
     query = f"""
     SELECT 
         TRIM(unnest(string_to_array(t.hari_datang, ','))) AS hari,
         SUM(COALESCE(t.emisi_transportasi, 0)) AS emisi
     FROM transportasi t
     {join_sql}
-    {final_where_sql} # <-- Pastikan menggunakan ini
+    {where_clause} {extra_where}
     GROUP BY hari
     """
     return run_sql(query)
 
 @st.cache_data(ttl=3600)
 def get_faculty_data(where_clause):
-    # No `join_needed` as it always joins
-    
-    conditions = []
-    if where_clause:
-        base_conditions = where_clause[len("WHERE "):].split(" AND ")
-        conditions.extend(base_conditions)
-    
-    final_where_sql = "WHERE " + " AND ".join(conditions) if conditions else ""
-
+    """Query data untuk chart Emisi per Fakultas."""
     query = f"""
     SELECT
         r.fakultas,
@@ -92,7 +75,7 @@ def get_faculty_data(where_clause):
         COUNT(DISTINCT t.id_mahasiswa) as count
     FROM transportasi t
     JOIN v_informasi_fakultas_mahasiswa r ON t.id_mahasiswa = r.id_mahasiswa
-    {final_where_sql} # <-- Pastikan menggunakan ini
+    {where_clause}
     GROUP BY r.fakultas
     ORDER BY total_emisi ASC
     """
@@ -100,15 +83,8 @@ def get_faculty_data(where_clause):
 
 @st.cache_data(ttl=3600)
 def get_transport_composition_data(where_clause, join_needed):
+    """Query data untuk chart Komposisi Moda."""
     join_sql = "JOIN v_informasi_fakultas_mahasiswa r ON t.id_mahasiswa = r.id_mahasiswa" if join_needed else ""
-    
-    conditions = []
-    if where_clause:
-        base_conditions = where_clause[len("WHERE "):].split(" AND ")
-        conditions.extend(base_conditions)
-    
-    final_where_sql = "WHERE " + " AND ".join(conditions) if conditions else ""
-
     query = f"""
     SELECT
         t.transportasi,
@@ -116,22 +92,15 @@ def get_transport_composition_data(where_clause, join_needed):
         SUM(COALESCE(array_length(string_to_array(t.hari_datang, ','), 1), 0) * COALESCE(t.emisi_transportasi, 0)) as total_emisi
     FROM transportasi t
     {join_sql}
-    {final_where_sql} # <-- Pastikan menggunakan ini
+    {where_clause}
     GROUP BY t.transportasi
     """
     return run_sql(query)
 
 @st.cache_data(ttl=3600)
 def get_heatmap_data(where_clause, join_needed):
+    """Query data untuk Heatmap."""
     join_sql = "JOIN v_informasi_fakultas_mahasiswa r ON t.id_mahasiswa = r.id_mahasiswa" if join_needed else ""
-    
-    conditions = ["t.hari_datang IS NOT NULL", "TRIM(t.hari_datang) <> ''"]
-    if where_clause:
-        base_conditions = where_clause[len("WHERE "):].split(" AND ")
-        conditions.extend(base_conditions)
-    
-    final_where_sql = "WHERE " + " AND ".join(conditions) if conditions else ""
-
     query = f"""
     SELECT 
         TRIM(unnest(string_to_array(t.hari_datang, ','))) AS hari,
@@ -139,7 +108,7 @@ def get_heatmap_data(where_clause, join_needed):
         COUNT(t.id_mahasiswa) as pengguna
     FROM transportasi t
     {join_sql}
-    {final_where_sql} # <-- Pastikan menggunakan ini
+    {where_clause}
     GROUP BY hari, t.transportasi
     """
     return run_sql(query)
@@ -414,7 +383,6 @@ def show():
         transport_modes_df = run_sql("SELECT DISTINCT transportasi FROM transportasi WHERE transportasi IS NOT NULL AND TRIM(transportasi) <> '' ORDER BY transportasi")
         available_modes = transport_modes_df['transportasi'].tolist() if not transport_modes_df.empty else []
         selected_modes_input = st.multiselect("Moda Transportasi:", options=available_modes, placeholder="Pilih Opsi", key='transport_mode_filter')        
-        
         if not selected_modes_input and available_modes:
             selected_modes = available_modes
         else:
