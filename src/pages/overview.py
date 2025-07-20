@@ -94,7 +94,8 @@ def get_daily_activity_emissions_for_trend(selected_fakultas: list, selected_day
             'Transportasi' AS kategori,
             COALESCE(t.emisi_transportasi, 0.0) AS emisi
         FROM transportasi t
-        WHERE t.hari_datang IS NOT NULL AND TRIM(t.hari_datang) <> '' AND COALESCE(t.emisi_transportasi, 0.0) > 0.0 -- Tambahkan ini
+        -- Pastikan hari_datang tidak NULL atau kosong
+        WHERE t.hari_datang IS NOT NULL AND TRIM(t.hari_datang) <> '' AND COALESCE(t.emisi_transportasi, 0.0) > 0.0
         
         UNION ALL
         
@@ -105,9 +106,10 @@ def get_daily_activity_emissions_for_trend(selected_fakultas: list, selected_day
             'Elektronik' AS kategori,
             (COALESCE(e.emisi_elektronik, 0.0) / NULLIF(COALESCE(array_length(string_to_array(e.hari_datang, ','), 1), 0), 0)) AS emisi
         FROM elektronik e
-        WHERE e.hari_datang IS NOT NULL AND TRIM(e.hari_datang) <> '' 
+        -- Pastikan hari_datang tidak NULL/kosong DAN ada data emisi.
+        WHERE e.hari_datang IS NOT NULL AND TRIM(e.hari_datang) <> ''
           AND COALESCE(array_length(string_to_array(e.hari_datang, ','), 1), 0) > 0
-          AND COALESCE(e.emisi_elektronik, 0.0) > 0.0 -- Tambahkan ini
+          AND COALESCE(e.emisi_elektronik, 0.0) > 0.0
         
         UNION ALL
 
@@ -118,6 +120,7 @@ def get_daily_activity_emissions_for_trend(selected_fakultas: list, selected_day
             'Elektronik' AS kategori,
             (COALESCE(ah.emisi_ac, 0.0) + COALESCE(ah.emisi_lampu, 0.0)) AS emisi
         FROM aktivitas_harian ah
+        -- Pastikan hari tidak NULL/kosong DAN ada data emisi AC/Lampu.
         WHERE ah.hari IS NOT NULL AND TRIM(ah.hari) <> ''
           AND (COALESCE(ah.emisi_ac, 0.0) > 0.0 OR COALESCE(ah.emisi_lampu, 0.0) > 0.0)
 
@@ -130,6 +133,7 @@ def get_daily_activity_emissions_for_trend(selected_fakultas: list, selected_day
             'Sampah' AS kategori,
             COALESCE(m.emisi_sampah_makanan_per_waktu, 0.0) AS emisi
         FROM v_aktivitas_makanan m
+        -- Pastikan hari tidak NULL/kosong DAN ada data emisi sampah.
         WHERE m.emisi_sampah_makanan_per_waktu IS NOT NULL AND m.emisi_sampah_makanan_per_waktu > 0.0
           AND m.hari IS NOT NULL AND TRIM(m.hari) <> ''
     )
