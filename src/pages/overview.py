@@ -36,21 +36,6 @@ MODEBAR_CONFIG = {
 }
 DAY_ORDER = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
 
-# Define the CASE statement logic for standardizing day names.
-# IMPORTANT: This is now a single-line string in Python, to avoid syntax errors in SQL
-standardize_day_case_sql_template = (
-    " (CASE UPPER(TRIM(%s)) "
-    "    WHEN 'SENIN' THEN 'Senin' "
-    "    WHEN 'SELASA' THEN 'Selasa' "
-    "    WHEN 'RABU' THEN 'Rabu' "
-    "    WHEN 'KAMIS' THEN 'Kamis' "
-    "    WHEN 'JUMAT' THEN 'Jumat' "
-    "    WHEN 'SABTU' THEN 'Sabtu' "
-    "    WHEN 'MINGGU' THEN 'Minggu' "
-    "    ELSE NULL "
-    " END) "
-)
-
 @st.cache_data(ttl=3600)
 def get_all_student_periodic_emissions() -> pd.DataFrame:
     """
@@ -61,10 +46,10 @@ def get_all_student_periodic_emissions() -> pd.DataFrame:
     query = """
     SELECT
         ve.id_mahasiswa,
-        COALESCE(TRIM(vim.fakultas), 'Unknown') AS fakultas,
-        COALESCE(ve.transportasi, 0) AS transportasi,
-        COALESCE(ve.elektronik, 0) AS elektronik,
-        COALESCE(ve.sampah_makanan, 0) AS sampah_makanan
+        COALESCE(TRIM(vim.fakultas), 'Unknown') AS fakultas, -- Menambahkan TRIM di SQL
+        ve.transportasi,
+        ve.elektronik,
+        ve.sampah_makanan
     FROM
         v_emisi_per_mahasiswa ve
     LEFT JOIN
@@ -100,64 +85,64 @@ def get_daily_activity_emissions_for_trend(selected_fakultas: list, selected_day
     
     final_where_sql = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
     
-    query = f"""
+    daily_query = f"""
     WITH DailyEmissions AS (
         -- 1. Emisi Transportasi per hari
+        -- Asumsi: emisi_transportasi adalah emisi per trip, diatribusikan PENUH ke setiap hari yang dilaporkan.
         SELECT
             t.id_mahasiswa,
-            {standardize_day_case_sql_template % 'unnested_hari.hari_val'} AS hari,
+            TRIM(UNNEST(STRING_TO_ARRAY(t.hari_datang, ','))) AS hari,
             'Transportasi' AS kategori,
-            COALESCE(t.emisi_transportasi, 0.0)::float8 AS emisi
+            t.emisi_transportasi AS emisi 
         FROM transportasi t
-        CROSS JOIN LATERAL UNNEST(STRING_TO_ARRAY(t.hari_datang, ',')) AS unnested_hari(hari_val)
-        WHERE t.hari_datang IS NOT NULL 
-          AND TRIM(t.hari_datang) <> ''
-          AND {standardize_day_case_sql_template % 'unnested_hari.hari_val'} IS NOT NULL -- Re-enabled filter
+        WHERE t.emisi_transportasi IS NOT NULL AND t.emisi_transportasi > 0.0
+          AND t.hari_datang IS NOT NULL AND TRIM(t.hari_datang) <> ''
         
         UNION ALL
         
         -- 2. Emisi Elektronik (Pribadi) per hari
+        -- Asumsi: emisi_elektronik di tabel 'elektronik' adalah TOTAL mingguan dari perangkat pribadi.
+        -- Emisi ini dibagi rata per hari yang dilaporkan.
         SELECT
             e.id_mahasiswa,
-            {standardize_day_case_sql_template % 'unnested_hari.hari_val'} AS hari,
+            TRIM(UNNEST(STRING_TO_ARRAY(e.hari_datang, ','))) AS hari,
             'Elektronik' AS kategori,
-            (COALESCE(e.emisi_elektronik, 0.0) / NULLIF(COALESCE(array_length(string_to_array(e.hari_datang, ','), 1), 0), 0))::float8 AS emisi
+            (e.emisi_elektronik / NULLIF(array_length(string_to_array(e.hari_datang, ','), 1), 0)) AS emisi
         FROM elektronik e
-        CROSS JOIN LATERAL UNNEST(STRING_TO_ARRAY(e.hari_datang, ',')) AS unnested_hari(hari_val)
-        WHERE e.hari_datang IS NOT NULL 
-          AND TRIM(e.hari_datang) <> ''
-          AND COALESCE(array_length(string_to_array(e.hari_datang, ','), 1), 0) > 0 -- Denominator tidak boleh nol, ini HARUS dipertahankan
-          AND {standardize_day_case_sql_template % 'unnested_hari.hari_val'} IS NOT NULL -- Re-enabled filter
+        WHERE e.emisi_elektronik IS NOT NULL AND e.emisi_elektronik > 0.0
+          AND e.hari_datang IS NOT NULL AND TRIM(e.hari_datang) <> '' 
+          AND array_length(string_to_array(e.hari_datang, ','), 1) > 0 
         
         UNION ALL
 
         -- 3. Emisi Elektronik (Fasilitas: AC & Lampu) per hari
+        -- Asumsi: emisi_ac dan emisi_lampu adalah emisi per aktivitas harian.
         SELECT
             ah.id_mahasiswa,
-            {standardize_day_case_sql_template % 'ah.hari'} AS hari,
+            TRIM(ah.hari) AS hari,
             'Elektronik' AS kategori,
-            (COALESCE(ah.emisi_ac, 0.0) + COALESCE(ah.emisi_lampu, 0.0))::float8 AS emisi
+            (COALESCE(ah.emisi_ac, 0.0) + COALESCE(ah.emisi_lampu, 0.0)) AS emisi
         FROM aktivitas_harian ah
-        WHERE ah.hari IS NOT NULL 
-          AND TRIM(ah.hari) <> ''
-          AND {standardize_day_case_sql_template % 'ah.hari'} IS NOT NULL -- Re-enabled filter
-        
+        WHERE (ah.emisi_ac IS NOT NULL OR ah.emisi_lampu IS NOT NULL) 
+          AND (COALESCE(ah.emisi_ac, 0.0) > 0.0 OR COALESCE(ah.emisi_lampu, 0.0) > 0.0)
+          AND ah.hari IS NOT NULL AND TRIM(ah.hari) <> ''
+
         UNION ALL
         
         -- 4. Emisi Sampah per hari
+        -- Asumsi: emisi_sampah_makanan_per_waktu adalah emisi per aktivitas makan harian.
         SELECT
             m.id_mahasiswa,
-            {standardize_day_case_sql_template % 'm.hari'} AS hari,
+            TRIM(m.hari) AS hari,
             'Sampah' AS kategori,
-            COALESCE(m.emisi_sampah_makanan_per_waktu, 0.0)::float8 AS emisi
+            m.emisi_sampah_makanan_per_waktu AS emisi
         FROM v_aktivitas_makanan m
-        WHERE m.hari IS NOT NULL 
-          AND TRIM(m.hari) <> ''
-          AND {standardize_day_case_sql_template % 'm.hari'} IS NOT NULL -- Re-enabled filter
+        WHERE m.emisi_sampah_makanan_per_waktu IS NOT NULL AND m.emisi_sampah_makanan_per_waktu > 0.0
+          AND m.hari IS NOT NULL AND TRIM(m.hari) <> ''
     )
     SELECT
         de.id_mahasiswa,
-        COALESCE(TRIM(vim.fakultas), 'Unknown') AS fakultas,
+        COALESCE(TRIM(vim.fakultas), 'Unknown') AS fakultas, -- Menambahkan TRIM di SQL
         de.hari,
         de.kategori,
         SUM(de.emisi) AS emisi
@@ -166,15 +151,16 @@ def get_daily_activity_emissions_for_trend(selected_fakultas: list, selected_day
     {final_where_sql}
     GROUP BY de.id_mahasiswa, vim.fakultas, de.hari, de.kategori
     """
-    df = run_sql(query)
+    df = run_sql(daily_query)
     df['fakultas'] = df['fakultas'].str.strip()
     return df
 
+
 def create_behavior_profile(row, thresholds):
     """Mengklasifikasikan responden ke dalam profil perilaku berdasarkan ambang batas emisi."""
-    t_val = row['transportasi'] if 'transportasi' in row and not pd.isna(row['transportasi']) else 0.0
-    e_val = row['elektronik'] if 'elektronik' in row and not pd.isna(row['elektronik']) else 0.0
-    f_val = row['sampah_makanan'] if 'sampah_makanan' in row and not pd.isna(row['sampah_makanan']) else 0.0
+    t_val = row['transportasi'] if 'transportasi' in row else 0.0
+    e_val = row['elektronik'] if 'elektronik' in row else 0.0
+    f_val = row['sampah_makanan'] if 'sampah_makanan' in row else 0.0
 
     t_level = "Tinggi" if t_val > thresholds.get('transportasi', 0) else "Rendah"
     e_level = "Tinggi" if e_val > thresholds.get('elektronik', 0) else "Rendah"
@@ -211,7 +197,6 @@ def generate_overview_pdf_report(filtered_agg_df_for_report, daily_pivot_for_rep
         'Sampah': filtered_agg_df_for_report['sampah_makanan'].sum() if 'sampah_makanan' in filtered_agg_df_for_report.columns else 0.0
     }
     
-    # Filter out categories with zero emission for a more relevant conclusion
     composition_data_filtered_for_conclusion = {k: v for k, v in composition_data.items() if v > 0}
     
     dominant_cat = "Tidak Tersedia"
@@ -264,7 +249,6 @@ def generate_overview_pdf_report(filtered_agg_df_for_report, daily_pivot_for_rep
     
     if not fakultas_stats_for_report.empty and fakultas_stats_for_report['total_emisi'].sum() > 0:
         fakultas_report = fakultas_stats_for_report.sort_values('total_emisi', ascending=False)
-        # Menampilkan SEMUA fakultas, bukan hanya top 10
         fakultas_report_html = ''.join([f"<tr><td>{row['fakultas']}</td><td style='text-align:right;'>{row['total_emisi']:.1f}</td></tr>" for idx, row in fakultas_report.iterrows()])
         
         if len(fakultas_report) > 1:
@@ -290,12 +274,10 @@ def generate_overview_pdf_report(filtered_agg_df_for_report, daily_pivot_for_rep
 
     if num_responden_unique_pdf > 5: 
         if not filtered_agg_df_for_report.empty:
-            # Handle potential NaNs from median if all values are zero or missing after filtering
             median_transportasi = filtered_agg_df_for_report['transportasi'].median() if 'transportasi' in filtered_agg_df_for_report.columns else 0.0
             median_elektronik = filtered_agg_df_for_report['elektronik'].median() if 'elektronik' in filtered_agg_df_for_report.columns else 0.0
             median_sampah = filtered_agg_df_for_report['sampah_makanan'].median() if 'sampah_makanan' in filtered_agg_df_for_report.columns else 0.0
 
-            # Pastikan nilai median yang mungkin NaN diubah menjadi 0
             median_transportasi = 0.0 if pd.isna(median_transportasi) else median_transportasi
             median_elektronik = 0.0 if pd.isna(median_elektronik) else median_elektronik
             median_sampah = 0.0 if pd.isna(median_sampah) else median_sampah
@@ -464,28 +446,13 @@ def show():
             
             main_source_for_kpis_segments['total_emisi'] = main_source_for_kpis_segments[['transportasi', 'elektronik', 'sampah_makanan']].sum(axis=1)
 
-            daily_trend_data = get_daily_activity_emissions_for_trend(cleaned_selected_fakultas, [], [])
-            
-            # --- DEBUG: Tampilkan DataFrame daily_trend_data ---
-            st.markdown("---")
-            st.subheader("DEBUG: Data Emisi Harian Mentah")
-            st.dataframe(daily_trend_data)
-            st.markdown("---")
-            # --- END DEBUG ---
-
+            daily_trend_data = get_daily_activity_emissions_for_trend(cleaned_selected_fakultas, [], selected_categories)
             daily_pivot = daily_trend_data.groupby(
                 ['hari', 'kategori']
             )['emisi'].sum().unstack(fill_value=0.0).reindex(DAY_ORDER).fillna(0.0)
 
         else: 
             daily_filtered_data_for_all = get_daily_activity_emissions_for_trend(cleaned_selected_fakultas, selected_days, selected_categories)
-            
-            # --- DEBUG: Tampilkan DataFrame daily_filtered_data_for_all ---
-            st.markdown("---")
-            st.subheader("DEBUG: Data Emisi Harian Mentah (dengan filter Hari)")
-            st.dataframe(daily_filtered_data_for_all)
-            st.markdown("---")
-            # --- END DEBUG ---
             
             main_source_for_kpis_segments = daily_filtered_data_for_all.groupby(['id_mahasiswa', 'fakultas', 'kategori'])['emisi'].sum().unstack(fill_value=0.0).reset_index()
             
@@ -508,13 +475,6 @@ def show():
         for cat in ['Transportasi', 'Elektronik', 'Sampah']:
             if cat not in daily_pivot.columns:
                 daily_pivot[cat] = 0.0 
-
-        # --- DEBUG: Tampilkan daily_pivot setelah pemrosesan ---
-        st.markdown("---")
-        st.subheader("DEBUG: daily_pivot (untuk Tren Emisi Harian)")
-        st.dataframe(daily_pivot)
-        st.markdown("---")
-        # --- END DEBUG ---
 
         filtered_overall_data_for_metrics = main_source_for_kpis_segments
 
@@ -622,30 +582,29 @@ def show():
             st.info("Tidak ada data emisi per fakultas untuk filter yang dipilih.")
 
     with col2:
-        if not daily_pivot.empty: # Mengubah kondisi, hanya cek apakah daily_pivot tidak kosong
+        if not daily_pivot.empty and daily_pivot.sum().sum() > 0:
             fig_trend = go.Figure()
             all_categories = ['Transportasi', 'Elektronik', 'Sampah']
+            
             for cat in all_categories:
-                # Mengubah kondisi, hanya cek apakah kolom kategori ada
-                if cat in daily_pivot.columns: 
+                if cat in daily_pivot.columns and daily_pivot[cat].sum() > 0: 
                     fig_trend.add_trace(go.Scatter(
-                        x=daily_pivot.index,
-                        y=daily_pivot[cat],
-                        name=cat,
-                        mode='lines+markers',
+                        x=daily_pivot.index, 
+                        y=daily_pivot[cat], 
+                        name=cat, 
+                        mode='lines+markers', 
                         line=dict(color=CATEGORY_COLORS.get(cat, '#cccccc')),
                         hovertemplate='<b>%{x}</b><br>' + cat + ': %{y:.1f} kg CO₂<extra></extra>'
                     ))
             
-            # Hanya plot jika ada setidaknya satu trace yang ditambahkan
-            if fig_trend.data: # Tetap cek apakah ada data untuk diplot
+            if fig_trend.data: 
                 fig_trend.update_layout(height=265, title_text="<b>Tren Emisi Harian</b>", title_x=0.32, title_y=0.95,
                     margin=dict(t=30, b=0, l=0, r=0), legend_title_text='', yaxis_title="Emisi (kg CO₂)", xaxis_title="Hari",
                     legend=dict(orientation="h", yanchor="bottom", y=-0.4, xanchor="center", x=0.5, font_size=9))
                 st.plotly_chart(fig_trend, config=MODEBAR_CONFIG, use_container_width=True)
             else:
                 st.info("Tidak ada data tren harian untuk filter yang dipilih.")
-        else:
+        else: 
             st.info("Tidak ada data tren harian untuk filter yang dipilih.")
 
         categories_data = {
@@ -699,7 +658,6 @@ def show():
             median_elektronik = filtered_overall_data_for_metrics['elektronik'].median() if 'elektronik' in filtered_overall_data_for_metrics.columns else 0.0
             median_sampah = filtered_overall_data_for_metrics['sampah_makanan'].median() if 'sampah_makanan' in filtered_overall_data_for_metrics.columns else 0.0
 
-            # Pastikan nilai median yang mungkin NaN diubah menjadi 0
             median_transportasi = 0.0 if pd.isna(median_transportasi) else median_transportasi
             median_elektronik = 0.0 if pd.isna(median_elektronik) else median_elektronik
             median_sampah = 0.0 if pd.isna(median_sampah) else median_sampah
