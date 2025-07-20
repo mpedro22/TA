@@ -107,12 +107,12 @@ def get_daily_activity_emissions_for_trend(selected_fakultas: list, selected_day
             t.id_mahasiswa,
             {standardize_day_case_sql_template % 'unnested_hari.hari_val'} AS hari,
             'Transportasi' AS kategori,
-            COALESCE(t.emisi_transportasi, 0.0) AS emisi
+            COALESCE(t.emisi_transportasi, 0.0)::float8 AS emisi -- Added ::float8 for precision
         FROM transportasi t
         CROSS JOIN LATERAL UNNEST(STRING_TO_ARRAY(t.hari_datang, ',')) AS unnested_hari(hari_val)
         WHERE t.hari_datang IS NOT NULL 
           AND TRIM(t.hari_datang) <> ''
-          -- AND {standardize_day_case_sql_template % 'unnested_hari.hari_val'} IS NOT NULL -- DEBUG: Filter ini dihapus sementara
+          AND {standardize_day_case_sql_template % 'unnested_hari.hari_val'} IS NOT NULL -- Re-enabled filter
           AND COALESCE(t.emisi_transportasi, 0.0) > 0.0
         
         UNION ALL
@@ -122,13 +122,13 @@ def get_daily_activity_emissions_for_trend(selected_fakultas: list, selected_day
             e.id_mahasiswa,
             {standardize_day_case_sql_template % 'unnested_hari.hari_val'} AS hari,
             'Elektronik' AS kategori,
-            (COALESCE(e.emisi_elektronik, 0.0) / NULLIF(COALESCE(array_length(string_to_array(e.hari_datang, ','), 1), 0), 0)) AS emisi
+            (COALESCE(e.emisi_elektronik, 0.0) / NULLIF(COALESCE(array_length(string_to_array(e.hari_datang, ','), 1), 0), 0))::float8 AS emisi -- Added ::float8 for precision
         FROM elektronik e
         CROSS JOIN LATERAL UNNEST(STRING_TO_ARRAY(e.hari_datang, ',')) AS unnested_hari(hari_val)
         WHERE e.hari_datang IS NOT NULL 
           AND TRIM(e.hari_datang) <> ''
           AND COALESCE(array_length(string_to_array(e.hari_datang, ','), 1), 0) > 0
-          -- AND {standardize_day_case_sql_template % 'unnested_hari.hari_val'} IS NOT NULL -- DEBUG: Filter ini dihapus sementara
+          AND {standardize_day_case_sql_template % 'unnested_hari.hari_val'} IS NOT NULL -- Re-enabled filter
           AND COALESCE(e.emisi_elektronik, 0.0) > 0.0
         
         UNION ALL
@@ -138,13 +138,13 @@ def get_daily_activity_emissions_for_trend(selected_fakultas: list, selected_day
             ah.id_mahasiswa,
             {standardize_day_case_sql_template % 'ah.hari'} AS hari,
             'Elektronik' AS kategori,
-            (COALESCE(ah.emisi_ac, 0.0) + COALESCE(ah.emisi_lampu, 0.0)) AS emisi
+            (COALESCE(ah.emisi_ac, 0.0) + COALESCE(ah.emisi_lampu, 0.0))::float8 AS emisi -- Added ::float8 for precision
         FROM aktivitas_harian ah
         WHERE ah.hari IS NOT NULL 
           AND TRIM(ah.hari) <> ''
-          -- AND {standardize_day_case_sql_template % 'ah.hari'} IS NOT NULL -- DEBUG: Filter ini dihapus sementara
+          AND {standardize_day_case_sql_template % 'ah.hari'} IS NOT NULL -- Re-enabled filter
           AND (COALESCE(ah.emisi_ac, 0.0) > 0.0 OR COALESCE(ah.emisi_lampu, 0.0) > 0.0)
-
+        
         UNION ALL
         
         -- 4. Emisi Sampah per hari
@@ -152,11 +152,11 @@ def get_daily_activity_emissions_for_trend(selected_fakultas: list, selected_day
             m.id_mahasiswa,
             {standardize_day_case_sql_template % 'm.hari'} AS hari,
             'Sampah' AS kategori,
-            COALESCE(m.emisi_sampah_makanan_per_waktu, 0.0) AS emisi
+            COALESCE(m.emisi_sampah_makanan_per_waktu, 0.0)::float8 AS emisi -- Added ::float8 for precision
         FROM v_aktivitas_makanan m
         WHERE m.hari IS NOT NULL 
           AND TRIM(m.hari) <> ''
-          -- AND {standardize_day_case_sql_template % 'm.hari'} IS NOT NULL -- DEBUG: Filter ini dihapus sementara
+          AND {standardize_day_case_sql_template % 'm.hari'} IS NOT NULL -- Re-enabled filter
           AND COALESCE(m.emisi_sampah_makanan_per_waktu, 0.0) > 0.0
     )
     SELECT
