@@ -99,8 +99,7 @@ def get_daily_activity_emissions_for_trend(selected_fakultas: list, selected_day
         -- Pastikan hari_datang tidak NULL atau kosong DAN hari valid
         WHERE t.hari_datang IS NOT NULL 
           AND TRIM(t.hari_datang) <> ''
-          AND TRIM(unnested_hari.hari_val) IN ({VALID_DAYS_SQL_STR}) -- Filter pada hasil UNNEST
-          AND COALESCE(t.emisi_transportasi, 0.0) > 0.0
+          AND TRIM(unnested_hari.hari_val) IN ({VALID_DAYS_SQL_STR})
         
         UNION ALL
         
@@ -116,8 +115,7 @@ def get_daily_activity_emissions_for_trend(selected_fakultas: list, selected_day
         WHERE e.hari_datang IS NOT NULL 
           AND TRIM(e.hari_datang) <> ''
           AND COALESCE(array_length(string_to_array(e.hari_datang, ','), 1), 0) > 0
-          AND TRIM(unnested_hari.hari_val) IN ({VALID_DAYS_SQL_STR}) -- Filter pada hasil UNNEST
-          AND COALESCE(e.emisi_elektronik, 0.0) > 0.0
+          AND TRIM(unnested_hari.hari_val) IN ({VALID_DAYS_SQL_STR})
         
         UNION ALL
 
@@ -131,8 +129,7 @@ def get_daily_activity_emissions_for_trend(selected_fakultas: list, selected_day
         -- Pastikan hari tidak NULL/kosong DAN hari valid.
         WHERE ah.hari IS NOT NULL 
           AND TRIM(ah.hari) <> ''
-          AND TRIM(ah.hari) IN ({VALID_DAYS_SQL_STR}) -- Tetap seperti semula karena hari adalah kolom tunggal
-          AND (COALESCE(ah.emisi_ac, 0.0) > 0.0 OR COALESCE(ah.emisi_lampu, 0.0) > 0.0)
+          AND TRIM(ah.hari) IN ({VALID_DAYS_SQL_STR})
 
         UNION ALL
         
@@ -146,8 +143,7 @@ def get_daily_activity_emissions_for_trend(selected_fakultas: list, selected_day
         -- Pastikan hari tidak NULL/kosong DAN hari valid.
         WHERE m.hari IS NOT NULL 
           AND TRIM(m.hari) <> ''
-          AND TRIM(m.hari) IN ({VALID_DAYS_SQL_STR}) -- Tetap seperti semula karena hari adalah kolom tunggal
-          AND COALESCE(m.emisi_sampah_makanan_per_waktu, 0.0) > 0.0
+          AND TRIM(m.hari) IN ({VALID_DAYS_SQL_STR})
     )
     SELECT
         de.id_mahasiswa,
