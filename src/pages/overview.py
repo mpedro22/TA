@@ -35,6 +35,7 @@ MODEBAR_CONFIG = {
     }
 }
 DAY_ORDER = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
+VALID_DAYS_SQL_STR = ", ".join([f"'{day}'" for day in DAY_ORDER])
 
 @st.cache_data(ttl=3600)
 def get_all_student_periodic_emissions() -> pd.DataFrame:
@@ -90,25 +91,32 @@ def get_daily_activity_emissions_for_trend(selected_fakultas: list, selected_day
         -- 1. Emisi Transportasi per hari
         SELECT
             t.id_mahasiswa,
-            TRIM(UNNEST(STRING_TO_ARRAY(t.hari_datang, ','))) AS hari,
+            TRIM(unnested_hari.hari_val) AS hari,
             'Transportasi' AS kategori,
             COALESCE(t.emisi_transportasi, 0.0) AS emisi
         FROM transportasi t
-        -- Pastikan hari_datang tidak NULL atau kosong
-        WHERE t.hari_datang IS NOT NULL AND TRIM(t.hari_datang) <> '' AND COALESCE(t.emisi_transportasi, 0.0) > 0.0
+        CROSS JOIN LATERAL UNNEST(STRING_TO_ARRAY(t.hari_datang, ',')) AS unnested_hari(hari_val)
+        -- Pastikan hari_datang tidak NULL atau kosong DAN hari valid
+        WHERE t.hari_datang IS NOT NULL 
+          AND TRIM(t.hari_datang) <> ''
+          AND TRIM(unnested_hari.hari_val) IN ({VALID_DAYS_SQL_STR}) -- Filter pada hasil UNNEST
+          AND COALESCE(t.emisi_transportasi, 0.0) > 0.0
         
         UNION ALL
         
         -- 2. Emisi Elektronik (Pribadi) per hari
         SELECT
             e.id_mahasiswa,
-            TRIM(UNNEST(STRING_TO_ARRAY(e.hari_datang, ','))) AS hari,
+            TRIM(unnested_hari.hari_val) AS hari,
             'Elektronik' AS kategori,
             (COALESCE(e.emisi_elektronik, 0.0) / NULLIF(COALESCE(array_length(string_to_array(e.hari_datang, ','), 1), 0), 0)) AS emisi
         FROM elektronik e
-        -- Pastikan hari_datang tidak NULL/kosong DAN ada data emisi.
-        WHERE e.hari_datang IS NOT NULL AND TRIM(e.hari_datang) <> ''
+        CROSS JOIN LATERAL UNNEST(STRING_TO_ARRAY(e.hari_datang, ',')) AS unnested_hari(hari_val)
+        -- Pastikan hari_datang tidak NULL/kosong, denominator tidak nol, DAN hari valid.
+        WHERE e.hari_datang IS NOT NULL 
+          AND TRIM(e.hari_datang) <> ''
           AND COALESCE(array_length(string_to_array(e.hari_datang, ','), 1), 0) > 0
+          AND TRIM(unnested_hari.hari_val) IN ({VALID_DAYS_SQL_STR}) -- Filter pada hasil UNNEST
           AND COALESCE(e.emisi_elektronik, 0.0) > 0.0
         
         UNION ALL
@@ -120,8 +128,10 @@ def get_daily_activity_emissions_for_trend(selected_fakultas: list, selected_day
             'Elektronik' AS kategori,
             (COALESCE(ah.emisi_ac, 0.0) + COALESCE(ah.emisi_lampu, 0.0)) AS emisi
         FROM aktivitas_harian ah
-        -- Pastikan hari tidak NULL/kosong DAN ada data emisi AC/Lampu.
-        WHERE ah.hari IS NOT NULL AND TRIM(ah.hari) <> ''
+        -- Pastikan hari tidak NULL/kosong DAN hari valid.
+        WHERE ah.hari IS NOT NULL 
+          AND TRIM(ah.hari) <> ''
+          AND TRIM(ah.hari) IN ({VALID_DAYS_SQL_STR}) -- Tetap seperti semula karena hari adalah kolom tunggal
           AND (COALESCE(ah.emisi_ac, 0.0) > 0.0 OR COALESCE(ah.emisi_lampu, 0.0) > 0.0)
 
         UNION ALL
@@ -133,9 +143,11 @@ def get_daily_activity_emissions_for_trend(selected_fakultas: list, selected_day
             'Sampah' AS kategori,
             COALESCE(m.emisi_sampah_makanan_per_waktu, 0.0) AS emisi
         FROM v_aktivitas_makanan m
-        -- Pastikan hari tidak NULL/kosong DAN ada data emisi sampah.
-        WHERE m.emisi_sampah_makanan_per_waktu IS NOT NULL AND m.emisi_sampah_makanan_per_waktu > 0.0
-          AND m.hari IS NOT NULL AND TRIM(m.hari) <> ''
+        -- Pastikan hari tidak NULL/kosong DAN hari valid.
+        WHERE m.hari IS NOT NULL 
+          AND TRIM(m.hari) <> ''
+          AND TRIM(m.hari) IN ({VALID_DAYS_SQL_STR}) -- Tetap seperti semula karena hari adalah kolom tunggal
+          AND COALESCE(m.emisi_sampah_makanan_per_waktu, 0.0) > 0.0
     )
     SELECT
         de.id_mahasiswa,
