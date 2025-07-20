@@ -446,7 +446,7 @@ def show():
             
             main_source_for_kpis_segments['total_emisi'] = main_source_for_kpis_segments[['transportasi', 'elektronik', 'sampah_makanan']].sum(axis=1)
 
-            daily_trend_data = get_daily_activity_emissions_for_trend(cleaned_selected_fakultas, [], selected_categories)
+            daily_trend_data = get_daily_activity_emissions_for_trend(cleaned_selected_fakultas, [], [])
             daily_pivot = daily_trend_data.groupby(
                 ['hari', 'kategori']
             )['emisi'].sum().unstack(fill_value=0.0).reindex(DAY_ORDER).fillna(0.0)
