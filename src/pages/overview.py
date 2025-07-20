@@ -35,7 +35,7 @@ MODEBAR_CONFIG = {
     }
 }
 DAY_ORDER = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
-VALID_DAYS_SQL_STR = ", ".join([f"'{day}'" for day in DAY_ORDER])
+# VALID_DAYS_SQL_STR tidak lagi diperlukan karena kita akan menggunakan CASE statement dengan output langsung dari DAY_ORDER
 
 @st.cache_data(ttl=3600)
 def get_all_student_periodic_emissions() -> pd.DataFrame:
@@ -86,64 +86,80 @@ def get_daily_activity_emissions_for_trend(selected_fakultas: list, selected_day
     
     final_where_sql = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
     
+    # Define the CASE statement logic for standardizing day names.
+    # We use UPPER(TRIM(column)) for input for robust matching against uppercase day names.
+    # The output will be the exact capitalization as in DAY_ORDER.
+    standardize_day_case_sql_template = """
+        (CASE UPPER(TRIM(%s))
+            WHEN 'SENIN' THEN 'Senin'
+            WHEN 'SELASA' THEN 'Selasa'
+            WHEN 'RABU' THEN 'Rabu'
+            WHEN 'KAMIS' THEN 'Kamis'
+            WHEN 'JUMAT' THEN 'Jumat'
+            WHEN 'SABTU' THEN 'Sabtu'
+            WHEN 'MINGGU' THEN 'Minggu'
+            ELSE NULL -- Return NULL for any non-standard/invalid day names
+        END)
+    """
+
     query = f"""
     WITH DailyEmissions AS (
         -- 1. Emisi Transportasi per hari
         SELECT
             t.id_mahasiswa,
-            TRIM(unnested_hari.hari_val) AS hari,
+            {standardize_day_case_sql_template % 'unnested_hari.hari_val'} AS hari,
             'Transportasi' AS kategori,
             COALESCE(t.emisi_transportasi, 0.0) AS emisi
         FROM transportasi t
         CROSS JOIN LATERAL UNNEST(STRING_TO_ARRAY(t.hari_datang, ',')) AS unnested_hari(hari_val)
-        -- Pastikan hari_datang tidak NULL atau kosong DAN hari valid
         WHERE t.hari_datang IS NOT NULL 
           AND TRIM(t.hari_datang) <> ''
-          AND TRIM(unnested_hari.hari_val) IN ({VALID_DAYS_SQL_STR})
+          AND {standardize_day_case_sql_template % 'unnested_hari.hari_val'} IS NOT NULL -- Filter out invalid day names after standardization
+          AND COALESCE(t.emisi_transportasi, 0.0) > 0.0
         
         UNION ALL
         
         -- 2. Emisi Elektronik (Pribadi) per hari
         SELECT
             e.id_mahasiswa,
-            TRIM(unnested_hari.hari_val) AS hari,
+            {standardize_day_case_sql_template % 'unnested_hari.hari_val'} AS hari,
             'Elektronik' AS kategori,
             (COALESCE(e.emisi_elektronik, 0.0) / NULLIF(COALESCE(array_length(string_to_array(e.hari_datang, ','), 1), 0), 0)) AS emisi
         FROM elektronik e
         CROSS JOIN LATERAL UNNEST(STRING_TO_ARRAY(e.hari_datang, ',')) AS unnested_hari(hari_val)
-        -- Pastikan hari_datang tidak NULL/kosong, denominator tidak nol, DAN hari valid.
         WHERE e.hari_datang IS NOT NULL 
           AND TRIM(e.hari_datang) <> ''
           AND COALESCE(array_length(string_to_array(e.hari_datang, ','), 1), 0) > 0
-          AND TRIM(unnested_hari.hari_val) IN ({VALID_DAYS_SQL_STR})
+          AND {standardize_day_case_sql_template % 'unnested_hari.hari_val'} IS NOT NULL -- Filter out invalid day names after standardization
+          AND COALESCE(e.emisi_elektronik, 0.0) > 0.0
         
         UNION ALL
 
         -- 3. Emisi Elektronik (Fasilitas: AC & Lampu) per hari
         SELECT
             ah.id_mahasiswa,
-            TRIM(ah.hari) AS hari,
+            {standardize_day_case_sql_template % 'ah.hari'} AS hari,
             'Elektronik' AS kategori,
             (COALESCE(ah.emisi_ac, 0.0) + COALESCE(ah.emisi_lampu, 0.0)) AS emisi
         FROM aktivitas_harian ah
-        -- Pastikan hari tidak NULL/kosong DAN hari valid.
         WHERE ah.hari IS NOT NULL 
           AND TRIM(ah.hari) <> ''
-          AND TRIM(ah.hari) IN ({VALID_DAYS_SQL_STR})
+          AND {standardize_day_case_sql_template % 'ah.hari'} IS NOT NULL -- Filter out invalid day names after standardization
+          AND (COALESCE(ah.emisi_ac, 0.0) > 0.0 OR COALESCE(ah.emisi_lampu, 0.0) > 0.0)
 
         UNION ALL
         
         -- 4. Emisi Sampah per hari
         SELECT
             m.id_mahasiswa,
-            TRIM(m.hari) AS hari,
+            {standardize_day_case_sql_template % 'm.hari'} AS hari,
             'Sampah' AS kategori,
             COALESCE(m.emisi_sampah_makanan_per_waktu, 0.0) AS emisi
         FROM v_aktivitas_makanan m
-        -- Pastikan hari tidak NULL/kosong DAN hari valid.
         WHERE m.hari IS NOT NULL 
           AND TRIM(m.hari) <> ''
-          AND TRIM(m.hari) IN ({VALID_DAYS_SQL_STR})
+          AND {standardize_day_case_sql_template % 'm.hari'} IS NOT NULL -- Filter out invalid day names after standardization
+          AND COALESCE(m.emisi_sampah_makanan_per_waktu, 0.0) > 0.0
     )
     SELECT
         de.id_mahasiswa,
