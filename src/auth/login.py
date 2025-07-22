@@ -3,36 +3,43 @@ from src.auth.auth import authenticate, supabase
 import time
 
 def show():
-    if supabase is None:
-        st.error("Dashboard tidak dapat beroperasi. Gagal menginisialisasi koneksi ke Supabase.")
-        return
-
+    # CSS yang sangat agresif untuk menyembunyikan sidebar bawaan Streamlit
+    # Ini harus menjadi perintah Streamlit pertama di fungsi show() ini.
     st.markdown("""
     <style>
-    /* Hide sidebar completely on login page */
     section[data-testid="stSidebar"] {
         display: none !important;
         visibility: hidden !important;
         width: 0 !important;
         min-width: 0 !important;
         max-width: 0 !important;
+        pointer-events: none !important;
+        overflow: hidden !important;
+        position: absolute !important;
+        left: -9999px !important; 
     }
-    
-    /* Make main content full width on login */
     .main .block-container {
         margin-left: 0 !important;
         padding-left: 1rem !important;
         max-width: none !important;
         width: 100% !important;
     }
-    
-    /* Mengatur background hijau lembut untuk seluruh halaman */
+    header { 
+        display: none !important; 
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    if supabase is None:
+        st.error("Dashboard tidak dapat beroperasi. Gagal menginisialisasi koneksi ke Supabase.")
+        return
+
+    # Sisa styling untuk halaman login
+    st.markdown("""
+    <style>
     [data-testid="stAppViewContainer"] > .main {
         background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
     }
-
-    /* Sembunyikan header bawaan Streamlit */
-    header { visibility: hidden; display: none; }
     
     button[title*="Copy"], 
     [data-testid="stCopyButton"], 
@@ -41,16 +48,14 @@ def show():
         display: none !important;
     }
     
-    /* Wrapper di dalam kolom tengah untuk menata elemen secara vertikal */
     .login-content {
         display: flex;
         flex-direction: column;
-        align-items: center; /* Memusatkan semua konten */
+        align-items: center;
     }
     
-    /* Styling untuk Logo */
     .login-logo {
-        margin-top: 1rem; /* Jarak dari atas DIKURANGI */
+        margin-top: 1rem;
         margin-bottom: 1.5rem;
         animation: fadeIn 0.5s ease-out;
     }
@@ -72,10 +77,9 @@ def show():
         letter-spacing: 0.05em; text-transform: uppercase;
     }
     
-    /* Styling Teks Sambutan (DIKECILKAN) */
     .welcome-text {
         text-align: center;
-        margin-bottom: 1.5rem; /* Jarak ke form DIKURANGI */
+        margin-bottom: 1.5rem;
         animation: fadeIn 0.7s ease-out;
     }
     .welcome-title {
@@ -86,7 +90,7 @@ def show():
     }
     .welcome-subtitle {
         font-family: 'Poppins', sans-serif;
-        font-size: 0.5rem; /* Ukuran font DIKECILKAN */
+        font-size: 0.5rem;
         color: #64748b;
         margin-top: 0.5rem;
     }
@@ -99,17 +103,15 @@ def show():
         animation: fadeIn 0.9s ease-out;
     }
 
-    /* Judul "Masuk" di dalam form (DI RAPATKAN) */
     [data-testid="stForm"] h3 {
         text-align: center;
         font-family: 'Poppins', sans-serif;
         font-weight: 600;
         color: #374151;
         margin-top: -1.5rem;
-        margin-bottom: 0.5rem; /* Jarak ke input DIKURANGI */
+        margin-bottom: 0.5rem;
     }
     
-    /* Styling Input Field */
     .stTextInput > label {
         font-weight: 600 !important;
         color: #374151 !important;
@@ -127,13 +129,12 @@ def show():
         box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.15) !important;
     }
 
-    /* Styling Tombol Masuk (DI RAPATKAN) */
     .stForm button[type="submit"] {
         color: white;
         border: none;
         border-radius: 8px;
         padding: 0.8rem;
-        margin-top: 1rem; /* Jarak dari input password DIKURANGI */
+        margin-top: 1rem;
         font-weight: 600;
         font-size: 2rem;
         font-family: 'Poppins', sans-serif !important;

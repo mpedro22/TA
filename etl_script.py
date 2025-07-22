@@ -171,7 +171,7 @@ def transform_all_data(df_raw):
                 if kegiatan and str(kegiatan).strip() and str(kegiatan).lower() != "tidak di kampus":
                     lokasi = None
                     if 'Kelas' in kegiatan: lokasi_raw = row[f'lokasi_kelas_{hari_name.lower()}']
-                    elif 'Makan/Minum' in kegiatan: lokasi_raw = row['tempat_makan_raw']
+                    elif 'Makan' in kegiatan: lokasi_raw = row['tempat_makan_raw']
                     else: lokasi_raw = row[f'lokasi_lain_{hari_name.lower()}']
                     
                     if isinstance(lokasi_raw, str) and lokasi_raw.strip() not in ['-', '']: 
@@ -179,17 +179,17 @@ def transform_all_data(df_raw):
                         lokasi = random.choice(cleaned_locations) if cleaned_locations else None
                     
                     is_kelas = 'Kelas' in kegiatan
-                    is_makan_minum = 'Makan/Minum' in kegiatan
+                    is_makan = 'Makan' in kegiatan
                     
                     # Logika: AC hanya jika 'Kelas'
                     emisi_ac_val = 1.66 if is_kelas else 0 
                     
-                    # Logika: Lampu jika 'Kelas' ATAU 'Makan/Minum'
-                    is_light_intensive = is_kelas or is_makan_minum
+                    # Logika: Lampu jika 'Kelas' ATAU 'Makan'
+                    is_light_intensive = is_kelas or is_makan
                     emisi_lampu_val = 0.24 if is_light_intensive else 0
                     
-                    # Emisi Sampah Makanan hanya jika 'Makan/Minum'
-                    emisi_sampah_makanan_per_waktu_val = 0.95 if is_makan_minum else 0
+                    # Emisi Sampah Makanan hanya jika 'Makan'
+                    emisi_sampah_makanan_per_waktu_val = 0.95 if is_makan else 0
 
                     all_activities.append({
                         'id_mahasiswa': row['id_mahasiswa'], 
@@ -197,7 +197,7 @@ def transform_all_data(df_raw):
                         'waktu': waktu_slots[i],
                         'kegiatan': kegiatan,
                         'lokasi': lokasi,
-                        'penggunaan_ac': emisi_ac_val > 0, # Update flag based on new logic
+                        'penggunaan_ac': emisi_ac_val > 0, 
                         'emisi_ac': emisi_ac_val,
                         'emisi_lampu': emisi_lampu_val,
                         'emisi_sampah_makanan_per_waktu': emisi_sampah_makanan_per_waktu_val

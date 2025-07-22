@@ -231,7 +231,7 @@ def show():
         <div class="hero-circle">
             <div class="hero-title">ITB Carbon Dashboard</div>
             <div class="hero-desc">
-                Dashboard analisis jejak karbon mahasiswa dengan visualisasi real-time 
+                Dashboard analisis jejak karbon mahasiswa dengan visualisasi data dinamis 
                 untuk mendukung transformasi kampus berkelanjutan dan mencapai target net-zero carbon.
                 Platform ini mengintegrasikan berbagai aspek kehidupan kampus untuk monitoring
                 komprehensif terhadap emisi karbon dari aktivitas sehari-hari civitas akademika.
@@ -281,7 +281,7 @@ def show():
                     <svg class="tujuan-icon" fill="none" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2 2v0" />
                     </svg>
-                    <div class="tujuan-text"><strong>Dashboard Utama:</strong> Overview emisi & perbandingan fakultas dengan visualisasi interaktif dan KPI real-time</div>
+                    <div class="tujuan-text"><strong>Dashboard Utama:</strong> Overview emisi & perbandingan fakultas dengan visualisasi interaktif dan KPI</div>
                 </div>
                 <div class="tujuan-item">
                     <svg class="tujuan-icon" fill="none" viewBox="0 0 24 24">
