@@ -139,13 +139,6 @@ def generate_pdf_report(where_clause, join_needed):
     import time 
     
     time.sleep(0.6) 
-
-    # Ambil data untuk semua visualisasi.
-    # Kolom yang diambil dari get_*_data akan diakses sesuai namanya:
-    # get_faculty_data -> 'count'
-    # get_transport_composition_data -> 'total_users'
-    # get_heatmap_data -> 'pengguna'
-    # get_kecamatan_data -> 'jumlah_mahasiswa'
     df_daily = get_daily_trend_data(where_clause, join_needed)
     df_faculty = get_faculty_data(where_clause) 
     df_composition = get_transport_composition_data(where_clause, join_needed) 
@@ -155,11 +148,9 @@ def generate_pdf_report(where_clause, join_needed):
     # KPI Calculation for PDF
     total_emisi = df_composition['total_emisi'].sum() if 'total_emisi' in df_composition.columns and not df_composition.empty else 0
     
-    # Menghitung total mahasiswa unik yang terlibat dalam data terfilter untuk KPI rata-rata
     unique_students_in_filtered_data = 0
     if not df_composition.empty and 'total_users' in df_composition.columns: # Menggunakan total_users
         try:
-            # Query langsung ke DB untuk count distinct id_mahasiswa sesuai filter
             unique_students_query_result = run_sql(f"""
                 SELECT COUNT(DISTINCT t.id_mahasiswa) as count FROM transportasi t
                 LEFT JOIN v_informasi_fakultas_mahasiswa r ON t.id_mahasiswa = r.id_mahasiswa
@@ -168,18 +159,15 @@ def generate_pdf_report(where_clause, join_needed):
             if not unique_students_query_result.empty and 'count' in unique_students_query_result.columns:
                 unique_students_in_filtered_data = unique_students_query_result.iloc[0,0]
         except Exception as e:
-            # Fallback jika query gagal, gunakan sum dari total_users sebagai perkiraan unik users.
             unique_students_in_filtered_data = df_composition['total_users'].sum() 
-            if unique_students_in_filtered_data == 0 and not df_daily.empty: # Jika daily data ada tapi composition is empty
-                 unique_students_in_filtered_data = df_daily['emisi'].count() # Proxy: hitung jumlah aktivitas yang ada
+            if unique_students_in_filtered_data == 0 and not df_daily.empty: 
+                 unique_students_in_filtered_data = df_daily['emisi'].count() 
     
     avg_emisi = total_emisi / unique_students_in_filtered_data if unique_students_in_filtered_data > 0 else 0
     
-    # Validasi awal jika tidak ada data sama sekali setelah filter, return pesan default
     if total_emisi == 0 and unique_students_in_filtered_data == 0 and df_daily.empty and df_faculty.empty and df_heatmap.empty and df_kecamatan.empty:
         return b"<html><body><h1>Tidak ada data untuk dilaporkan</h1><p>Silakan ubah filter Anda.</p></body></html>"
 
-    # Inisialisasi variabel untuk konten laporan (default ke 'Data tidak tersedia')
     daily_trend_table_html, trend_conclusion, trend_recommendation = ("<tr><td colspan='2'>Data tidak tersedia.</td></tr>", "Pola mobilitas mingguan tidak dapat diidentifikasi.", "Data tidak cukup untuk analisis tren.")
     fakultas_table_html, fakultas_conclusion, fakultas_recommendation = ("<tr><td colspan='3'>Data tidak tersedia.</td></tr>", "Distribusi emisi per fakultas tidak dapat dibuat.", "Data tidak cukup untuk analisis fakultas.")
     mode_table_html, mode_conclusion, mode_recommendation = ("<tr><td colspan='3'>Data tidak tersedia.</td></tr>", "Preferensi moda transportasi tidak dapat dianalisis.", "Data tidak cukup untuk analisis moda.")
@@ -200,7 +188,7 @@ def generate_pdf_report(where_clause, join_needed):
 
             if low_emisi_val > 0 and (peak_emisi_val / low_emisi_val) > 1.5: # Ambang batas 1.5x untuk variasi signifikan
                 trend_conclusion = f"Terdapat variasi signifikan dalam mobilitas harian mahasiswa, dengan puncak emisi terjadi pada hari <strong>{peak_day}</strong> ({peak_emisi_val:.1f} kg CO<sub>2</sub>) dan titik terendah pada hari <strong>{low_day}</strong> ({low_emisi_val:.1f} kg CO<sub>2</sub>). Pola ini menunjukkan intensitas aktivitas akademik dan operasional kampus yang lebih tinggi pada hari kerja."
-                trend_recommendation = f"Fokuskan kebijakan transportasi berkelanjutan dan kampanye kesadaran pada hari <strong>{peak_day}</strong> untuk mendapatkan dampak maksimal. Pertimbangkan untuk menganalisis aktivitas spesifik yang menyumbang emisi tinggi pada hari tersebut, seperti jam sibuk kedatangan/kepulangan mahasiswa, untuk intervensi yang lebih bertarget (misal: penambahan *shuttle bus* atau promosi *carpooling* pada jam-jam tersebut)."
+                trend_recommendation = f"Fokuskan kebijakan transportasi berkelanjutan dan kampanye kesadaran pada hari <strong>{peak_day}</strong> untuk mendapatkan dampak maksimal. Pertimbangkan untuk menganalisis aktivitas spesifik yang menyumbang emisi tinggi pada hari tersebut, seperti jam sibuk kedatangan/kepulangan mahasiswa, untuk intervensi yang lebih bertarget (misal: penambahan shuttle bus atau promosi carpooling pada jam-jam tersebut)."
             else:
                 trend_conclusion = "Pola mobilitas cenderung konsisten sepanjang hari-hari yang dipilih, tanpa adanya lonjakan yang ekstrem. Emisi transportasi mahasiswa tersebar relatif merata."
                 trend_recommendation = "Rekomendasi berupa kampanye mobilitas berkelanjutan secara umum, tidak spesifik pada hari tertentu. Fokus dapat dialihkan ke jenis moda atau lokasi asal perjalanan yang dominan."
@@ -233,7 +221,7 @@ def generate_pdf_report(where_clause, join_needed):
                 conclusion_detail = f"Fakultas <strong>{highest_fakultas_row['fakultas']}</strong> memiliki jejak karbon transportasi per mahasiswa tertinggi sebesar <strong>{highest_fakultas_row['avg_emisi']:.2f} kg CO<sub>2</sub></strong>, sementara beberapa fakultas lain memiliki rata-rata emisi mendekati nol."
 
             fakultas_conclusion = f"Terdapat perbedaan yang jelas dalam jejak karbon transportasi per mahasiswa antar fakultas. {conclusion_detail} Pola ini mungkin mengindikasikan bahwa mahasiswa dari fakultas dengan emisi tinggi cenderung tinggal lebih jauh dari kampus atau lebih bergantung pada kendaraan pribadi, atau memiliki akses terbatas ke moda ramah lingkungan."
-            fakultas_recommendation = f"Terapkan intervensi berbasis lokasi dan demografi. Prioritaskan program edukasi dan insentif yang ditargetkan pada Fakultas <strong>{highest_fakultas_row['fakultas']}</strong>, seperti perbaikan fasilitas parkir sepeda, penambahan layanan *shuttle*, atau promosi *carpooling* dari area padat mahasiswa di fakultas tersebut. Pertimbangkan juga studi kasus dari Fakultas <strong>{lowest_fakultas_row['fakultas']}</strong> untuk memahami praktik terbaik mereka."
+            fakultas_recommendation = f"Terapkan intervensi berbasis lokasi dan demografi. Prioritaskan program edukasi dan insentif yang ditargetkan pada Fakultas <strong>{highest_fakultas_row['fakultas']}</strong>, seperti perbaikan fasilitas parkir sepeda, penambahan layanan shuttle, atau promosi carpooling dari area padat mahasiswa di fakultas tersebut. Pertimbangkan juga studi kasus dari Fakultas <strong>{lowest_fakultas_row['fakultas']}</strong> untuk memahami praktik terbaik mereka."
         else: # Hanya ada satu fakultas dengan emisi > 0
             if not df_faculty_sorted[df_faculty_sorted['total_emisi'] > 0].empty:
                 fakultas_conclusion = f"Data hanya mencakup Fakultas <strong>{df_faculty_sorted[df_faculty_sorted['total_emisi'] > 0].iloc[0]['fakultas']}</strong>, dengan rata-rata emisi per mahasiswa sebesar {df_faculty_sorted[df_faculty_sorted['total_emisi'] > 0].iloc[0]['avg_emisi']:.2f} kg CO<sub>2</sub>. Perbandingan dengan fakultas lain tidak dapat dilakukan karena keterbatasan data filter."
@@ -252,7 +240,7 @@ def generate_pdf_report(where_clause, join_needed):
         if len(df_comp_sorted) > 0: 
             dominant_mode_row = df_comp_sorted.iloc[0]
             mode_conclusion = f"<strong>{dominant_mode_row['transportasi']}</strong> adalah moda transportasi pilihan utama di antara mahasiswa yang terfilter, dengan {int(dominant_mode_row['total_users'])} mahasiswa menggunakannya. Ini menunjukkan bahwa infrastruktur dan kondisi eksisting mendukung penggunaan moda ini, namun juga merupakan penyumbang emisi terbesar jika moda tersebut tinggi karbon."
-            mode_recommendation = f"Tingkatkan 'user experience' dan aksesibilitas untuk moda transportasi ramah lingkungan (misal: penambahan unit *bike sharing*, perbaikan jalur pejalan kaki/sepeda). Jika <strong>{dominant_mode_row['transportasi']}</strong> adalah moda tinggi karbon (misal: mobil pribadi, motor), terapkan kebijakan 'mode shifting' (misal: zona rendah emisi, insentif untuk transportasi publik) untuk mengurangi ketergantungan pada moda tersebut."
+            mode_recommendation = f"Tingkatkan 'user experience' dan aksesibilitas untuk moda transportasi ramah lingkungan (misal: penambahan unit bike sharing, perbaikan jalur pejalan kaki/sepeda). Jika <strong>{dominant_mode_row['transportasi']}</strong> adalah moda tinggi karbon (misal: mobil pribadi, motor), terapkan kebijakan 'mode shifting' (misal: zona rendah emisi, insentif untuk transportasi publik) untuk mengurangi ketergantungan pada moda tersebut."
         else:
             mode_conclusion = "Tidak ada data moda transportasi untuk analisis. Ini mungkin karena filter yang terlalu spesifik."
             mode_recommendation = "Pastikan data transportasi dikumpulkan dengan benar dan filter yang diterapkan tidak terlalu membatasi."
@@ -299,7 +287,7 @@ def generate_pdf_report(where_clause, join_needed):
         if len(kecamatan_stats_sorted) > 0:
             hottest_spot_row = kecamatan_stats_sorted.iloc[0]
             kecamatan_conclusion = f"Kecamatan <strong>{hottest_spot_row['kecamatan']}</strong> teridentifikasi sebagai 'hotspot' emisi transportasi, dengan total emisi <strong>{hottest_spot_row['total_emisi']:.1f} kg CO<sub>2</sub></strong> dari {int(hottest_spot_row['jumlah_mahasiswa'])} mahasiswa. Ini menunjukkan bahwa area ini adalah 'feeder' utama komuter ke kampus dan titik intervensi strategis di luar kampus."
-            rec_kecamatan = f"Gunakan data ini sebagai dasar proposal kolaborasi dengan Dinas Perhubungan setempat untuk optimalisasi rute angkutan umum dari <strong>{hottest_spot_row['kecamatan']}</strong> menuju kampus. Alternatifnya, kampus dapat mempertimbangkan penyediaan layanan *shuttle* khusus dari area ini atau mendukung pembentukan komunitas *carpooling* bagi mahasiswa yang tinggal di sana."
+            rec_kecamatan = f"Gunakan data ini sebagai dasar proposal kolaborasi dengan Dinas Perhubungan setempat untuk optimalisasi rute angkutan umum dari <strong>{hottest_spot_row['kecamatan']}</strong> menuju kampus. Alternatifnya, kampus dapat mempertimbangkan penyediaan layanan shuttle khusus dari area ini atau mendukung pembentukan komunitas carpooling bagi mahasiswa yang tinggal di sana."
         else:
             kecamatan_conclusion = "Tidak ada data kecamatan untuk analisis. Ini mungkin karena filter yang terlalu spesifik atau data alamat mahasiswa belum lengkap."
             rec_kecamatan = "Pastikan data kecamatan dikumpulkan dengan benar, atau perluas filter untuk mencakup lebih banyak area asal mahasiswa."
