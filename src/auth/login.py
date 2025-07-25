@@ -3,8 +3,6 @@ from src.auth.auth import authenticate, supabase
 import time
 
 def show():
-    # CSS yang sangat agresif untuk menyembunyikan sidebar bawaan Streamlit
-    # Ini harus menjadi perintah Streamlit pertama di fungsi show() ini.
     st.markdown("""
     <style>
     section[data-testid="stSidebar"] {
@@ -15,8 +13,8 @@ def show():
         max-width: 0 !important;
         pointer-events: none !important;
         overflow: hidden !important;
-        position: absolute !important;
-        left: -9999px !important; 
+        position: hidden !important;
+        left: -99999px !important; 
     }
     .main .block-container {
         margin-left: 0 !important;
@@ -34,7 +32,6 @@ def show():
         st.error("Dashboard tidak dapat beroperasi. Gagal menginisialisasi koneksi ke Supabase.")
         return
 
-    # Sisa styling untuk halaman login
     st.markdown("""
     <style>
     [data-testid="stAppViewContainer"] > .main {
@@ -55,7 +52,7 @@ def show():
     }
     
     .login-logo {
-        margin-top: 1rem;
+        margin-top: 0rem;
         margin-bottom: 1.5rem;
         animation: fadeIn 0.5s ease-out;
     }
@@ -84,7 +81,7 @@ def show():
     }
     .welcome-title {
         font-family: 'Poppins', sans-serif;
-        font-size: 1.5rem;
+        font-size: 1.3rem;
         font-weight: 620;
         color: #1e293b;
     }
@@ -97,7 +94,7 @@ def show():
 
     [data-testid="stForm"] {
         background: white;
-        padding: 2.5rem;
+        padding: 1.5rem;
         box-shadow: 0 15px 40px rgba(0, 0, 0, 0.08);
         border: 1px solid rgba(0,0,0,0.06);
         animation: fadeIn 0.9s ease-out;
@@ -113,16 +110,16 @@ def show():
     }
     
     .stTextInput > label {
-        font-weight: 600 !important;
+        font-weight: 400 !important;
         color: #374151 !important;
-        font-size: 1rem !important;
+        font-size: 0.6rem !important;
         font-family: 'Poppins', sans-serif !important;
         margin-bottom: 0.3rem !important;
     }
     .stTextInput > div > div > input {
         transition: all 0.2s ease-in-out;
         font-family: 'Poppins', sans-serif !important;
-        height: 40px;
+        height: 39px;
     }
     .stTextInput input:focus {
         background-color: white !important;
@@ -135,8 +132,8 @@ def show():
         border-radius: 8px;
         padding: 0.8rem;
         margin-top: 1rem;
-        font-weight: 600;
-        font-size: 2rem;
+        font-weight: 300;
+        font-size: 1rem;
         font-family: 'Poppins', sans-serif !important;
         width: 100%;
         cursor: pointer;
